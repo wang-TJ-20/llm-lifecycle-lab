@@ -1,0 +1,10 @@
+# Install from the repository root inside an activated Conda environment:
+#   python -m pip install -r requirements.txt
+#
+# pyproject.toml is the single source for the runtime dependencies:
+# PyYAML, numpy, torch, tokenizers, huggingface-hub, and pyarrow.
+# Install a hardware-compatible PyTorch wheel first when using Linux CPU/CUDA.
+-e .[training,public-data]
+
+# Keep the BPE implementation aligned with the current tokenizer baseline.
+tokenizers==0.21.4

@@ -410,7 +410,8 @@ def _load_huggingface_rows(
         from huggingface_hub import hf_hub_download
     except ImportError as exc:
         raise DataValidationError(
-            "public dataset support is unavailable; run `uv sync --extra public-data`"
+            "public dataset support is unavailable; run "
+            "`python -m pip install -e '.[public-data]'`"
         ) from exc
 
     try:

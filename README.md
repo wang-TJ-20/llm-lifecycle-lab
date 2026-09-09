@@ -1,131 +1,74 @@
 # LLM Lifecycle Lab
 
-> 从预训练到后训练，观察每一步，验证每次改变。
+面向中文用户的 LLM 学习与实验项目：从随机初始化的自有 10M/60M 模型开始，
+用可追溯的数据、配置、checkpoint 和双语评测观察训练过程。
 
-LLM Lifecycle Lab 是一个面向中文用户和初学者的 LLM 全生命周期学习与实验项目。项目使用支持中英文训练的原生 10M/60M 模型讲解完整训练链路，并计划通过 Qwen3-0.6B-Base 验证后训练协议向真实预训练模型的迁移。项目文档和 CLI 操作说明优先使用中文。
+当前已实现 Native 模型、BPE Tokenizer、不可变磁盘 Packing、Pretrain、恢复和评测。
+SFT、DPO、GRPO、Qwen 迁移、导出和服务尚未实现；仓库不附带训练好的权重。
 
-项目已经完成工程地基、Native 10M/60M 模型、BPE Tokenizer 和 Pretrain 训练闭环。SFT、DPO、GRPO 与 Qwen 迁移路线尚未实现。
+## 三份文档
 
-## 核心目标
+| 文档 | 内容 |
+| --- | --- |
+| [数据介绍与准备](./docs/DATA_GUIDE.md) | 中英文数据来源与许可、公开/自有数据、切分、Tokenizer、Packing、校验与迁移 |
+| [自有模型介绍](./docs/NATIVE_MODEL_GUIDE.md) | 10M/60M 结构、参数预算、张量形状、RMSNorm/RoPE/GQA、前向与 KV Cache 实验 |
+| [Pretrain 训练文档](./docs/NATIVE_PRETRAIN_GUIDE.md) | Conda 安装、Smoke/60M 训练、配置、指标、恢复、评测、Reference 验收与排错 |
 
-- 让训练过程可观察，而不只是提供可运行脚本。
-- 让代码、配置、数据、checkpoint 和评测结果可追溯。
-- 通过统一基线比较每个训练阶段带来的改善与退化。
-- 通过受控故障学习数据、监督信号、奖励和导出协议。
-- 最终让学习者能够替换自己的数据并交付可验证的模型。
+首次实践顺序：安装环境 -> 按数据文档准备 Smoke 数据 -> 运行两步训练与评测。
+原理学习可先看模型文档，其中模型实验不需要下载语料。
 
-## 首版主线
+## 快速开始
+
+从仓库根目录执行。Linux CPU/CUDA 请先按
+[环境准备](./docs/NATIVE_PRETRAIN_GUIDE.md#2-环境准备) 选择 PyTorch wheel。
+
+```bash
+conda create -n llm-lifecycle-lab python=3.11 pip -y
+conda activate llm-lifecycle-lab
+python -m pip install -r requirements.txt
+python scripts/doctor.py
+```
+
+按 [数据文档](./docs/DATA_GUIDE.md#4-第一次实践10m-双语-smoke) 完成下载、混合、切分、
+Tokenizer 和 Packing 后：
+
+```bash
+python scripts/doctor.py --config configs/pipelines/native-smoke.yaml
+python scripts/train_pretrain.py \
+  --config configs/pipelines/native-smoke.yaml \
+  --run-id native-smoke-001
+python scripts/eval_pretrain.py \
+  --config configs/pipelines/native-smoke.yaml \
+  --checkpoint runs/native-smoke-001/checkpoints/step-00000002
+```
+
+已有同名数据或 run 时不要覆盖；有效数据可以校验复用，新训练使用新 run ID。
+10M Smoke 支持 CPU/MPS/CUDA，用于验证链路，不代表语言能力。
+60M 目标环境为 Linux + 单张 24GB NVIDIA GPU，完整 CUDA 参考实验尚未完成。
+
+## 目录
 
 ```text
-Data
-  -> Tokenizer
-  -> Pretrain
-  -> SFT
-  -> DPO
-  -> GRPO
-  -> Evaluation
-  -> Export & Serving
+configs/       模型、Pipeline 和 Reference 验收 YAML
+docs/          数据、自有模型、Pretrain 三份文档
+scripts/       Python 操作入口
+src/           共享实现
+tests/         单元与集成测试
+.github/       CI
+data/          本地训练数据，不进入 Git
+runs/          本地实验产物，不进入 Git
 ```
 
-首版只覆盖纯文本 LLM，正式支持目标为 Linux + 单张 24GB NVIDIA GPU，同时提供不承诺模型质量的 CPU/MPS smoke 配方。
+依赖以 `pyproject.toml` 为来源，`requirements.txt` 提供 Conda/Pip 安装入口；
+`uv.lock` 保留严格锁环境用途。Python 脚本与旧 `llmlab` 命令共享实现，旧入口继续兼容。
 
-## 当前可用
-
-项目要求 Python 3.11 或更高版本。
+## 开发验证
 
 ```bash
-uv sync --extra public-data --extra training --extra dev
-
-uv run llmlab doctor
-uv run llmlab model inspect --config configs/models/smoke-10m.yaml
-uv run llmlab config validate configs/pipelines/native-smoke.yaml
-uv run llmlab config validate configs/pipelines/native-v1.yaml
+python -m pip install -e '.[dev]'
+python -m pytest -q
+python -m ruff check src scripts tests
+python -m ruff format --check src scripts tests
 ```
 
-拉取固定版本的英文 SimpleStories 与中文 Wikipedia Smoke 数据，生成双语确定性切分：
-
-```bash
-uv run llmlab data fetch \
-  --recipe simplestories-smoke-v1 \
-  --output data/raw/simplestories-smoke-v1 \
-  --accept-license MIT
-
-uv run llmlab data fetch \
-  --recipe wikipedia-zh-smoke-v1 \
-  --output data/raw/wikipedia-zh-smoke-v1 \
-  --accept-license CC-BY-SA-3.0
-
-uv run llmlab data mix \
-  --mixture bilingual-smoke-v1 \
-  --input data/raw/simplestories-smoke-v1/source.jsonl \
-  --input data/raw/wikipedia-zh-smoke-v1/source.jsonl \
-  --output data/raw/bilingual-smoke-v1
-
-uv run llmlab data prepare \
-  --input data/raw/bilingual-smoke-v1/source.jsonl \
-  --output data/prepared/bilingual-smoke-v1 \
-  --dataset-id bilingual-smoke-v1 \
-  --kind pretrain \
-  --license "CC-BY-SA-3.0 AND MIT" \
-  --group-by source_id
-```
-
-训练 16K BPE Tokenizer、生成不可变磁盘 packing，并运行两步 10M CPU/MPS Smoke：
-
-```bash
-uv run llmlab tokenizer train \
-  --manifest data/prepared/bilingual-smoke-v1/data_manifest.json \
-  --output data/tokenizers/bilingual-smoke-v1 \
-  --tokenizer-id bilingual-smoke-v1 \
-  --vocab-size 16384 \
-  --min-frequency 1
-
-uv run llmlab data pack \
-  --manifest data/prepared/bilingual-smoke-v1/data_manifest.json \
-  --tokenizer data/tokenizers/bilingual-smoke-v1 \
-  --output data/packed/bilingual-smoke-v1-seq128 \
-  --sequence-length 128
-
-uv run llmlab doctor --config configs/pipelines/native-smoke.yaml
-uv run llmlab train pretrain \
-  --config configs/pipelines/native-smoke.yaml \
-  --run-id native-smoke-example
-
-uv run llmlab eval pretrain \
-  --config configs/pipelines/native-smoke.yaml \
-  --checkpoint runs/native-smoke-example/checkpoints/step-00000002
-```
-
-训练自动记录随机初始化 baseline、训练/验证 loss、perplexity、bits-per-byte、中英文
-分桶指标、训练预算覆盖率、梯度范数、学习率、吞吐、checkpoint 和恢复所需状态。
-Tokenizer 的实际词表大小必须与模型配置一致。
-
-当前 CLI 仅实现 Native Pretrain 及其评测，不包含 SFT、DPO、GRPO、`export` 和 `serve`。
-
-## 文档
-
-- [Native 10M/60M 模型结构说明](./docs/NATIVE_MODEL_GUIDE.md)
-- [Pretrain 数据准备 Runbook](./docs/DATA_PREPARATION_RUNBOOK.md)
-- [Native 10M/60M Pretrain 训练指南](./docs/NATIVE_PRETRAIN_GUIDE.md)
-- [Native 60M Pretrain Reference Run](./reference_runs/native-60m-pretrain-v1/README.md)
-
-## 当前状态
-
-- [x] Contracts、Artifacts、ModelProtocol 与 Doctor
-- [x] JSONL 数据校验、确定性切分与 Data Manifest
-- [x] 中英文公开数据 recipe、确定性混合与来源追踪
-- [x] Native BPE Tokenizer
-- [x] 不可变磁盘 Token Packing、训练预算与中英文分桶评测
-- [x] Native 10M/60M 模型与 Pretrain
-- [ ] SFT 与单样本监督追踪
-- [ ] DPO 与 GRPO
-- [ ] 统一评测、导出与服务
-
-## 名称说明
-
-- 项目名：`LLM Lifecycle Lab`
-- 仓库名：`llm-lifecycle-lab`
-- Python 包名：`llm_lifecycle_lab`
-- CLI：`llmlab`
-
-名称强调三件事：LLM 是当前明确范围，Lifecycle 表示从数据和预训练到后训练与交付，Lab 表示项目以可复现实验而不是功能堆叠为核心。
+权重、数据和历史运行不是缓存，不应随普通构建缓存一起删除。完整目录职责与清理边界见训练文档。

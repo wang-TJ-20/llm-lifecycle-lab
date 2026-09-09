@@ -9,45 +9,65 @@ permissions:
 
 jobs:
   native-pretrain:
-    name: Native pretrain CPU
+    name: Native pretrain CPU (${{ matrix.install }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        install: [locked, requirements]
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
       - name: Install uv
+        if: matrix.install == 'locked'
         uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
 
       - name: Install Python
-        run: uv python install 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
       - name: Sync locked dependencies
+        if: matrix.install == 'locked'
         run: uv sync --extra training --extra public-data --extra dev --locked --python 3.11
 
+      - name: Use locked environment for Python scripts
+        if: matrix.install == 'locked'
+        run: echo "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"
+
+      - name: Install through requirements
+        if: matrix.install == 'requirements'
+        run: |
+          python -m pip install 'torch>=2.4,<3' --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install -r requirements.txt
+          python -m pip install -e '.[dev]'
+          python -m pip check
+
       - name: Lint
-        run: uv run ruff check src tests pyproject.toml
+        run: python -m ruff check src scripts tests pyproject.toml
 
       - name: Check formatting
-        run: uv run ruff format --check src tests
+        run: python -m ruff format --check src scripts tests
 
       - name: Run tests
-        run: uv run pytest -q
+        run: python -m pytest -q
 
       - name: Compile package
-        run: uv run python -m compileall -q src tests
+        run: python -m compileall -q src scripts tests
 
       - name: Validate reference configurations
         run: |
           for config in configs/pipelines/*.yaml; do
-            uv run llmlab config validate "$config"
+            python scripts/validate_config.py "$config"
           done
 
       - name: Run base preflight
-        run: uv run llmlab doctor
+        run: python scripts/doctor.py
 
       - name: Inspect native smoke model
-        run: uv run llmlab model inspect --config configs/models/smoke-10m.yaml
+        run: python scripts/inspect_model.py --config configs/models/smoke-10m.yaml

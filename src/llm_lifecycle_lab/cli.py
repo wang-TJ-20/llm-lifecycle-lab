@@ -29,9 +29,13 @@ from llm_lifecycle_lab.doctor.result import CheckStatus, DoctorReport
 from llm_lifecycle_lab.exceptions import LLMLabError
 
 
-def build_parser() -> argparse.ArgumentParser:
+def build_parser(
+    *,
+    command: tuple[str, ...] = (),
+    prog: str = "llmlab",
+) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="llmlab",
+        prog=prog,
         description="Run reproducible LLM lifecycle experiments.",
     )
     parser.add_argument(
@@ -234,11 +238,48 @@ def build_parser() -> argparse.ArgumentParser:
     run_create.add_argument("--config", type=Path, required=True)
     run_create.add_argument("--run-id")
     run_create.set_defaults(handler=_run_create_command)
-    return parser
+
+    parsers = {
+        (): parser,
+        ("doctor",): doctor_parser,
+        ("config",): config_parser,
+        ("config", "validate"): config_validate,
+        ("data",): data_parser,
+        ("data", "validate"): data_validate,
+        ("data", "recipes"): data_recipes,
+        ("data", "fetch"): data_fetch,
+        ("data", "mix"): data_mix,
+        ("data", "prepare"): data_prepare,
+        ("data", "pack"): data_pack,
+        ("tokenizer",): tokenizer_parser,
+        ("tokenizer", "train"): tokenizer_train,
+        ("tokenizer", "inspect"): tokenizer_inspect,
+        ("model",): model_parser,
+        ("model", "inspect"): model_inspect,
+        ("train",): train_parser,
+        ("train", "pretrain"): train_pretrain,
+        ("eval",): eval_parser,
+        ("eval", "pretrain"): eval_pretrain,
+        ("reference",): reference_parser,
+        ("reference", "verify"): reference_verify,
+        ("run",): run_parser,
+        ("run", "create"): run_create,
+    }
+    for path, command_parser in parsers.items():
+        if path[: len(command)] == command:
+            command_parser.prog = " ".join((prog, *path[len(command) :]))
+    return parsers[command]
 
 
-def main(argv: Sequence[str] | None = None) -> int:
-    parser = build_parser()
+def main(
+    argv: Sequence[str] | None = None,
+    *,
+    command: tuple[str, ...] = (),
+    prog: str = "llmlab",
+) -> int:
+    """Run the full CLI or a script's focused command in the current process."""
+
+    parser = build_parser(command=command, prog=prog)
     args = parser.parse_args(argv)
     try:
         return int(args.handler(args))
@@ -272,7 +313,7 @@ def _config_validate_command(args: argparse.Namespace) -> int:
         except ImportError as exc:
             raise LLMLabError(
                 "training dependencies are unavailable; run "
-                "`uv sync --extra training --extra dev`"
+                "`python -m pip install -e '.[training]'`"
             ) from exc
         EngineConfig.from_dict(config.training)
     result = {
@@ -412,7 +453,7 @@ def _data_pack_command(args: argparse.Namespace) -> int:
     except ImportError as exc:
         raise LLMLabError(
             "packing dependencies are unavailable; run "
-            "`uv sync --extra training --extra dev`"
+            "`python -m pip install -e '.[training]'`"
         ) from exc
 
     manifest = materialize_packed_pretraining_dataset(
@@ -449,7 +490,7 @@ def _tokenizer_train_command(args: argparse.Namespace) -> int:
     except ImportError as exc:
         raise LLMLabError(
             "tokenizer dependencies are unavailable; run "
-            "`uv sync --extra training --extra dev`"
+            "`python -m pip install -e '.[training]'`"
         ) from exc
 
     manifest = train_native_tokenizer(
@@ -472,7 +513,7 @@ def _tokenizer_inspect_command(args: argparse.Namespace) -> int:
     except ImportError as exc:
         raise LLMLabError(
             "tokenizer dependencies are unavailable; run "
-            "`uv sync --extra training --extra dev`"
+            "`python -m pip install -e '.[training]'`"
         ) from exc
 
     tokenizer = NativeTokenizer.from_directory(args.path)
@@ -492,7 +533,7 @@ def _model_inspect_command(args: argparse.Namespace) -> int:
     except ImportError as exc:
         raise LLMLabError(
             "training dependencies are unavailable; run "
-            "`uv sync --extra training --extra dev`"
+            "`python -m pip install -e '.[training]'`"
         ) from exc
 
     config = load_native_model_config(args.config)
@@ -559,7 +600,7 @@ def _train_pretrain_command(args: argparse.Namespace) -> int:
     except ImportError as exc:
         raise LLMLabError(
             "training dependencies are unavailable; run "
-            "`uv sync --extra training --extra dev`"
+            "`python -m pip install -e '.[training]'`"
         ) from exc
 
     config = load_run_config(args.config)
@@ -591,7 +632,7 @@ def _eval_pretrain_command(args: argparse.Namespace) -> int:
     except ImportError as exc:
         raise LLMLabError(
             "training dependencies are unavailable; run "
-            "`uv sync --extra training --extra dev`"
+            "`python -m pip install -e '.[training]'`"
         ) from exc
 
     config = load_run_config(args.config)
@@ -630,7 +671,7 @@ def _reference_verify_command(args: argparse.Namespace) -> int:
     except ImportError as exc:
         raise LLMLabError(
             "reference verification dependencies are unavailable; run "
-            "`uv sync --extra training --extra dev`"
+            "`python -m pip install -e '.[training]'`"
         ) from exc
 
     report = verify_reference_run(

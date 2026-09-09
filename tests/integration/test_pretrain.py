@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import platform
 import tempfile
 import unittest
@@ -178,10 +179,22 @@ class PretrainingIntegrationTests(unittest.TestCase):
                 evaluation["eval_en_loss"] * evaluation["eval_en_tokens"]
                 + evaluation["eval_zh_loss"] * evaluation["eval_zh_tokens"]
             ) / (evaluation["eval_en_tokens"] + evaluation["eval_zh_tokens"])
-            self.assertAlmostEqual(
-                evaluation["eval_loss"],
-                language_weighted_loss,
-                places=6,
+            self.assertEqual(
+                evaluation["eval_tokens"],
+                evaluation["eval_en_tokens"] + evaluation["eval_zh_tokens"],
+            )
+            # Float32 reductions can differ across CPU backends.
+            self.assertTrue(
+                math.isclose(
+                    evaluation["eval_loss"],
+                    language_weighted_loss,
+                    rel_tol=1e-6,
+                    abs_tol=1e-6,
+                ),
+                msg=(
+                    f"aggregate={evaluation['eval_loss']}, "
+                    f"buckets={language_weighted_loss}"
+                ),
             )
             self.assertTrue(Path(evaluation["report_path"]).is_file())
 
