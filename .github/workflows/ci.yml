@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  native-pretrain:
+    name: Native pretrain CPU
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Install Python
+        run: uv python install 3.11
+
+      - name: Sync locked dependencies
+        run: uv sync --extra training --extra public-data --extra dev --locked --python 3.11
+
+      - name: Lint
+        run: uv run ruff check src tests pyproject.toml
+
+      - name: Check formatting
+        run: uv run ruff format --check src tests
+
+      - name: Run tests
+        run: uv run pytest -q
+
+      - name: Compile package
+        run: uv run python -m compileall -q src tests
+
+      - name: Validate reference configurations
+        run: |
+          for config in configs/pipelines/*.yaml; do
+            uv run llmlab config validate "$config"
+          done
+
+      - name: Run base preflight
+        run: uv run llmlab doctor
+
+      - name: Inspect native smoke model
+        run: uv run llmlab model inspect --config configs/models/smoke-10m.yaml

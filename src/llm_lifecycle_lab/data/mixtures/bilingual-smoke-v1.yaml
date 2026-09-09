@@ -1,0 +1,9 @@
+schema_version: "1.0"
+mixture_id: bilingual-smoke-v1
+description: Equal-record English and Chinese public smoke corpus for Native 10M.
+components:
+  - simplestories-smoke-v1
+  - wikipedia-zh-smoke-v1
+mixing:
+  strategy: round-robin
+  output_sha256: 4a6cb466167566d151dd4f597f29522a5157047b93989917776d8983a6118883

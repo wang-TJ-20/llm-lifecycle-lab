@@ -1,0 +1,33 @@
+schema_version: "1.0"
+model_route: native-smoke
+run_profile: smoke
+stage: pretrain
+seed: 42
+output_dir: runs
+model:
+  provider: native
+  model_id: smoke-10m
+  architecture: dense-decoder
+  config: configs/models/smoke-10m.yaml
+  tokenizer: data/tokenizers/bilingual-smoke-v1
+data:
+  manifest: data/prepared/bilingual-smoke-v1/data_manifest.json
+  packed_manifest: data/packed/bilingual-smoke-v1-seq128/packed_manifest.json
+training:
+  device: auto
+  dtype: float32
+  sequence_length: 128
+  micro_batch_size: 1
+  gradient_accumulation_steps: 1
+  max_steps: 2
+  learning_rate: 0.0003
+  weight_decay: 0.1
+  beta1: 0.9
+  beta2: 0.95
+  warmup_steps: 0
+  min_lr_ratio: 0.1
+  gradient_clipping: 1.0
+  checkpoint_interval: 1
+  eval_interval: 1
+  eval_batches: 2
+  log_interval: 1

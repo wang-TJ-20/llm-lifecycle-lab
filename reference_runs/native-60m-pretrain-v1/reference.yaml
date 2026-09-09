@@ -1,0 +1,65 @@
+schema_version: "1.0"
+reference_id: native-60m-pretrain-v1
+pipeline_config: configs/pipelines/native-60m-reference.yaml
+requirements:
+  expected_data_manifest_sha256: 11a0c0abf73abcb36fcd269565363ef60564d778cb6006b23ff381a069d577b8
+  expected_tokenizer_sha256: 7455ac1168f36a3d7dca03fee28784f97899fe233f496484a11e5da2e44a2f32
+  expected_model_config_sha256: 8ee6cecd46afe89b90c037725bdce39d0ef2594cfc8ab58baffafb66a312c4d5
+  expected_packed_sequence_length: 512
+  expected_packed_array_sha256:
+    train.tokens.i32: c733fa10fc7ab04dfb0b4310fc6d265c8e7d44c93d8ead5b6f8f29f358b7c8b9
+    train.languages.i8: 95631b8d7c98039ef4215dfd85244193a895fe9f639781d91e16e65ec135c1fe
+    train.byte_weights.f32: be8610dfbfab07194534ab7a1405487460c17f7360b45d5626645303ef8adc31
+    dev.tokens.i32: f0716c667f4c7372c72978787ae97774a54c390779c8588a0787a84813268c5f
+    dev.languages.i8: 4b7c32c64bcf59b6d5392bef14ac74b5914f8504352026f51b9f2b578520e254
+    dev.byte_weights.f32: 37c2cbaa688578ec6ed465c25fbcce055ad8206ef8bd9b9e4663cd514bc87eb7
+    test.tokens.i32: 262ebaefbd65bdb3109357aa775bf33682b4852376536435552c6bfcb2051bc3
+    test.languages.i8: b327573d0a4ac82850fe832a0b15c7126a9e64b36f33907b0fdacc3dd1856c30
+    test.byte_weights.f32: 20552a12d06e48ba18f86ecafc50db02787e725782b8b55962da9b9b3ac28acf
+  expected_budget_mode: num_epochs
+  expected_global_step: 5649
+  expected_target_train_tokens: 46184530
+  minimum_target_token_coverage: 1.0
+  maximum_target_token_coverage: 1.01
+  platform_system: Linux
+  device_type: cuda
+  minimum_device_memory_gib: 22
+  require_clean_git: true
+  require_eval_improvement: true
+  evaluation_suites:
+    - pretrain-dev
+    - pretrain-test
+  required_training_metric_keys:
+    - train_loss
+    - train_bits_per_byte
+    - gradient_norm
+    - learning_rate
+    - tokens_seen
+    - epochs_seen
+    - target_token_coverage
+    - cuda_memory_allocated_bytes
+    - cuda_max_memory_allocated_bytes
+    - eval_loss
+    - eval_perplexity
+    - eval_bits_per_byte
+    - eval_en_loss
+    - eval_en_perplexity
+    - eval_en_bits_per_byte
+    - eval_en_tokens
+    - eval_zh_loss
+    - eval_zh_perplexity
+    - eval_zh_bits_per_byte
+    - eval_zh_tokens
+  required_evaluation_metric_keys:
+    - eval_loss
+    - eval_perplexity
+    - eval_bits_per_byte
+    - eval_tokens
+    - eval_en_loss
+    - eval_en_perplexity
+    - eval_en_bits_per_byte
+    - eval_en_tokens
+    - eval_zh_loss
+    - eval_zh_perplexity
+    - eval_zh_bits_per_byte
+    - eval_zh_tokens

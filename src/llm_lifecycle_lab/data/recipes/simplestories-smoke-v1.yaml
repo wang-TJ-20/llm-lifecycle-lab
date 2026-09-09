@@ -1,0 +1,21 @@
+schema_version: "1.0"
+recipe_id: simplestories-smoke-v1
+description: 10K-story public smoke corpus for Native 10M.
+dataset:
+  provider: huggingface
+  repository: SimpleStories/SimpleStories
+  revision: e63b8adc3b1a1bdc7cac5b500d150b71346b0628
+  config: default
+  split: train
+  text_field: story
+  source_id_field: generation_id
+  license: MIT
+  language: en
+  synthetic: true
+  file: data/train-00000-of-00007.parquet
+  file_sha256: ca33531b99f3bebb4125e82f56017c223a4900331b55bcf7cde1b0f750d88fd4
+selection:
+  strategy: source-prefix
+  max_records: 10000
+  min_characters: 64
+  output_sha256: 861ca23380e0d6a718350038e74fedd4f7d824bf9e18c3d907bd01fa88be346e

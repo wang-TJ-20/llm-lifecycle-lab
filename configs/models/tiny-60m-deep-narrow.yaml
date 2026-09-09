@@ -1,0 +1,13 @@
+schema_version: "1.0"
+model_route: native-learn
+provider: native
+model_id: tiny-60m-deep-narrow
+architecture: dense-decoder
+vocab_size: 16384
+num_hidden_layers: 19
+hidden_size: 512
+num_attention_heads: 8
+num_key_value_heads: 4
+intermediate_size: 1344
+max_sequence_length: 512
+qk_norm: false

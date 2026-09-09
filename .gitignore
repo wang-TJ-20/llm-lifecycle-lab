@@ -1,0 +1,19 @@
+.DS_Store
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.coverage
+dist/
+build/
+
+# Local experiment outputs
+/data/
+/runs/
+/checkpoints/
+/wandb/
+*.pt
+*.pth
+*.safetensors

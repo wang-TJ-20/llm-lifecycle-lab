@@ -1,0 +1,21 @@
+schema_version: "1.0"
+recipe_id: wikipedia-zh-smoke-v1
+description: 10K-article public Chinese smoke corpus for Native 10M.
+dataset:
+  provider: huggingface
+  repository: wikimedia/wikipedia
+  revision: b04c8d1ceb2f5cd4588862100d08de323dccfbaa
+  config: 20231101.zh
+  split: train
+  text_field: text
+  source_id_field: id
+  license: CC-BY-SA-3.0
+  language: zh
+  synthetic: false
+  file: 20231101.zh/train-00002-of-00006.parquet
+  file_sha256: ec8f6c0dd1418b8fcd454278fb4f2bc7cd0ce8312f29c80b672533942601338f
+selection:
+  strategy: source-prefix
+  max_records: 10000
+  min_characters: 64
+  output_sha256: 6dd9f3f86fbb3101dffea4315881e25c5516cecaf66bf1afcb442c804bae2739
