@@ -12,6 +12,8 @@ Native 模型的定位不是追求同参数量下的最佳效果，而是作为�
 
 - 结构上接近现代 decoder-only LLM。
 - 10M 和 60M 共用同一份实现，只通过配置缩放。
+- 两档模型统一使用 `model_route: native`；`run_profile: smoke` 表示 10M
+  快速验证，`learn/reproduce` 表示 60M 教学训练或参考验收。
 - 代码边界清晰：模型只负责张量级前向、生成和 checkpoint，不负责 stage-specific loss。
 - 能支持真实的 Pretrain 训练、增量生成和 KV Cache。
 - 两档默认词表大小都为 16,384，各自使用对应数据 recipe 训练的双语 Tokenizer。
@@ -22,12 +24,16 @@ Native 模型的定位不是追求同参数量下的最佳效果，而是作为�
 
 当前实现文件：
 
+- 实践入口：[scripts/model_experiment.py](../scripts/model_experiment.py)，直接展示一次参数更新。
 - 配置：[src/llm_lifecycle_lab/model/native/config.py](../src/llm_lifecycle_lab/model/native/config.py)
 - 注意力：[src/llm_lifecycle_lab/model/native/attention.py](../src/llm_lifecycle_lab/model/native/attention.py)
 - RMSNorm：[src/llm_lifecycle_lab/model/native/normalization.py](../src/llm_lifecycle_lab/model/native/normalization.py)
 - Block/SwiGLU：[src/llm_lifecycle_lab/model/native/layers.py](../src/llm_lifecycle_lab/model/native/layers.py)
 - 主模型：[src/llm_lifecycle_lab/model/native/transformer.py](../src/llm_lifecycle_lab/model/native/transformer.py)
-- 采样生成：[src/llm_lifecycle_lab/model/native/generation.py](../src/llm_lifecycle_lab/model/native/generation.py)
+- 生成循环与采样：[src/llm_lifecycle_lab/model/native/generation.py](../src/llm_lifecycle_lab/model/native/generation.py)
+
+先读实验脚本，再读主模型的 `__init__()` 和 `forward()`，最后按需进入 Attention
+和 Block。关键数学实现旁有中英文说明与张量形状，不需要先理解训练框架。
 
 ## 2. 两档模型
 
@@ -42,6 +48,9 @@ Native 模型的定位不是追求同参数量下的最佳效果，而是作为�
 
 - [configs/models/smoke-10m.yaml](../configs/models/smoke-10m.yaml)
 - [configs/models/tiny-60m.yaml](../configs/models/tiny-60m.yaml)
+
+`model_route` 只选择 Native 实现，不再把 10M 和 60M 当成两个模型类型。Pipeline 中的
+`model.config` 明确选择具体结构，`run_profile` 则决定对应的实践规模和 Doctor 资源要求。
 
 模型最大长度与训练长度是两件事：10M 模型支持到 256，但 Smoke pipeline 默认只取 128；
 60M 两者均为 512。改大配置上限不能证明模型学会了更长上下文。
@@ -66,7 +75,9 @@ SFT/DPO/GRPO 不需要扩展 embedding 或改变已有 token ID。
 - `hidden_size % num_attention_heads == 0`
 - `num_attention_heads % num_key_value_heads == 0`
 - `head_dim` 必须为偶数，才能应用 RoPE
-- 所有核心维度必须为正值
+- 所有核心维度必须是正整数；`2.9`、`true` 或字符串 `"2"` 不会自动转为整数
+- `norm_eps`、`rope_theta`、`initializer_range` 必须是有限正数，拒绝 `NaN/Inf`
+- 直接构造与 YAML/JSON 加载共用校验；YAML 数值不要加引号
 
 ### 2.1 词表参数预算
 
@@ -83,6 +94,13 @@ SFT/DPO/GRPO 不需要扩展 embedding 或改变已有 token ID。
 显式比较 8K/12K/16K，而不是静默更换默认词表。
 
 ### 2.2 60M 架构消融
+
+第一份冻结基线选用宽浅、QK-Norm 关闭的 `tiny-60m`，不是先把四臂全部跑一遍。
+其 62,927,616 个参数、16K 词表、512 上下文和 `initializer_range=0.02` 保持不变；
+数据、训练预算、源码与验收由
+[`native-60m-baseline-v1.yaml`](../configs/reference/native-60m-baseline-v1.yaml) 固定。
+执行顺序见 [固定 60M 基线](./NATIVE_PRETRAIN_GUIDE.md#92-固定-60m-基线)。
+规范与输入冻结不等于完成了正式 CUDA 训练，也不表示模型质量已达标。
 
 项目提供四个约 60M 配方，组成宽浅/深窄与 QK-Norm 的 2×2 对照：
 
@@ -236,13 +254,20 @@ RoPE cache 不进入 `state_dict`，不会增加 checkpoint 大小或改变旧�
 
 ### 5.4 Causal Mask
 
-mask 逻辑见 [_attention_mask()](../src/llm_lifecycle_lab/model/native/attention.py)：
+mask 逻辑见 [build_attention_mask()](../src/llm_lifecycle_lab/model/native/attention.py)：
 
-- 如果是完整前缀、无外部 mask、且没有 cache，直接让 `scaled_dot_product_attention(..., is_causal=True)` 走内置 causal 路径。
-- 只要引入 cache 或显式 `attention_mask`，就构造布尔 mask。
+- 在 CUDA/MPS 上，如果是完整前缀、无外部 mask、且没有 cache，则让
+  `scaled_dot_product_attention(..., is_causal=True)` 走内置 causal 路径。
+- CPU 保留共享的显式 causal mask：本地 10M 短序列微基准中，该路径比内置 causal 模式
+  更快。这不是对所有 CPU、模型规模或序列长度的性能保证。
+- `collate_pretraining_batch()` 在 CPU 组 batch 时省略全真的 mask，不需要在 GPU 上
+  判断是否全真；存在 padding 时保留原始 mask，不删除样本或改变 labels。
+- 需要显式 mask 时，只在模型前向中构造一次，所有层共享，而非每层重复分配。
 - 当存在 cache 时，`attention_mask` 的长度必须是 `past_length + current_length`。
 
-这也是为什么 `forward()` 在增量推理时会强校验 `attention_mask` 形状。
+公开 `forward()` 接收 `[B, total_T]` mask；内部 Attention 接收已经准备好的
+`[B, 1, Tq, Tk]` mask（无 padding 时可沿 batch 广播）。True 表示允许注意，
+这是 PyTorch SDPA 的语义。
 
 ## 6. KV Cache 与生成
 
@@ -250,6 +275,8 @@ mask 逻辑见 [_attention_mask()](../src/llm_lifecycle_lab/model/native/attenti
 
 - `use_cache`
 - `cache`
+- `logits_to_keep`：默认 `0` 输出全部位置；正整数只对末尾指定数量的位置做 LM head
+  投影，不裁剪 KV Cache。该选项属于 Native 前向，不改变通用训练接口。
 
 其中 cache 的结构是：
 
@@ -266,12 +293,18 @@ tuple[layer] -> (key, value)
 `generate()` 的行为：
 
 - 默认 greedy；如果 `do_sample=True`，支持 `temperature` 和 `top_p`
-- 每步只把最新 token 喂回模型，并复用 cache
+- 首轮处理整个 prompt，之后只输入最新 token 并复用 cache；每轮仅投影最后位置的 logits
+- 支持无 padding 或左侧 padding；拒绝右侧 padding、mask 中间有空洞和全 padding 的行
+- mask 必须与输入同形、同设备且只包含 0/1；未提供 mask 时所有输入位置都视为有效
 - 如果配置了 `eos_token_id`，所有样本都结束时提前停止
 - 已结束样本会被 `pad_token_id` 填充
-- `prompt_tokens + max_new_tokens` 不能超过模型 `max_sequence_length`
+- `prompt_tokens + max_new_tokens` 不能超过模型 `max_sequence_length`，prompt 长度包含
+  左侧 padding 占据的物理位置
+- 成功或异常退出后都会恢复模型原来的 train/eval 状态
 
-这部分见 [transformer.py](../src/llm_lifecycle_lab/model/native/transformer.py) 和 [generation.py](../src/llm_lifecycle_lab/model/native/generation.py)。
+完整流程在 [generation.py](../src/llm_lifecycle_lab/model/native/generation.py) 的
+`generate_tokens()` 中，主模型的 `generate()` 只是直接调用它。训练 `forward()` 仍然
+支持右侧 padding；生成的布局限制不改变训练数据格式。
 
 ## 7. 初始化与参数量
 
@@ -378,74 +411,36 @@ python scripts/inspect_model.py \
 **检查结果**：两档总参数分别为 9,915,200 与 62,927,616。词表比较只是参数估算，
 不会自动修改模型、生成新的 Tokenizer 或开始训练。
 
-### 步骤 2：前向、Loss 与梯度
+### 步骤 2：前向、Loss、梯度与参数更新
 
 ```bash
-python - <<'PY'
-import torch
-from llm_lifecycle_lab.model.native import NativeTransformer, load_native_model_config
-from llm_lifecycle_lab.training.stages.pretrain import causal_lm_loss
-
-torch.manual_seed(42)
-config = load_native_model_config("configs/models/smoke-10m.yaml")
-model = NativeTransformer(config)
-input_ids = torch.randint(0, config.vocab_size, (2, 16))
-output = model(input_ids=input_ids)
-assert output.logits.shape == (2, 16, config.vocab_size)
-assert model.lm_head.weight is model.token_embedding.weight
-loss, supervised_tokens = causal_lm_loss(output.logits, input_ids)
-loss.backward()
-assert supervised_tokens == 30
-assert torch.isfinite(model.token_embedding.weight.grad).all()
-print("logits:", tuple(output.logits.shape))
-print("supervised tokens:", supervised_tokens)
-print("loss:", loss.item())
-PY
+python scripts/model_experiment.py
 ```
 
-**检查结果**：logits 为 `(2, 16, 16384)`，每条序列 15 个 next-token 目标，共 30；
-loss 和梯度有限。实际 loss 因运行环境略有不同，不应把固定最后小数位作为验收。
-这一步只执行 backward，没有 optimizer step，不会生成 checkpoint。
+打开 [model_experiment.py](../scripts/model_experiment.py) 的 `main()`，可以按顺序读到：
+
+1. 加载 10M 配置并随机初始化模型，创建 `[2, 16]` 的整数 token。
+2. 调用 `model(input_ids=...)` 得到 `[2, 16, 16384]` 的 logits。
+3. 使用 `logits[:, :-1]` 预测 `input_ids[:, 1:]`，直接计算交叉熵。
+4. `loss.backward()` 计算梯度，裁剪梯度，然后 `optimizer.step()` 更新参数。
+
+**检查结果**：每条序列 15 个 next-token 目标，共 30；loss、梯度范数有限，
+`weight_update_max > 0` 表示观察的 embedding 行确实发生了更新。
+它只在 CPU 上做一步实验，没有训练 run、调度器或真实语料；不是正式 Pretrain 的替代入口。
+实际小数值随环境可能变化，不用固定 loss 或要求单步 loss 必须下降作为验收。
 
 ### 步骤 3：KV Cache 与保存加载
 
-```bash
-python - <<'PY'
-import tempfile
-from pathlib import Path
-import torch
-from llm_lifecycle_lab.model.native import NativeTransformer, load_native_model_config
-from llm_lifecycle_lab.model.protocol import GenerationConfig
+同一个脚本在更新后继续验证以下行为，无需运行另一份内嵌 Python：
 
-torch.manual_seed(42)
-config = load_native_model_config("configs/models/smoke-10m.yaml")
-model = NativeTransformer(config).eval()
-tokens = torch.randint(0, config.vocab_size, (1, 16))
-with torch.inference_mode():
-    full = model(input_ids=tokens).logits
-    prefix = model(input_ids=tokens[:, :8], use_cache=True)
-    suffix = model(input_ids=tokens[:, 8:], use_cache=True, cache=prefix.cache)
-    torch.testing.assert_close(full[:, 8:], suffix.logits, rtol=1e-5, atol=1e-6)
-    print("layers in cache:", len(suffix.cache))
-    print("K shape:", tuple(suffix.cache[0][0].shape))
-    with tempfile.TemporaryDirectory() as directory:
-        path = Path(directory) / "model"
-        model.save(path)
-        restored = NativeTransformer(config).eval()
-        restored.load(path)
-        torch.testing.assert_close(full, restored(input_ids=tokens).logits)
-    generated = model.generate(
-        input_ids=tokens,
-        attention_mask=None,
-        config=GenerationConfig(max_new_tokens=4),
-    )
-    print("generated shape:", tuple(generated.token_ids.shape))
-PY
-```
+- 完整前向与 prefix + cached suffix 的 logits 在容差内一致。
+- 临时保存模型，重新构建并加载后，logits 保持一致。
+- 生成 4 个新 token，默认输出形状为 `[2, 20]`，每层 K 为 `[2, 1, 16, 64]`。
 
-**检查结果**：4 层 cache，K 为 `(1, 1, 16, 64)`，生成 token 形状 `(1, 20)`。
-完整前向与 cache 续写的 suffix logits 在容差内一致；临时保存加载后输出一致。
-临时文件在退出时删除，不在项目内留下实验目录。
+结果中的 `cache_matches_full` 和 `checkpoint_matches_full` 应为 `true`；
+对应比较失败会直接报错。临时模型文件会自动删除，不留下训练产物。
+可添加 `--json` 输出结构化结果，或使用 `--sequence-length` / `--batch-size` 调整规模；
+学习实验的长度必须至少为 2，且小于模型最大长度，以保留生成空间。
 
 ### 步骤 4：理解 Tokenizer/生成边界
 
@@ -479,9 +474,9 @@ SFT 之前应使用普通文本续写观察模型，而不是用聊天质量判�
 | 观察点 | MiniMind 当前实现 | 本项目的取舍或后续完善 |
 | --- | --- | --- |
 | RoPE 与 QK-Norm | 模型级共享 cos/sin；默认 Q/K RMSNorm | 已有共享 cache；QK-Norm 保留独立消融，不直接打开基线开关 |
-| 无 padding 的注意力 | 满足条件时使用 SDPA `is_causal` | 我们传入全真 mask 时仍构建显式 causal mask，可优化满长 batch 的路径，但须验证 causal/padding/cache 等价性与 CUDA 吞吐 |
+| 无 padding 的注意力 | 满足条件时使用 SDPA `is_causal` | CPU 组 batch 时省略全真 mask；CUDA/MPS 可用 causal 路径，CPU 使用共享显式 mask；仍需测量 CUDA 吞吐 |
 | 词表与 MLP 预算 | 6,400 词表；768 hidden 默认 MLP 为 2,432 | 我们 16K 词表、768 hidden、MLP 2,048；缩词表应同时比较中英文压缩率、上下文利用率和质量，不能只比较参数量 |
-| 推理 logits | 支持 `logits_to_keep` 以限制输出位置 | 可在 prefill 仅投影最后位置，训练仍保留全序列；需验证生成与 KV cache 的一致性 |
+| 推理 logits | 支持 `logits_to_keep` 以限制输出位置 | 已支持生成时只投影最后位置，训练默认保留全序列，KV Cache 不裁剪 |
 | HF 兼容 | `PreTrainedModel`、`PretrainedConfig` 与生成接口 | 后续以独立适配/导出层对接，不在 Native forward 中加入训练阶段分支 |
 | 长上下文 | 配置更大 RoPE cache 和可选 YaRN | 512 长度训练不能据此宣称具备 32K 能力；需长文本数据与专门评测后再扩展 |
 | MoE | 有专家路由、top-k 和辅助 loss | 暂不引入；它增加变量与算子调度成本，不能解决尚未完成的 Dense CUDA 基线验证 |
@@ -497,10 +492,13 @@ SFT 之前应使用普通文本续写观察模型，而不是用聊天质量判�
 
 ### 推荐顺序
 
-1. 补满长 batch 的 SDPA 路径等价测试与实际 CUDA profiling，再决定是否启用快速路径。
-2. 在固定中英文 dev 文本上报告 Tokenizer 的字符/token、UTF-8 字节/token 和归一化往返一致性。
-3. 完成现有 60M 四臂同数据训练，再讨论词表/MLP 重分配；新 Tokenizer 必须对应新训练路线。
-4. 最后扩展 HF 导出和长上下文；不预设 MoE 或更深模型一定优于当前基线。
+1. 冻结并完成宽浅 60M 基线，记录中英文指标、吞吐、显存和耗时，再开始改变实验变量。
+2. 在现有输出、梯度和缓存等价测试之外，增加独立数值参考，覆盖 attention 与 FP32/BF16。
+3. 单独做残差投影初始化消融，不把新的初始化混入原基线。
+4. 在相同数据与预算下做 CUDA profiling，再测量 GQA、优化器或其他性能调整的收益。
+5. 最后做词表与容量实验；比较中英文压缩率和 bits-per-byte，新 Tokenizer 使用新训练路线。
+
+已有四臂配方保留供后续对照；HF 导出和长上下文另行扩展，不预设 MoE 或更深模型更优。
 
 训练侧的恢复、预算和复现缺口见
 [Pretrain 的后续完善](./NATIVE_PRETRAIN_GUIDE.md#11-保留边界与后续完善)。

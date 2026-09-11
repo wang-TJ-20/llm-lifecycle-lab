@@ -24,13 +24,12 @@ _VERSION_PATTERN = re.compile(r"^\d+\.\d+\.\d+(?:[A-Za-z0-9.+-]*)$")
 class ModelRoute(StrEnum):
     """Supported model families with isolated checkpoint histories."""
 
-    NATIVE_SMOKE = "native-smoke"
-    NATIVE_LEARN = "native-learn"
+    NATIVE = "native"
     QWEN3_TRANSFER = "qwen3-transfer"
 
 
 class RunProfile(StrEnum):
-    """Execution budgets; profiles do not implicitly select a model."""
+    """Execution scales and acceptance levels within a model family."""
 
     SMOKE = "smoke"
     LEARN = "learn"
@@ -339,6 +338,8 @@ class ModelMetadata(JsonContract):
                 raise ContractError(
                     "Qwen tokenizer_revision must be a 40-character commit SHA"
                 )
+        elif self.provider != "native":
+            raise ContractError("native model metadata requires provider=native")
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> ModelMetadata:
@@ -400,15 +401,10 @@ class RunConfig(JsonContract):
 
     def _validate_route_constraints(self) -> None:
         if (
-            self.model_route is ModelRoute.NATIVE_SMOKE
-            and self.run_profile is not RunProfile.SMOKE
-        ):
-            raise ContractError("native-smoke only supports run_profile=smoke")
-        if (
-            self.model_route is not ModelRoute.NATIVE_SMOKE
+            self.model_route is ModelRoute.QWEN3_TRANSFER
             and self.run_profile is RunProfile.SMOKE
         ):
-            raise ContractError("run_profile=smoke requires native-smoke")
+            raise ContractError("run_profile=smoke requires model_route=native")
         if self.model_route is ModelRoute.QWEN3_TRANSFER and self.stage in {
             Stage.PRETRAIN,
             Stage.TOKENIZER,
@@ -443,7 +439,7 @@ class RunConfig(JsonContract):
                     "model.transformers_version must be an exact version"
                 )
         elif provider != "native":
-            raise ContractError("native routes require model.provider=native")
+            raise ContractError("native route requires model.provider=native")
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> RunConfig:

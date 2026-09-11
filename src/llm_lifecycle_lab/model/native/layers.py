@@ -1,4 +1,7 @@
-"""Native Transformer normalization, feed-forward, and decoder block."""
+"""组合归一化、注意力、SwiGLU 和残差连接，构建单层 Transformer。
+
+Build one Transformer block with normalization, attention, SwiGLU, and residuals.
+"""
 
 from __future__ import annotations
 
@@ -33,6 +36,7 @@ class SwiGLU(nn.Module):
         )
 
     def forward(self, hidden_states: Tensor) -> Tensor:
+        # 门控后投影回 D 维：[B, T, I] -> [B, T, D]。Gate, then project down.
         return self.down_proj(
             F.silu(self.gate_proj(hidden_states)) * self.up_proj(hidden_states)
         )
@@ -54,15 +58,18 @@ class TransformerBlock(nn.Module):
         hidden_states: Tensor,
         *,
         position_embeddings: tuple[Tensor, Tensor],
-        attention_mask: Tensor | None = None,
+        attention_mask: Tensor | None,
+        is_causal: bool,
         past_key_value: KVCacheEntry | None = None,
         use_cache: bool = False,
     ) -> tuple[Tensor, KVCacheEntry | None]:
+        # Pre-norm 残差路径不改变 [B, T, D]。Both residuals preserve the shape.
         residual = hidden_states
         attention_output, present = self.attention(
             self.input_norm(hidden_states),
             position_embeddings=position_embeddings,
             attention_mask=attention_mask,
+            is_causal=is_causal,
             past_key_value=past_key_value,
             use_cache=use_cache,
         )

@@ -73,7 +73,7 @@ class ModelBundleTests(unittest.TestCase):
             tokenizer=DummyTokenizer(),
             chat_template=None,
             metadata=ModelMetadata(
-                model_route=ModelRoute.NATIVE_SMOKE,
+                model_route=ModelRoute.NATIVE,
                 provider="native",
                 model_id="smoke-10m",
                 architecture="dense-decoder",
@@ -111,7 +111,7 @@ class ModelBundleTests(unittest.TestCase):
                 tokenizer=object(),
                 chat_template=None,
                 metadata=ModelMetadata(
-                    model_route=ModelRoute.NATIVE_SMOKE,
+                    model_route=ModelRoute.NATIVE,
                     provider="native",
                     model_id="smoke-10m",
                     architecture="dense-decoder",

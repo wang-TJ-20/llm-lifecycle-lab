@@ -1,4 +1,7 @@
-"""Grouped-query causal attention with rotary position embeddings."""
+"""结合 RoPE 位置编码的分组查询因果注意力。
+
+Grouped-query causal attention with rotary position embeddings.
+"""
 
 from __future__ import annotations
 
@@ -98,11 +101,13 @@ class CausalSelfAttention(nn.Module):
         hidden_states: Tensor,
         *,
         position_embeddings: tuple[Tensor, Tensor],
-        attention_mask: Tensor | None = None,
+        attention_mask: Tensor | None,
+        is_causal: bool,
         past_key_value: KVCacheEntry | None = None,
         use_cache: bool = False,
     ) -> tuple[Tensor, KVCacheEntry | None]:
         batch_size, sequence_length, _ = hidden_states.shape
+        # 分头：[B, T, D] -> [B, Hq/Hkv, T, Dh]。Split query and KV heads.
         query = self._shape_query(self.q_proj(hidden_states))
         key = self._shape_key_value(self.k_proj(hidden_states))
         value = self._shape_key_value(self.v_proj(hidden_states))
@@ -111,7 +116,7 @@ class CausalSelfAttention(nn.Module):
             query = self.q_norm(query)
             key = self.k_norm(key)
 
-        past_length = 0 if past_key_value is None else past_key_value[0].shape[2]
+        # RoPE 只旋转 Q/K，保持 V 不变。Rotate Q/K, not V.
         cosine, sine = position_embeddings
         cosine = cosine.to(dtype=query.dtype)
         sine = sine.to(dtype=query.dtype)
@@ -122,25 +127,18 @@ class CausalSelfAttention(nn.Module):
             past_key, past_value = past_key_value
             key = torch.cat((past_key, key), dim=2)
             value = torch.cat((past_value, value), dim=2)
+        # Cache 保留 Hkv 个头；仅计算时扩展到 Hq。Cache compact KV heads.
         present = (key, value) if use_cache else None
 
         repeated_key = repeat_key_value(key, self.num_key_value_groups)
         repeated_value = repeat_key_value(value, self.num_key_value_groups)
-        mask = _attention_mask(
-            attention_mask,
-            query_length=sequence_length,
-            key_length=repeated_key.shape[2],
-            past_length=past_length,
-            device=hidden_states.device,
-        )
-        use_builtin_causal = mask is None and past_length == 0
         attended = F.scaled_dot_product_attention(
             query,
             repeated_key,
             repeated_value,
-            attn_mask=mask,
+            attn_mask=attention_mask,
             dropout_p=self.dropout if self.training else 0.0,
-            is_causal=use_builtin_causal,
+            is_causal=is_causal,
         )
         attended = attended.transpose(1, 2).contiguous()
         attended = attended.view(batch_size, sequence_length, -1)
@@ -184,7 +182,7 @@ def repeat_key_value(tensor: Tensor, repetitions: int) -> Tensor:
     return tensor.repeat_interleave(repetitions, dim=1)
 
 
-def _attention_mask(
+def build_attention_mask(
     attention_mask: Tensor | None,
     *,
     query_length: int,
@@ -192,9 +190,15 @@ def _attention_mask(
     past_length: int,
     device: torch.device,
 ) -> Tensor | None:
-    if attention_mask is None and past_length == 0:
+    """构造一次供全部层共享的 [B, 1, Tq, Tk] 布尔 mask。
+
+    Build one broadcastable boolean mask for all layers; True means allowed.
+    """
+    # CPU 基准选择共享显式 mask；加速设备使用 causal 内核。CPU keeps a shared mask.
+    if attention_mask is None and past_length == 0 and device.type != "cpu":
         return None
 
+    # Cache 续写的位置从 past_length 开始。Offset queries by the cached prefix.
     query_positions = past_length + torch.arange(query_length, device=device)
     key_positions = torch.arange(key_length, device=device)
     allowed = key_positions.unsqueeze(0) <= query_positions.unsqueeze(1)
@@ -203,5 +207,5 @@ def _attention_mask(
     if attention_mask is None:
         return allowed
     if attention_mask.ndim != 2 or attention_mask.shape[1] != key_length:
-        raise ValueError("attention_mask must have shape [batch, total_key_length]")
+        raise ContractError("attention_mask must have shape [batch, total_key_length]")
     return allowed & attention_mask[:, None, None, :].to(dtype=torch.bool)

@@ -5,10 +5,11 @@ import tempfile
 import unittest
 from dataclasses import asdict, replace
 from pathlib import Path
+from unittest.mock import patch
 
 import torch
 
-from llm_lifecycle_lab.exceptions import ConfigError
+from llm_lifecycle_lab.exceptions import ArtifactError, ConfigError, ContractError
 from llm_lifecycle_lab.model.native import (
     NativeModelConfig,
     NativeTransformer,
@@ -226,6 +227,266 @@ class NativeModelTests(unittest.TestCase):
 
         self.assertTrue(torch.equal(first.token_ids, second.token_ids))
         self.assertEqual(first.generated_tokens, 3)
+
+    def test_generation_rejects_unsupported_padding(self) -> None:
+        model = NativeTransformer(micro_config())
+        tokens = torch.tensor([[1, 2, 3, 0, 0]])
+        for mask in (
+            [[1, 1, 1, 0, 0]],
+            [[1, 0, 1, 1, 1]],
+            [[0, 0, 0, 0, 0]],
+        ):
+            with (
+                self.subTest(mask=mask),
+                self.assertRaisesRegex(ContractError, "left.padding"),
+            ):
+                model.generate(
+                    input_ids=tokens,
+                    attention_mask=torch.tensor(mask),
+                    config=GenerationConfig(max_new_tokens=3),
+                )
+        self.assertTrue(model.training)
+
+    def test_left_padded_generation_matches_individual_prompts(self) -> None:
+        model = NativeTransformer(micro_config())
+        tokens = torch.tensor([[0, 0, 1, 2, 3], [4, 5, 6, 7, 8]])
+        mask = torch.tensor([[0, 0, 1, 1, 1], [1, 1, 1, 1, 1]])
+        config = GenerationConfig(max_new_tokens=3)
+        batched = model.generate(input_ids=tokens, attention_mask=mask, config=config)
+        for index, start in ((0, 2), (1, 0)):
+            single = model.generate(
+                input_ids=tokens[index : index + 1, start:],
+                attention_mask=None,
+                config=config,
+            )
+            torch.testing.assert_close(
+                batched.token_ids[index, -3:], single.token_ids[0, -3:]
+            )
+        self.assertTrue(model.training)
+
+    def test_generation_restores_eval_mode(self) -> None:
+        model = NativeTransformer(micro_config()).eval()
+        model.generate(
+            input_ids=torch.tensor([[1, 2, 3]]),
+            attention_mask=None,
+            config=GenerationConfig(max_new_tokens=2),
+        )
+        self.assertFalse(model.training)
+
+    def test_generation_validates_input_before_changing_mode(self) -> None:
+        model = NativeTransformer(micro_config())
+        for tokens, mask in (
+            (torch.empty((0, 3), dtype=torch.long), None),
+            (torch.empty((1, 0), dtype=torch.long), None),
+            (torch.tensor([[1, 2, 3]]), torch.ones((1, 2))),
+            (torch.tensor([[1, 2, 3]]), torch.tensor([[0.5, 1, 1]])),
+        ):
+            with (
+                self.subTest(tokens=tokens, mask=mask),
+                self.assertRaises(ContractError),
+            ):
+                model.generate(
+                    input_ids=tokens,
+                    attention_mask=mask,
+                    config=GenerationConfig(max_new_tokens=2),
+                )
+            self.assertTrue(model.training)
+        for field in ("eos_token_id", "pad_token_id"):
+            with (
+                self.subTest(field=field),
+                self.assertRaisesRegex(ContractError, field),
+            ):
+                model.generate(
+                    input_ids=torch.tensor([[1, 2, 3]]),
+                    attention_mask=None,
+                    config=GenerationConfig(max_new_tokens=2, **{field: 64}),
+                )
+
+    def test_generation_pads_finished_rows_and_stops_at_eos(self) -> None:
+        model = NativeTransformer(micro_config())
+        with patch(
+            "llm_lifecycle_lab.model.native.generation.select_next_token",
+            side_effect=[torch.tensor([2, 4]), torch.tensor([6, 2])],
+        ) as select:
+            output = model.generate(
+                input_ids=torch.tensor([[1, 3], [1, 5]]),
+                attention_mask=None,
+                config=GenerationConfig(
+                    max_new_tokens=4, eos_token_id=2, pad_token_id=0
+                ),
+            )
+        self.assertEqual(select.call_count, 2)
+        self.assertEqual(output.token_ids.tolist(), [[1, 3, 2, 0], [1, 5, 4, 2]])
+        self.assertEqual(output.stop_reason, "eos")
+        self.assertEqual(output.generated_tokens, 2)
+
+    def test_generation_restores_mode_when_sampling_fails(self) -> None:
+        model = NativeTransformer(micro_config())
+        with (
+            patch(
+                "llm_lifecycle_lab.model.native.generation.select_next_token",
+                side_effect=RuntimeError("sampling failed"),
+            ) as select,
+            self.assertRaisesRegex(RuntimeError, "sampling failed"),
+        ):
+            model.generate(
+                input_ids=torch.tensor([[1, 2, 3]]),
+                attention_mask=None,
+                config=GenerationConfig(max_new_tokens=2),
+            )
+        select.assert_called_once()
+        self.assertTrue(model.training)
+
+    def test_sampling_is_seeded_without_changing_cpu_rng(self) -> None:
+        model = NativeTransformer(micro_config())
+        config = GenerationConfig(max_new_tokens=4, do_sample=True, top_p=0.8, seed=11)
+        state = torch.get_rng_state().clone()
+        first = model.generate(
+            input_ids=torch.tensor([[1, 2, 3]]), attention_mask=None, config=config
+        )
+        second = model.generate(
+            input_ids=torch.tensor([[1, 2, 3]]), attention_mask=None, config=config
+        )
+        torch.testing.assert_close(first.token_ids, second.token_ids)
+        torch.testing.assert_close(state, torch.get_rng_state())
+
+    def test_unpadded_forward_matches_explicit_mask_and_gradients(self) -> None:
+        tokens = torch.tensor([[1, 2, 3, 4], [5, 6, 7, 8]])
+        for qk_norm in (False, True):
+            with self.subTest(qk_norm=qk_norm):
+                config = replace(micro_config(), qk_norm=qk_norm)
+                fast = NativeTransformer(config)
+                explicit = NativeTransformer(config)
+                explicit.load_state_dict(fast.state_dict())
+                fast_logits = fast(input_ids=tokens).logits
+                explicit_logits = explicit(
+                    input_ids=tokens, attention_mask=torch.ones_like(tokens)
+                ).logits
+                torch.testing.assert_close(fast_logits, explicit_logits)
+                fast_logits.square().mean().backward()
+                explicit_logits.square().mean().backward()
+                for left, right in zip(
+                    fast.parameters(), explicit.parameters(), strict=True
+                ):
+                    torch.testing.assert_close(
+                        left.grad, right.grad, rtol=1e-4, atol=1e-6
+                    )
+
+    def test_padding_mask_is_shared_by_all_layers(self) -> None:
+        model = NativeTransformer(micro_config()).eval()
+        observed = []
+
+        def record_mask(_module, _args, kwargs):
+            observed.append((kwargs["attention_mask"], kwargs["is_causal"]))
+
+        handles = [
+            layer.attention.register_forward_pre_hook(record_mask, with_kwargs=True)
+            for layer in model.layers
+        ]
+        try:
+            model(
+                input_ids=torch.tensor([[1, 2, 3, 0]]),
+                attention_mask=torch.tensor([[1, 1, 1, 0]]),
+            )
+        finally:
+            for handle in handles:
+                handle.remove()
+        self.assertEqual(len(observed), model.config.num_hidden_layers)
+        expected = torch.tensor(
+            [
+                [True, False, False, False],
+                [True, True, False, False],
+                [True, True, True, False],
+                [True, True, True, False],
+            ]
+        )[None, None]
+        torch.testing.assert_close(observed[0][0], expected)
+        self.assertTrue(
+            all(mask is observed[0][0] and not causal for mask, causal in observed)
+        )
+
+    def test_padded_cache_matches_full_forward(self) -> None:
+        tokens = torch.tensor([[0, 0, 1, 2, 3, 4], [1, 2, 3, 4, 5, 6]])
+        mask = torch.tensor([[0, 0, 1, 1, 1, 1], [1, 1, 1, 1, 1, 1]])
+        for qk_norm in (False, True):
+            model = NativeTransformer(replace(micro_config(), qk_norm=qk_norm)).eval()
+            with self.subTest(qk_norm=qk_norm), torch.inference_mode():
+                full = model(input_ids=tokens, attention_mask=mask).logits
+                for split in (3, 5):
+                    prefix = model(
+                        input_ids=tokens[:, :split],
+                        attention_mask=mask[:, :split],
+                        use_cache=True,
+                    )
+                    suffix = model(
+                        input_ids=tokens[:, split:],
+                        attention_mask=mask,
+                        cache=prefix.cache,
+                    )
+                    torch.testing.assert_close(full[:, split:], suffix.logits)
+
+    def test_last_logits_preserve_outputs_cache_and_gradients(self) -> None:
+        tokens = torch.tensor([[1, 2, 3, 4, 5]])
+        for keep in (1, 3):
+            with self.subTest(keep=keep):
+                full_model = NativeTransformer(micro_config())
+                sliced_model = NativeTransformer(micro_config())
+                sliced_model.load_state_dict(full_model.state_dict())
+                full = full_model(input_ids=tokens, use_cache=True)
+                sliced = sliced_model(
+                    input_ids=tokens, use_cache=True, logits_to_keep=keep
+                )
+                self.assertEqual(tuple(sliced.logits.shape), (1, keep, 64))
+                torch.testing.assert_close(full.logits[:, -keep:], sliced.logits)
+                for full_kv, sliced_kv in zip(full.cache, sliced.cache, strict=True):
+                    torch.testing.assert_close(full_kv, sliced_kv)
+                full.logits[:, -keep:].square().mean().backward()
+                sliced.logits.square().mean().backward()
+                for left, right in zip(
+                    full_model.parameters(), sliced_model.parameters(), strict=True
+                ):
+                    torch.testing.assert_close(
+                        left.grad, right.grad, rtol=1e-4, atol=1e-6
+                    )
+
+    def test_last_logits_validates_count(self) -> None:
+        model = NativeTransformer(micro_config())
+        for value in (-1, 4, True, 1.5):
+            with (
+                self.subTest(value=value),
+                self.assertRaisesRegex(ContractError, "logits_to_keep"),
+            ):
+                model(input_ids=torch.tensor([[1, 2, 3]]), logits_to_keep=value)
+
+    def test_generation_projects_only_one_position_per_step(self) -> None:
+        model = NativeTransformer(micro_config())
+        shapes = []
+
+        def record_shape(_module, args):
+            shapes.append(tuple(args[0].shape))
+
+        handle = model.lm_head.register_forward_pre_hook(record_shape)
+        try:
+            model.generate(
+                input_ids=torch.tensor([[1, 2, 3]]),
+                attention_mask=None,
+                config=GenerationConfig(max_new_tokens=3),
+            )
+        finally:
+            handle.remove()
+        self.assertEqual(shapes, [(1, 1, 32)] * 3)
+
+    def test_checkpoint_rejects_fractional_dimension(self) -> None:
+        model = NativeTransformer(micro_config())
+        with tempfile.TemporaryDirectory() as directory:
+            checkpoint = Path(directory) / "model"
+            model.save(checkpoint)
+            path = checkpoint / "config.json"
+            value = json.loads(path.read_text(encoding="utf-8"))
+            value["num_hidden_layers"] = 2.9
+            path.write_text(json.dumps(value), encoding="utf-8")
+            with self.assertRaisesRegex(ArtifactError, "num_hidden_layers"):
+                model.load(checkpoint)
 
     def test_profile_parameter_counts_match_names(self) -> None:
         project_root = Path(__file__).resolve().parents[2]

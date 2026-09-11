@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from llm_lifecycle_lab.config import load_mapping
-from llm_lifecycle_lab.contracts import ModelRoute, RunConfig, Stage
+from llm_lifecycle_lab.contracts import ModelRoute, RunConfig, RunProfile, Stage
 from llm_lifecycle_lab.data.prepare import (
     load_data_manifest,
     verify_data_manifest,
@@ -77,11 +77,11 @@ def available_profiles() -> tuple[str, ...]:
 
 
 def profile_for_config(config: RunConfig) -> str:
-    if config.model_route is ModelRoute.NATIVE_SMOKE:
+    if config.model_route is ModelRoute.QWEN3_TRANSFER:
+        return "qwen3-0.6b-base"
+    if config.run_profile is RunProfile.SMOKE:
         return "smoke-10m"
-    if config.model_route is ModelRoute.NATIVE_LEARN:
-        return "tiny-60m"
-    return "qwen3-0.6b-base"
+    return "tiny-60m"
 
 
 def run_doctor(
@@ -173,15 +173,16 @@ def _check_profile_matches_config(
         name="profile-config-match",
         status=CheckStatus.PASS if matches else CheckStatus.FAIL,
         message=(
-            f"profile matches config route: {expected}"
+            f"profile matches config run profile: {expected}"
             if matches
-            else f"profile {selected_profile} conflicts with config route; "
+            else f"profile {selected_profile} conflicts with config run profile; "
             f"expected {expected}"
         ),
         details={
             "selected_profile": selected_profile,
             "expected_profile": expected,
             "model_route": config.model_route.value,
+            "run_profile": config.run_profile.value,
         },
     )
 

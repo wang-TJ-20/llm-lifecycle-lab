@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import importlib.metadata
 import os
 import platform
@@ -13,7 +14,9 @@ from typing import Any
 import torch
 
 from llm_lifecycle_lab import __version__
+from llm_lifecycle_lab.config import canonical_json
 from llm_lifecycle_lab.contracts import SCHEMA_VERSION, utc_now
+from llm_lifecycle_lab.data.fingerprint import sha256_file
 
 _PACKAGES = (
     "llm-lifecycle-lab",
@@ -48,6 +51,16 @@ def capture_runtime_provenance(
         "accelerator": _accelerator_details(device),
         "code": _git_details(Path(workdir)),
     }
+
+
+def source_tree_sha256(workdir: str | Path) -> str | None:
+    """Hash Python source contents, independent of checkout path and timestamps."""
+    root = Path(workdir).resolve()
+    files = sorted((root / "src/llm_lifecycle_lab").rglob("*.py"))
+    if not files:
+        return None
+    contents = {path.relative_to(root).as_posix(): sha256_file(path) for path in files}
+    return hashlib.sha256(canonical_json(contents).encode("utf-8")).hexdigest()
 
 
 def _package_version(package: str) -> str | None:
@@ -96,6 +109,7 @@ def _git_details(workdir: Path) -> dict[str, Any]:
         "branch": _run_git(workdir, "branch", "--show-current"),
         "dirty": None if status is None else bool(status),
         "status_entries": (None if status is None else len(status.splitlines())),
+        "source_sha256": source_tree_sha256(workdir),
     }
 
 

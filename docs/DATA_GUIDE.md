@@ -89,8 +89,7 @@ python scripts/data.py recipes
 ```
 
 标准 [requirements.txt](../requirements.txt) 已包含训练及公开数据依赖。
-只有自有 JSONL 的场景也可安装 `python -m pip install -e '.[training]'`；
-公开数据另外需要 `huggingface-hub==0.36.2` 和 `pyarrow==25.0.1`。
+它只安装第三方依赖；各 `scripts/*.py` 会直接加载仓库的 `src/`，不需要安装本项目。
 
 ## 4. 第一次实践：10M 双语 Smoke
 
@@ -427,22 +426,3 @@ SHA-256、来源 Data Manifest、Tokenizer hash 和序列长度。先写临时�
 建议把原始来源与制品归档到可靠存储后再做磁盘清理。训练当前仍用 prepared 做
 Doctor 校验，不应只留下 packed。删除 raw/Hugging Face 缓存虽可重新下载，却会增加
 后续重建成本；删除 Tokenizer 或改其 ID 映射会使原 checkpoint 无法按原协议使用。
-
-## 9. 常见问题
-
-| 现象 | 检查与处理 |
-| --- | --- |
-| `No module named llm_lifecycle_lab` | 激活正确环境，在根目录执行 `python -m pip install -r requirements.txt` |
-| `requires --accept-license ...` | 核对许可证后显式传入；不要随意改许可名 |
-| 下载超时 | 检查网络和 Hugging Face 可达性；保留未损坏缓存，不替换成未验证镜像数据 |
-| `upstream/public recipe ... hash mismatch` | 固定来源或依赖行为不符；停止并核对 recipe/缓存/版本 |
-| `duplicate_id` / group field missing | 修正原 JSONL；同文档片段应使用共同 group |
-| dev/test 为空 | 文档组太少或比例不当；增加数据，不能强行绕过 |
-| `output ... already exists` | 有效产物应复用；新实验使用新目录 |
-| `tokenizer vocab_size ...` | 实际 BPE 词表不足或模型使用了错误词表 |
-| `different Data Manifest` | Tokenizer 来源和当前数据不是同一份 manifest |
-| `packed ... incompatible` | 核对 Data Manifest、Tokenizer、序列长度三者 |
-| `packed array hash mismatch` | 数组被修改或损坏，确认后重建到新版本目录 |
-
-数据侧完成标准：hash 验证通过、split 非空、词表匹配、双语标签有效、
-对应配置的 Doctor 无 FAIL。之后不再修改这些产物，训练实验只改变自己的 pipeline。

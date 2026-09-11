@@ -15,7 +15,7 @@ SFT、DPO、GRPO、Qwen 迁移、HF 导出和服务尚未实现。
 | 目录 | 职责 | 是否应保留 |
 | --- | --- | --- |
 | `src/llm_lifecycle_lab/` | 模型、数据、训练、校验的实际实现 | 必须 |
-| `scripts/` | 在当前 Python 进程中调用共享实现的操作入口 | 必须 |
+| `scripts/` | 可直接阅读和运行的参数、流程与结果输出 | 必须 |
 | `configs/models/` | 模型结构配置 | 必须 |
 | `configs/pipelines/` | 数据、模型、预算、优化器等运行配置 | 必须 |
 | `configs/reference/` | 机器可读 Reference 验收规范 | 使用 Reference 时必须 |
@@ -24,8 +24,8 @@ SFT、DPO、GRPO、Qwen 迁移、HF 导出和服务尚未实现。
 | `runs/` | checkpoint、配置快照和指标 | 实验记录，应归档 |
 | `.venv/` | 可选的 uv Python 环境 | 正在使用时保留 |
 
-`llmlab` 与 `python -m llm_lifecycle_lab` 是兼容入口。文档统一使用 `python scripts/...`；
-它们使用同一套参数解析器、YAML、hash 和训练逻辑，不通过 shell 调用另一个 CLI。
+文档统一使用 `python scripts/...`。每个脚本会从仓库位置自动加载 `src/` 下的共享实现，
+无需把项目安装进 Python 环境；它们使用同一套参数解析器、YAML、hash 和训练逻辑。
 
 ## 2. 环境准备
 
@@ -77,20 +77,21 @@ Linux CUDA：先执行 `nvidia-smi`，再从
 安装命令。项目接受 PyTorch `>=2.4,<3`；不需要 torchvision/torchaudio，也不要仅根据
 Conda 中是否安装 CUDA 包来判断驱动可用。
 
-### 2.4 安装项目并验证
+### 2.4 安装依赖并验证
 
 ```bash
 python -m pip install -r requirements.txt
 python -m pip check
-python -m llm_lifecycle_lab --version
+python scripts/data.py recipes
 python scripts/doctor.py
 ```
 
-`requirements.txt` 用 `-e .[training,public-data]` 从 `pyproject.toml` 安装实际依赖，
-并固定 `tokenizers==0.21.4`。预先安装且满足版本范围的 PyTorch 不会被主动升级。
-editable 安装让 Python 能导入 `src/` 下的包，无需手动修改 `PYTHONPATH`。
+`requirements.txt` 只安装训练和公开数据所需的第三方依赖，并固定
+`tokenizers==0.21.4`。预先安装且满足版本范围的 PyTorch 不会被主动升级。
+各 `scripts/*.py` 入口会根据自身位置加载 `src/`，无需 editable 安装或手动修改
+`PYTHONPATH`。
 
-**检查结果**：`pip check` 无依赖冲突；版本命令正常；基础 Doctor 无 FAIL。
+**检查结果**：`pip check` 无依赖冲突；recipes 命令正常；基础 Doctor 无 FAIL。
 基础 Doctor 不检查所有训练依赖和数据，开始训练前还必须运行带 `--config` 的 Doctor。
 
 GPU 信息检查：
@@ -116,18 +117,19 @@ PY
 Conda + requirements 是兼容范围安装，不是完整传递依赖锁。严格复现时可使用：
 
 ```bash
-uv sync --locked --extra training --extra public-data --extra dev
-uv run python scripts/doctor.py
+uv sync --locked --no-install-project --extra training --extra public-data --extra dev
+uv run --no-sync python scripts/doctor.py
 ```
 
-选择 uv 后，后续 `python ...` 均相应写为 `uv run python ...`，避免调用另一套解释器。
+选择 uv 后，后续 `python ...` 均相应写为 `uv run --no-sync python ...`，避免调用
+另一套解释器或自动安装当前项目。
 也可用 `uv export --frozen` 导出锁依赖后安装到独立 Conda 环境，但其 CUDA 依赖仍需驱动兼容。
 同 seed 不保证不同 CPU/GPU、PyTorch 版本间结果逐位一致，训练会记录实际环境。
 
 开发测试使用：
 
 ```bash
-python -m pip install -e '.[dev]'
+python -m pip install -r requirements-dev.txt
 python -m pytest -q
 python -m ruff check src scripts tests
 python -m ruff format --check src scripts tests
@@ -163,6 +165,14 @@ data/packed/bilingual-smoke-v1-seq128/各 split 的三个二进制数组
 | `native-60m-deep-narrow.yaml` | 深窄，无 QK-Norm | 同 60M 基线 | 8 batches |
 | `native-60m-deep-narrow-qk-norm.yaml` | 深窄 + QK-Norm | 同 60M 基线 | 8 batches |
 
+这些 Pipeline 的 `model_route` 都是 `native`。规模由 `run_profile` 表达：
+`smoke` 对应 10M 快速验证，`learn` 对应 60M 教学训练，`reproduce` 对应 60M
+Reference 验收；具体模型维度仍由 `model.config` 指定。
+
+旧版 `native-smoke` / `native-learn` 配置和 run/checkpoint 契约不再兼容。已有数据、
+Tokenizer 和 Packing 通过 hash 校验后仍可复用；不要手改历史 run 或 checkpoint，
+应使用新配置和新 run ID 重新开始。
+
 首次选择 `configs/pipelines/native-smoke.yaml`。模型详细参数不在本节重复，见模型文档。
 
 ### 3.3 先验证，再做真实 batch 检查
@@ -175,7 +185,8 @@ python scripts/doctor.py --config configs/pipelines/native-smoke.yaml
 `validate_config` 只做配置级校验；Doctor 进一步检查：
 
 1. Python、依赖、设备、可写输出路径和磁盘空间。
-2. Pipeline 与模型 `provider/model_id/model_route` 等元数据。
+2. Pipeline 与模型 `provider/model_id/model_route` 等元数据，以及 `run_profile`
+   对应的设备和资源要求。
 3. Data Manifest、split 内容 hash 与 dev split。
 4. Tokenizer 内容/来源 hash、实际词表和模型词表一致性。
 5. Packed 数组 hash 以及数据、Tokenizer、序列长度三者绑定。
@@ -504,46 +515,142 @@ python scripts/train_pretrain.py \
 token 预算相同不等于 FLOPs 或耗时相同。应一起比较双语指标、token 吞吐、峰值显存、
 总耗时，不预设更复杂结构一定更好。
 
-### 9.2 Reference 是另一份独立配方
+### 9.2 固定 60M 基线
 
-机器验收规范已集中到
-[`configs/reference/native-60m-pretrain-v1.yaml`](../configs/reference/native-60m-pretrain-v1.yaml)，
-对应 `configs/pipelines/native-60m-reference.yaml`，不能拿普通 `native-v1` 的 run 冒充。
+本轮使用
+[`configs/reference/native-60m-baseline-v1.yaml`](../configs/reference/native-60m-baseline-v1.yaml)，
+对应 `configs/pipelines/native-60m-reference.yaml`。历史
+[`native-60m-pretrain-v1.yaml`](../configs/reference/native-60m-pretrain-v1.yaml)
+保留原验收要求；新规范增加独立配置锁、源码锁、环境版本锁和最终双语改善检查。
+不能拿普通 `native-v1.yaml` 的 learn run 冒充正式基线。
 
-**当前限制**：规范固定了原 Data Manifest 文件 hash，而 manifest 含时间戳和来源绝对路径。
-在另一台机器重新 prepare 相同文本也可能得到不同 hash。须使用原配套不可变产物；
-否则该历史 v1 规范不适用，不能通过跳过校验或把要求改成当前输出就宣称复现成功。
-稳定内容身份的跨机器重建支持仍待完善。
+| 固定项 | `native-60m-baseline-v1` |
+| --- | --- |
+| 模型 | 62,927,616 参数；8 层、hidden 768、12 Q heads / 4 KV heads、MLP 2048 |
+| 词表与上下文 | 16,384；训练长度 512；embedding/head 绑定 |
+| 初始化与结构 | `initializer_range=0.02`；QK-Norm 关闭；不加入新初始化或结构消融 |
+| 数据 | 英文 SimpleStories 100,000 条、中文 Wikipedia 126,000 条 |
+| Packing | train 90,381 / dev 11,432 / test 11,055 个样本 |
+| 预算 | seed 42；1 epoch；46,184,530 个目标监督 token；5,649 optimizer steps |
+| Batch | micro batch 1、梯度累积 16；完整无 padding 时每步 8,176 个监督 token |
+| 优化器 | AdamW；LR 0.0003；betas 0.9/0.95；weight decay 0.1；clip 1.0 |
+| 调度与评测 | warmup 50；cosine 最低 LR 比例 0.1；每 500 steps 评测和保存；最终步也执行 |
+| 评测范围 | 确定性双语分层抽样，每个 dev/test suite 64 个 packed 样本 |
+| 环境 | Linux、CUDA BF16、首个可见 GPU 不少于 22 GiB、干净 Git commit |
+| Python 与训练依赖 | Python 3.11；NumPy 2.4.6；PyYAML 6.0.3；tokenizers 0.21.4；torch 2.14.0 |
 
-符合固定输入与硬件条件时执行：
+步数按完整梯度累积向上取整，实际 token 可略超 1 epoch；验收覆盖率仍限定在
+`[1.0, 1.01]`。64 batches 在 micro batch 为 1 时等于 64 个样本，不是全量评测，
+也不是每种语言各 64 个样本。
+
+`freeze.execution_sha256` 同时锁住 Pipeline、模型配置及训练器的有效默认值；
+`freeze.source_sha256` 锁住 `src/llm_lifecycle_lab/**/*.py` 的相对路径和文件内容，
+与 checkout 的绝对路径、时间戳无关。文档与脚本不参与该源码摘要。
+不要在原基线上调学习率、初始化或默认值后重算 hash 放行，应另建实验版本。
+当前只是冻结了可执行规范和输入，**尚无通过该规范的完整 CUDA 训练结果**。
+
+### 9.3 输入与环境门控
+
+**不可变输入**：保留以下三个目录的完整字节内容及目录内部相对路径：
+
+```text
+data/prepared/bilingual-60m-v1/
+data/tokenizers/bilingual-60m-v1/
+data/packed/bilingual-60m-v1-seq512/
+```
+
+可以把整套产物复制到另一台机器的相同仓库相对位置，不需要修改 manifest 中作为
+来源记录的旧绝对路径。校验会实际读取三个 prepared split、Tokenizer 和全部九个
+packed 数组，不只比较 manifest 自报的 hash。
+
+Data Manifest 含时间戳和来源绝对路径，重新 prepare 相同文本也可能产生不同 hash。
+没有原配套产物时，新建数据与基线版本，不能修改本规范假装复现；稳定内容身份的
+跨机器重建支持不在本轮范围内。
+
+任何已安装训练依赖的机器都可先检查输入，不会创建 run：
+
+```bash
+python scripts/verify_reference.py \
+  --spec configs/reference/native-60m-baseline-v1.yaml \
+  --inputs-only --json
+```
+
+`scope=inputs-only` 且 `ok=true` **只表示输入冻结通过**，不表示 CUDA 就绪或模型质量合格。
+
+正式环境沿用 `uv.lock` 的 Python 3.11 分支。可以使用第 2 节的 Conda 环境，
+安装以下固定训练依赖；不要安装项目自身：
+
+```bash
+conda create -n llm-60m-baseline python=3.11 pip -y
+conda activate llm-60m-baseline
+python -m pip install "torch==2.14.0"
+python -m pip install "numpy==2.4.6" "PyYAML==6.0.3" "tokenizers==0.21.4"
+python -m pip check
+```
+
+Linux 的 PyTorch wheel 与 NVIDIA 驱动须兼容，按第 2.3 节核对。以上固定了训练直接依赖，
+不是全部传递依赖；完整锁环境可改用已安装的 uv：
+
+```bash
+uv sync --locked --no-install-project --python 3.11 \
+  --extra training --extra public-data --extra dev
+```
+
+使用 uv 时，后续命令的 `python` 替换为 `uv run --no-sync python`。不能通过只安装
+NumPy 2.4.6 到 Python 3.13 来满足 Python 3.11 要求。
+验收比较 PyTorch 发布版本，允许 `+cu...` 后缀；实际 CUDA/cuDNN、GPU 和 Python patch
+记录在 `runtime_environment.json`。这不是跨硬件逐位一致性保证，目标 CUDA 环境仍待实测。
+
+在确认并提交本次代码的干净 checkout 上检查，Git 有任何未提交变更都不能发布正式基线。
+不要为了清空状态删除自己的工作：
 
 ```bash
 git status --short
+python scripts/verify_reference.py \
+  --spec configs/reference/native-60m-baseline-v1.yaml \
+  --preflight --json
 python scripts/doctor.py --config configs/pipelines/native-60m-reference.yaml
+```
+
+两个检查都须通过再训练。`--preflight` 检查冻结输入和真实环境；Doctor 额外检查
+资源、输出目录和真实 batch。macOS/无 CUDA/版本不符/dirty Git 的失败是正常门控，
+不得降低规范要求。退出码 `0` 表示该 scope 通过，`1` 表示验收不通过，`2` 表示参数、
+配置或产物读取错误。
+
+### 9.4 正式训练与验收
+
+训练命令必须带 `--reference-spec`，入口会再次门控；失败时不会创建或恢复 run。
+
+```bash
 python scripts/train_pretrain.py \
   --config configs/pipelines/native-60m-reference.yaml \
-  --run-id native-60m-pretrain-v1
+  --reference-spec configs/reference/native-60m-baseline-v1.yaml \
+  --run-id native-60m-baseline-v1
 
 python scripts/eval_pretrain.py \
   --config configs/pipelines/native-60m-reference.yaml \
-  --checkpoint runs/native-60m-pretrain-v1/checkpoints/step-00005649 \
+  --checkpoint runs/native-60m-baseline-v1/checkpoints/step-00005649 \
   --split dev --json
 
 python scripts/eval_pretrain.py \
   --config configs/pipelines/native-60m-reference.yaml \
-  --checkpoint runs/native-60m-pretrain-v1/checkpoints/step-00005649 \
+  --checkpoint runs/native-60m-baseline-v1/checkpoints/step-00005649 \
   --split test --json
 
 python scripts/verify_reference.py \
-  --spec configs/reference/native-60m-pretrain-v1.yaml \
-  --run runs/native-60m-pretrain-v1
+  --spec configs/reference/native-60m-baseline-v1.yaml \
+  --run runs/native-60m-baseline-v1 --json
 ```
 
-`git status --short` 应无输出，正式运行须来自干净 commit。验收检查 completed 状态、
-固定配置/数据/模型/Tokenizer/packed hash、5,649 steps、目标 token 46,184,530、
-覆盖率 `[1.0, 1.01]`、双语指标、相对 baseline 的 dev 改善、checkpoint 完整性、
-独立 dev/test 报告及 Linux/CUDA GPU 不少于 22 GiB。
-Reference 的 64 batches 也只是抽样范围，不是全量评测。
+未完成 run 恢复时将 `--run-id` 换成 `--resume-run`，保留 `--reference-spec`，并使用
+同一源码、配置、输入和环境；不要在普通训练命令里绕过门控后宣称符合基线。
+已有完成 run 不覆盖，重复实验使用新的 run ID，最后验收指向实际 run。
+
+最终验收要求：completed 状态、所有冻结项一致、预算完成、指标有限且中英文分桶与
+聚合一致、checkpoint 完整，以及最终 checkpoint 的独立 dev/test 报告各 64 个样本。
+除历史的 best dev 改善外，**最终 dev 聚合、英文、中文 loss 都必须低于 step 0**；
+不能用中途 best 或英文改善掩盖最终中文退化。各语言 loss、perplexity、bits-per-byte
+和 token 数都需保留，不预设一个未经正式训练验证的绝对质量阈值。
 
 实际时间取 `training_result.json`，显存取 `metrics.jsonl`。成本应依据 GPU 计费与
 实际占用时长计算，不引用其他项目的 SFT 耗时作为本项目 Pretrain 成本。
@@ -552,7 +659,7 @@ Reference 的 64 batches 也只是抽样范围，不是全量评测。
 
 | 现象 | 处理顺序 |
 | --- | --- |
-| `No module named ...` | 检查 `sys.executable`、Conda 激活、根目录 editable 安装 |
+| `No module named ...` | 检查 `sys.executable`、Conda 激活、第三方依赖安装及仓库 `src/` 是否完整 |
 | `config file does not exist` | 确认从仓库根目录运行，并检查配置路径 |
 | `different Data Manifest` / packed 不兼容 | 对照数据文档确认配套关系，禁止手改 hash |
 | Tokenizer/model 词表不一致 | 读取实际词表，修正独立模型配置或重新训练 Tokenizer |

@@ -17,8 +17,8 @@ from llm_lifecycle_lab.doctor.result import CheckStatus
 
 
 class DoctorTests(unittest.TestCase):
-    def test_profile_is_derived_from_model_route(self) -> None:
-        config = RunConfig(
+    def test_profile_is_derived_from_model_route_and_run_profile(self) -> None:
+        qwen = RunConfig(
             model_route=ModelRoute.QWEN3_TRANSFER,
             run_profile=RunProfile.LEARN,
             stage=Stage.SFT,
@@ -30,12 +30,26 @@ class DoctorTests(unittest.TestCase):
                 "transformers_version": "4.51.3",
             },
         )
+        smoke = RunConfig(
+            model_route=ModelRoute.NATIVE,
+            run_profile=RunProfile.SMOKE,
+            stage=Stage.PRETRAIN,
+            model={"provider": "native", "model_id": "smoke-10m"},
+        )
+        learn = RunConfig(
+            model_route=ModelRoute.NATIVE,
+            run_profile=RunProfile.LEARN,
+            stage=Stage.PRETRAIN,
+            model={"provider": "native", "model_id": "tiny-60m"},
+        )
 
-        self.assertEqual(profile_for_config(config), "qwen3-0.6b-base")
+        self.assertEqual(profile_for_config(qwen), "qwen3-0.6b-base")
+        self.assertEqual(profile_for_config(smoke), "smoke-10m")
+        self.assertEqual(profile_for_config(learn), "tiny-60m")
 
     def test_explicit_conflicting_profile_fails(self) -> None:
         config = RunConfig(
-            model_route=ModelRoute.NATIVE_SMOKE,
+            model_route=ModelRoute.NATIVE,
             run_profile=RunProfile.SMOKE,
             stage=Stage.PRETRAIN,
             model={"provider": "native", "model_id": "smoke-10m"},
@@ -78,7 +92,7 @@ class DoctorTests(unittest.TestCase):
                 license_name="test-only",
             )
             config = RunConfig(
-                model_route=ModelRoute.NATIVE_SMOKE,
+                model_route=ModelRoute.NATIVE,
                 run_profile=RunProfile.SMOKE,
                 stage=Stage.PRETRAIN,
                 model={"provider": "native", "model_id": "smoke-10m"},

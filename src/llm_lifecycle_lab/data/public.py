@@ -411,7 +411,7 @@ def _load_huggingface_rows(
     except ImportError as exc:
         raise DataValidationError(
             "public dataset support is unavailable; run "
-            "`python -m pip install -e '.[public-data]'`"
+            "`python -m pip install -r requirements.txt`"
         ) from exc
 
     try:

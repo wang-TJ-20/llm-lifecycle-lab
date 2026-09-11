@@ -65,10 +65,10 @@ def evaluate_native_pretraining(
     split: str = "dev",
     workdir: str | Path = ".",
 ) -> dict[str, Any]:
-    if config.stage is not Stage.PRETRAIN or config.model_route not in {
-        ModelRoute.NATIVE_SMOKE,
-        ModelRoute.NATIVE_LEARN,
-    }:
+    if (
+        config.stage is not Stage.PRETRAIN
+        or config.model_route is not ModelRoute.NATIVE
+    ):
         raise ConfigError("pretrain evaluation requires a native pretrain config")
 
     root = Path(workdir).resolve()
@@ -164,11 +164,8 @@ def run_native_pretraining(
 ) -> PretrainingRun:
     if config.stage is not Stage.PRETRAIN:
         raise ConfigError("native pretraining requires stage=pretrain")
-    if config.model_route not in {
-        ModelRoute.NATIVE_SMOKE,
-        ModelRoute.NATIVE_LEARN,
-    }:
-        raise ConfigError("pretraining is only available for native model routes")
+    if config.model_route is not ModelRoute.NATIVE:
+        raise ConfigError("pretraining is only available for model_route=native")
     if run_id is not None and resume_run is not None:
         raise ConfigError("run_id and resume_run are mutually exclusive")
     if resume_checkpoint is not None and resume_run is None:

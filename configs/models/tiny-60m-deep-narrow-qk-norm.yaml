@@ -1,5 +1,5 @@
 schema_version: "1.0"
-model_route: native-learn
+model_route: native
 provider: native
 model_id: tiny-60m-deep-narrow-qk-norm
 architecture: dense-decoder

@@ -1,6 +1,16 @@
 schema_version: "1.0"
-reference_id: native-60m-pretrain-v1
+reference_id: native-60m-baseline-v1
 pipeline_config: configs/pipelines/native-60m-reference.yaml
+freeze:
+  execution_sha256: 227c96173e3438981174d4b7f69b6877a6779790540d3a2af700c9be7073c83e
+  source_sha256: 809e81e28c90993c478ac32fe6370e154b9a14d3a8922b0f0e8ab1d1271be21a
+  packed_manifest_sha256: 49c7bf3b7d0c142d8e9c98ee3dda11da12b29a59055b05cca261cce5eab0b84a
+  python_major_minor: "3.11"
+  packages:
+    numpy: "2.4.6"
+    PyYAML: "6.0.3"
+    tokenizers: "0.21.4"
+    torch: "2.14.0"
 requirements:
   expected_data_manifest_sha256: 11a0c0abf73abcb36fcd269565363ef60564d778cb6006b23ff381a069d577b8
   expected_tokenizer_sha256: 7455ac1168f36a3d7dca03fee28784f97899fe233f496484a11e5da2e44a2f32
@@ -26,6 +36,8 @@ requirements:
   minimum_device_memory_gib: 22
   require_clean_git: true
   require_eval_improvement: true
+  require_final_language_improvement: true
+  expected_evaluation_samples: 64
   evaluation_suites:
     - pretrain-dev
     - pretrain-test

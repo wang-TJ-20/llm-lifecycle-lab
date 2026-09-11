@@ -17,7 +17,7 @@ from llm_lifecycle_lab.exceptions import ArtifactError
 
 def _config() -> RunConfig:
     return RunConfig(
-        model_route=ModelRoute.NATIVE_SMOKE,
+        model_route=ModelRoute.NATIVE,
         run_profile=RunProfile.SMOKE,
         stage=Stage.PRETRAIN,
         model={"provider": "native", "model_id": "smoke-10m"},
@@ -38,7 +38,7 @@ class ArtifactStoreTests(unittest.TestCase):
                 (artifacts.path / "run_manifest.json").read_text(encoding="utf-8")
             )
             self.assertEqual(manifest["run_id"], "test-run")
-            self.assertEqual(manifest["model_route"], "native-smoke")
+            self.assertEqual(manifest["model_route"], "native")
 
     def test_create_run_refuses_existing_directory(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

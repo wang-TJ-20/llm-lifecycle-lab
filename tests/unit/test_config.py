@@ -48,7 +48,7 @@ class ConfigTests(unittest.TestCase):
                 "\n".join(
                     (
                         'schema_version: "1.0"',
-                        "model_route: native-smoke",
+                        "model_route: native",
                         "run_profile: smoke",
                         "stage: pretrain",
                         "model:",

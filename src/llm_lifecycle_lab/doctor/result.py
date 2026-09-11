@@ -1,4 +1,4 @@
-"""Structured diagnostics returned by llmlab doctor."""
+"""Structured diagnostics returned by the environment doctor."""
 
 from __future__ import annotations
 

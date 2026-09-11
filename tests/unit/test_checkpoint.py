@@ -26,7 +26,7 @@ class CheckpointTests(unittest.TestCase):
     def test_restore_recovers_training_and_batch_state(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             config = RunConfig(
-                model_route=ModelRoute.NATIVE_SMOKE,
+                model_route=ModelRoute.NATIVE,
                 run_profile=RunProfile.SMOKE,
                 stage=Stage.PRETRAIN,
                 model={"provider": "native", "model_id": "micro"},
@@ -68,7 +68,7 @@ class CheckpointTests(unittest.TestCase):
 
             manager = CheckpointManager(
                 artifacts,
-                model_route=ModelRoute.NATIVE_SMOKE,
+                model_route=ModelRoute.NATIVE,
                 stage=Stage.PRETRAIN,
                 tokenizer_sha256="0" * 64,
                 config_sha256=config_sha256(config),

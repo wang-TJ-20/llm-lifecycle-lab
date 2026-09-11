@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -15,11 +16,26 @@ SCRIPT_NAMES = (
     "eval_pretrain",
     "inspect_model",
     "inspect_tokenizer",
+    "model_experiment",
     "train_pretrain",
     "train_tokenizer",
     "validate_config",
     "verify_reference",
 )
+
+
+@pytest.mark.parametrize("name", SCRIPT_NAMES)
+def test_script_contains_its_own_main_flow(name: str) -> None:
+    source = (PROJECT_ROOT / "scripts" / f"{name}.py").read_text(encoding="utf-8")
+    assert "def build_parser(" in source
+    assert "def main(" in source
+
+
+def test_project_has_no_generic_cli_entry() -> None:
+    assert not (PROJECT_ROOT / "src/llm_lifecycle_lab/cli.py").exists()
+    assert not (PROJECT_ROOT / "src/llm_lifecycle_lab/__main__.py").exists()
+    pyproject = (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    assert "[project.scripts]" not in pyproject
 
 
 def run_script(
@@ -28,9 +44,12 @@ def run_script(
     cwd: Path,
     expected_code: int = 0,
 ) -> subprocess.CompletedProcess[str]:
+    env = os.environ.copy()
+    env.pop("PYTHONPATH", None)
     result = subprocess.run(
         [sys.executable, str(PROJECT_ROOT / "scripts" / f"{name}.py"), *arguments],
         cwd=cwd,
+        env=env,
         capture_output=True,
         text=True,
         timeout=90,
@@ -61,17 +80,150 @@ def test_script_error_codes_and_nested_help(tmp_path: Path) -> None:
     assert not (tmp_path / "runs").exists()
 
 
-def test_python_and_legacy_entries_list_identical_recipes(tmp_path: Path) -> None:
-    scripted = run_script("data", "recipes", "--json", cwd=tmp_path)
-    legacy = subprocess.run(
-        [sys.executable, "-m", "llm_lifecycle_lab", "data", "recipes", "--json"],
-        cwd=tmp_path,
-        capture_output=True,
-        text=True,
-        timeout=30,
-        check=True,
+@pytest.fixture
+def mismatched_reference(tmp_path: Path) -> Path:
+    pipeline = yaml.safe_load(
+        (PROJECT_ROOT / "configs/pipelines/native-60m-reference.yaml").read_text(
+            encoding="utf-8"
+        )
     )
-    assert json.loads(scripted.stdout) == json.loads(legacy.stdout)
+    pipeline["model"]["config"] = str(PROJECT_ROOT / "configs/models/tiny-60m.yaml")
+    (tmp_path / "pipeline.yaml").write_text(yaml.safe_dump(pipeline), encoding="utf-8")
+    spec = yaml.safe_load(
+        (PROJECT_ROOT / "configs/reference/native-60m-pretrain-v1.yaml").read_text(
+            encoding="utf-8"
+        )
+    )
+    spec["pipeline_config"] = "pipeline.yaml"
+    spec["freeze"] = {
+        "execution_sha256": "0" * 64,
+        "source_sha256": "0" * 64,
+        "packed_manifest_sha256": "0" * 64,
+        "python_major_minor": "3.11",
+        "packages": {"tokenizers": "0.21.4"},
+    }
+    path = tmp_path / "reference.yaml"
+    path.write_text(yaml.safe_dump(spec), encoding="utf-8")
+    return path
+
+
+@pytest.mark.parametrize("mode", ["inputs-only", "preflight"])
+def test_reference_script_rejects_drift_before_loading_data(
+    tmp_path: Path, mismatched_reference: Path, mode: str
+) -> None:
+    result = run_script(
+        "verify_reference",
+        "--spec",
+        str(mismatched_reference),
+        f"--{mode}",
+        "--json",
+        cwd=tmp_path,
+        expected_code=1,
+    )
+    report = json.loads(result.stdout)
+    assert report["scope"] == mode
+    assert report["ok"] is False
+    assert report["counts"]["fail"] == 1
+    assert report["checks"][0]["name"] == "execution-lock"
+    assert not (tmp_path / "runs").exists()
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [(), ("--inputs-only", "--preflight"), ("--run", "missing", "--inputs-only")],
+)
+def test_reference_script_requires_exactly_one_mode(
+    tmp_path: Path, arguments: tuple[str, ...]
+) -> None:
+    run_script(
+        "verify_reference",
+        "--spec",
+        "missing.yaml",
+        *arguments,
+        cwd=tmp_path,
+        expected_code=2,
+    )
+
+
+def test_reference_script_reports_missing_completed_run(
+    tmp_path: Path, mismatched_reference: Path
+) -> None:
+    result = run_script(
+        "verify_reference",
+        "--spec",
+        str(mismatched_reference),
+        "--run",
+        "runs/missing",
+        "--json",
+        cwd=tmp_path,
+        expected_code=1,
+    )
+    report = json.loads(result.stdout)
+    assert report["scope"] == "completed-run"
+    assert report["checks"][0]["name"] == "required-artifacts"
+    assert report["checks"][0]["status"] == "fail"
+
+
+@pytest.mark.parametrize("run_option", ["--run-id", "--resume-run"])
+def test_training_reference_gate_does_not_create_a_run(
+    tmp_path: Path, mismatched_reference: Path, run_option: str
+) -> None:
+    result = run_script(
+        "train_pretrain",
+        "--config",
+        "pipeline.yaml",
+        "--reference-spec",
+        str(mismatched_reference),
+        run_option,
+        "rejected",
+        cwd=tmp_path,
+        expected_code=2,
+    )
+    assert "reference preflight failed: execution-lock" in result.stderr
+    assert not (tmp_path / "runs").exists()
+
+
+def test_model_experiment_runs_without_data_or_installation(tmp_path: Path) -> None:
+    model_path = tmp_path / "model.yaml"
+    model_path.write_text(
+        yaml.safe_dump(
+            {
+                "model_id": "experiment-micro",
+                "vocab_size": 64,
+                "num_hidden_layers": 2,
+                "hidden_size": 32,
+                "num_attention_heads": 4,
+                "num_key_value_heads": 2,
+                "intermediate_size": 64,
+                "max_sequence_length": 32,
+            }
+        ),
+        encoding="utf-8",
+    )
+    result = run_script(
+        "model_experiment", "--config", str(model_path), "--json", cwd=tmp_path
+    )
+    report = json.loads(result.stdout)
+    assert report["input_shape"] == [2, 16]
+    assert report["logits_shape"] == [2, 16, 64]
+    assert report["supervised_tokens"] == 30
+    assert report["weight_update_max"] > 0
+    assert report["grad_norm"] > 0
+    assert report["cache_matches_full"]
+    assert report["checkpoint_matches_full"]
+    assert report["cache_key_shape"] == [2, 2, 16, 8]
+    assert report["generated_shape"] == [2, 20]
+    assert list(tmp_path.iterdir()) == [model_path]
+    invalid = run_script(
+        "model_experiment",
+        "--config",
+        str(model_path),
+        "--sequence-length",
+        "32",
+        cwd=tmp_path,
+        expected_code=2,
+    )
+    assert "sequence-length" in invalid.stderr
 
 
 def test_python_scripts_prepare_train_and_evaluate(tmp_path: Path) -> None:
@@ -155,7 +307,7 @@ def test_python_scripts_prepare_train_and_evaluate(tmp_path: Path) -> None:
         yaml.safe_dump(
             {
                 "schema_version": "1.0",
-                "model_route": "native-smoke",
+                "model_route": "native",
                 "provider": "native",
                 "model_id": "script-micro",
                 "vocab_size": vocab_size,
@@ -170,7 +322,7 @@ def test_python_scripts_prepare_train_and_evaluate(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     config = {
-        "model_route": "native-smoke",
+        "model_route": "native",
         "run_profile": "smoke",
         "stage": "pretrain",
         "seed": 11,

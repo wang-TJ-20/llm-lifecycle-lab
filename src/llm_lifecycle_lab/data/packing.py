@@ -339,7 +339,12 @@ def collate_pretraining_batch(
         "byte_weights",
         "source_bytes",
     )
-    return {key: torch.stack([example[key] for example in examples]) for key in keys}
+    batch = {key: torch.stack([example[key] for example in examples]) for key in keys}
+    # Check on CPU before transfer, avoiding a device synchronization in each layer.
+    mask = batch["attention_mask"]
+    if mask.device.type == "cpu" and bool(mask.all()):
+        del batch["attention_mask"]
+    return batch
 
 
 def materialize_packed_pretraining_dataset(

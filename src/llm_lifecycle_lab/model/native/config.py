@@ -1,7 +1,11 @@
-"""Configuration for the native teaching Transformer."""
+"""校验 Native 教学模型的结构维度和数值参数。
+
+Validate architecture dimensions and numeric settings for the Native Transformer.
+"""
 
 from __future__ import annotations
 
+import math
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -57,10 +61,13 @@ class NativeModelConfig:
             "max_sequence_length": self.max_sequence_length,
         }
         for name, value in integer_fields.items():
-            if value <= 0:
-                raise ConfigError(f"{name} must be positive")
-        if not self.model_id.strip():
-            raise ConfigError("model_id must not be empty")
+            if type(value) is not int or value <= 0:
+                raise ConfigError(f"{name} must be a positive integer")
+        if not isinstance(self.model_id, str) or not self.model_id.strip():
+            raise ConfigError("model_id must be a non-empty string")
+        for name in ("qk_norm", "tie_word_embeddings"):
+            if not isinstance(getattr(self, name), bool):
+                raise ConfigError(f"{name} must be a boolean")
         if self.hidden_size % self.num_attention_heads != 0:
             raise ConfigError("hidden_size must be divisible by num_attention_heads")
         if self.num_attention_heads % self.num_key_value_heads != 0:
@@ -69,12 +76,18 @@ class NativeModelConfig:
             )
         if self.head_dim % 2 != 0:
             raise ConfigError("attention head dimension must be even for RoPE")
-        if self.norm_eps <= 0 or self.rope_theta <= 0:
-            raise ConfigError("norm_eps and rope_theta must be positive")
+        for name in ("norm_eps", "rope_theta", "initializer_range"):
+            value = getattr(self, name)
+            if (
+                type(value) not in (int, float)
+                or not math.isfinite(value)
+                or value <= 0
+            ):
+                raise ConfigError(f"{name} must be finite and positive")
+        if type(self.attention_dropout) not in (int, float):
+            raise ConfigError("attention_dropout must be a number in [0, 1)")
         if not 0 <= self.attention_dropout < 1:
             raise ConfigError("attention_dropout must be in [0, 1)")
-        if self.initializer_range <= 0:
-            raise ConfigError("initializer_range must be positive")
 
     @property
     def head_dim(self) -> int:
@@ -101,8 +114,8 @@ class NativeModelConfig:
         )
 
     def token_parameter_count_for_vocab_size(self, vocab_size: int) -> int:
-        if vocab_size <= 0:
-            raise ConfigError("vocab_size must be positive")
+        if type(vocab_size) is not int or vocab_size <= 0:
+            raise ConfigError("vocab_size must be a positive integer")
         multiplier = 1 if self.tie_word_embeddings else 2
         return vocab_size * self.hidden_size * multiplier
 
@@ -130,26 +143,24 @@ class NativeModelConfig:
             )
         if data.get("provider", "native") != "native":
             raise ConfigError("native model config requires provider=native")
+        if data.get("model_route", "native") != "native":
+            raise ConfigError("native model config requires model_route=native")
         try:
             return cls(
-                model_id=str(data["model_id"]),
-                vocab_size=int(data["vocab_size"]),
-                num_hidden_layers=int(data["num_hidden_layers"]),
-                hidden_size=int(data["hidden_size"]),
-                num_attention_heads=int(data["num_attention_heads"]),
-                num_key_value_heads=int(data["num_key_value_heads"]),
-                intermediate_size=int(data["intermediate_size"]),
-                max_sequence_length=int(data["max_sequence_length"]),
-                norm_eps=float(data.get("norm_eps", 1e-6)),
-                rope_theta=float(data.get("rope_theta", 10_000.0)),
-                qk_norm=_optional_bool(data, "qk_norm", default=False),
-                attention_dropout=float(data.get("attention_dropout", 0.0)),
-                tie_word_embeddings=_optional_bool(
-                    data,
-                    "tie_word_embeddings",
-                    default=True,
-                ),
-                initializer_range=float(data.get("initializer_range", 0.02)),
+                model_id=data["model_id"],
+                vocab_size=data["vocab_size"],
+                num_hidden_layers=data["num_hidden_layers"],
+                hidden_size=data["hidden_size"],
+                num_attention_heads=data["num_attention_heads"],
+                num_key_value_heads=data["num_key_value_heads"],
+                intermediate_size=data["intermediate_size"],
+                max_sequence_length=data["max_sequence_length"],
+                norm_eps=data.get("norm_eps", 1e-6),
+                rope_theta=data.get("rope_theta", 10_000.0),
+                qk_norm=data.get("qk_norm", False),
+                attention_dropout=data.get("attention_dropout", 0.0),
+                tie_word_embeddings=data.get("tie_word_embeddings", True),
+                initializer_range=data.get("initializer_range", 0.02),
             )
         except KeyError as exc:
             raise ConfigError(
@@ -161,15 +172,3 @@ class NativeModelConfig:
 
 def load_native_model_config(path: str | Path) -> NativeModelConfig:
     return NativeModelConfig.from_dict(load_mapping(path))
-
-
-def _optional_bool(
-    data: Mapping[str, Any],
-    field: str,
-    *,
-    default: bool,
-) -> bool:
-    value = data.get(field, default)
-    if not isinstance(value, bool):
-        raise ConfigError(f"{field} must be a boolean")
-    return value

@@ -1,5 +1,5 @@
 schema_version: "1.0"
-model_route: native-smoke
+model_route: native
 provider: native
 model_id: smoke-10m
 architecture: dense-decoder

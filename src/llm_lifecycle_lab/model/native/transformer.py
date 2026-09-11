@@ -1,4 +1,7 @@
-"""Decoder-only native language model shared by the 10M and 60M profiles."""
+"""构建 Native Decoder-only 模型：Embedding、Transformer Blocks 和 LM Head。
+
+Build the Native decoder from embeddings, Transformer blocks, and an LM head.
+"""
 
 from __future__ import annotations
 
@@ -13,12 +16,13 @@ import torch
 from torch import Tensor, nn
 
 from llm_lifecycle_lab.exceptions import ArtifactError, ConfigError, ContractError
-from llm_lifecycle_lab.model.native.attention import KVCacheEntry, RotaryEmbedding
-from llm_lifecycle_lab.model.native.config import NativeModelConfig
-from llm_lifecycle_lab.model.native.generation import (
-    make_generator,
-    select_next_token,
+from llm_lifecycle_lab.model.native.attention import (
+    KVCacheEntry,
+    RotaryEmbedding,
+    build_attention_mask,
 )
+from llm_lifecycle_lab.model.native.config import NativeModelConfig
+from llm_lifecycle_lab.model.native.generation import generate_tokens
 from llm_lifecycle_lab.model.native.layers import TransformerBlock
 from llm_lifecycle_lab.model.native.normalization import RMSNorm
 from llm_lifecycle_lab.model.protocol import (
@@ -31,7 +35,10 @@ KVCache = tuple[KVCacheEntry, ...]
 
 
 class NativeTransformer(nn.Module):
-    """A compact Llama-style decoder with no stage-specific loss logic."""
+    """模型只输出 logits，loss 在训练代码中计算。
+
+    Return logits; the training code computes the task-specific loss.
+    """
 
     def __init__(self, config: NativeModelConfig) -> None:
         super().__init__()
@@ -62,8 +69,22 @@ class NativeTransformer(nn.Module):
         attention_mask: Tensor | None = None,
         use_cache: bool = False,
         cache: KVCache | None = None,
+        logits_to_keep: int = 0,
     ) -> ModelOutput:
+        """默认返回全部位置；logits_to_keep > 0 只投影末尾位置。
+
+        Zero keeps all logits; a positive value projects only the final positions.
+        KV cache always retains the complete input, regardless of this setting.
+        """
         self._validate_inputs(input_ids, attention_mask, cache)
+        if (
+            type(logits_to_keep) is not int
+            or not 0 <= logits_to_keep <= input_ids.shape[1]
+        ):
+            raise ContractError(
+                "logits_to_keep must be an integer in [0, input length]"
+            )
+        # token ID 转为向量：[B, T] -> [B, T, D]。Token IDs to hidden states.
         hidden_states = self.token_embedding(input_ids)
         present_cache: list[KVCacheEntry] = []
         past_length = 0 if cache is None else cache[0][0].shape[2]
@@ -71,26 +92,38 @@ class NativeTransformer(nn.Module):
             start_position=past_length,
             sequence_length=input_ids.shape[1],
         )
+        # 各层共享 mask；加速设备可用 SDPA causal。Share masks across layers.
+        mask = build_attention_mask(
+            attention_mask,
+            query_length=input_ids.shape[1],
+            key_length=past_length + input_ids.shape[1],
+            past_length=past_length,
+            device=input_ids.device,
+        )
+        is_causal = mask is None and past_length == 0
 
         for index, layer in enumerate(self.layers):
             past_key_value = None if cache is None else cache[index]
             hidden_states, present = layer(
                 hidden_states,
                 position_embeddings=position_embeddings,
-                attention_mask=attention_mask,
+                attention_mask=mask,
+                is_causal=is_causal,
                 past_key_value=past_key_value,
                 use_cache=use_cache,
             )
             if present is not None:
                 present_cache.append(present)
 
+        # 先切位置再做词表投影：[B, T/1, D] -> [B, T/1, V]。Slice before LM head.
+        if logits_to_keep:
+            hidden_states = hidden_states[:, -logits_to_keep:, :]
         logits = self.lm_head(self.final_norm(hidden_states))
         return ModelOutput(
             logits=logits,
             cache=tuple(present_cache) if use_cache else None,
         )
 
-    @torch.inference_mode()
     def generate(
         self,
         *,
@@ -98,87 +131,8 @@ class NativeTransformer(nn.Module):
         attention_mask: Tensor | None,
         config: GenerationConfig,
     ) -> GenerationOutput:
-        if input_ids.ndim != 2 or input_ids.shape[1] == 0:
-            raise ContractError("generation input_ids must have shape [batch, time]")
-        if input_ids.shape[1] + config.max_new_tokens > self.config.max_sequence_length:
-            raise ContractError(
-                "prompt plus max_new_tokens exceeds model max_sequence_length"
-            )
-
-        was_training = self.training
-        self.eval()
-        generated = input_ids
-        if attention_mask is None:
-            attention_mask = torch.ones_like(input_ids, dtype=torch.bool)
-        else:
-            attention_mask = attention_mask.to(dtype=torch.bool)
-
-        generator = make_generator(input_ids.device, config.seed)
-        finished = torch.zeros(
-            input_ids.shape[0],
-            dtype=torch.bool,
-            device=input_ids.device,
-        )
-        cache: KVCache | None = None
-        next_input = input_ids
-        generated_steps = 0
-        stop_reason = "length"
-        pad_token_id = (
-            config.pad_token_id
-            if config.pad_token_id is not None
-            else config.eos_token_id
-        )
-        if pad_token_id is None:
-            pad_token_id = 0
-
-        try:
-            for _ in range(config.max_new_tokens):
-                output = self.forward(
-                    input_ids=next_input,
-                    attention_mask=attention_mask,
-                    use_cache=True,
-                    cache=cache,
-                )
-                next_token = select_next_token(
-                    output.logits[:, -1, :],
-                    config=config,
-                    generator=generator,
-                )
-                next_token = torch.where(
-                    finished,
-                    torch.full_like(next_token, pad_token_id),
-                    next_token,
-                )
-                generated = torch.cat((generated, next_token[:, None]), dim=1)
-                attention_mask = torch.cat(
-                    (
-                        attention_mask,
-                        torch.ones(
-                            (attention_mask.shape[0], 1),
-                            dtype=torch.bool,
-                            device=attention_mask.device,
-                        ),
-                    ),
-                    dim=1,
-                )
-                cache = output.cache
-                next_input = next_token[:, None]
-                generated_steps += 1
-
-                if config.eos_token_id is not None:
-                    finished |= next_token == config.eos_token_id
-                    if bool(finished.all()):
-                        stop_reason = "eos"
-                        break
-        finally:
-            self.train(was_training)
-
-        return GenerationOutput(
-            token_ids=generated,
-            prompt_tokens=input_ids.shape[1],
-            generated_tokens=generated_steps,
-            stop_reason=stop_reason,
-            metadata={"batch_size": input_ids.shape[0]},
+        return generate_tokens(
+            self, input_ids=input_ids, attention_mask=attention_mask, config=config
         )
 
     def trainable_parameters(self) -> tuple[tuple[str, nn.Parameter], ...]:

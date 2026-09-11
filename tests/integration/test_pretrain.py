@@ -22,7 +22,11 @@ from llm_lifecycle_lab.data.packing import (
 )
 from llm_lifecycle_lab.doctor import run_doctor
 from llm_lifecycle_lab.doctor.result import CheckStatus
-from llm_lifecycle_lab.reference import verify_reference_run
+from llm_lifecycle_lab.provenance import source_tree_sha256
+from llm_lifecycle_lab.reference import (
+    reference_execution_sha256,
+    verify_reference_run,
+)
 from llm_lifecycle_lab.tokenizer import train_native_tokenizer
 from llm_lifecycle_lab.training.pretrain import (
     evaluate_native_pretraining,
@@ -34,6 +38,9 @@ class PretrainingIntegrationTests(unittest.TestCase):
     def test_two_step_pretraining_writes_metrics_and_checkpoints(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
+            source_dir = root / "src/llm_lifecycle_lab"
+            source_dir.mkdir(parents=True)
+            (source_dir / "fixture.py").write_text("VERSION = 1\n", encoding="utf-8")
             data_manifest = _prepare_data(root)
             tokenizer_dir = root / "tokenizer"
             tokenizer_manifest = train_native_tokenizer(
@@ -55,7 +62,7 @@ class PretrainingIntegrationTests(unittest.TestCase):
                 yaml.safe_dump(
                     {
                         "schema_version": "1.0",
-                        "model_route": "native-smoke",
+                        "model_route": "native",
                         "provider": "native",
                         "model_id": "integration-micro",
                         "architecture": "dense-decoder",
@@ -72,7 +79,7 @@ class PretrainingIntegrationTests(unittest.TestCase):
                 encoding="utf-8",
             )
             config = RunConfig(
-                model_route=ModelRoute.NATIVE_SMOKE,
+                model_route=ModelRoute.NATIVE,
                 run_profile=RunProfile.SMOKE,
                 stage=Stage.PRETRAIN,
                 seed=11,
@@ -264,6 +271,75 @@ class PretrainingIntegrationTests(unittest.TestCase):
                 workdir=root,
             )
             self.assertFalse(reference_report.has_failures)
+
+            # A synthetic CPU run also exercises the frozen-spec contract.
+            spec = yaml.safe_load(reference_spec.read_text(encoding="utf-8"))
+            spec["freeze"] = {
+                "execution_sha256": reference_execution_sha256(config, workdir=root),
+                "source_sha256": source_tree_sha256(root),
+                "packed_manifest_sha256": sha256_file(
+                    packed_dir / "packed_manifest.json"
+                ),
+                "python_major_minor": ".".join(
+                    platform.python_version().split(".")[:2]
+                ),
+                "packages": {"tokenizers": "0.21.4"},
+            }
+            spec["requirements"]["expected_evaluation_samples"] = 2
+            reference_spec.write_text(yaml.safe_dump(spec), encoding="utf-8")
+            report = verify_reference_run(
+                reference_spec, run.artifacts.path, workdir=root
+            )
+            self.assertFalse(report.has_failures, report.to_json())
+
+            spec["requirements"]["require_final_language_improvement"] = True
+            reference_spec.write_text(yaml.safe_dump(spec), encoding="utf-8")
+            records = [json.loads(line) for line in metrics]
+            for value in (records[0], records[-1]):
+                value.update(eval_tokens=20, eval_en_tokens=10, eval_zh_tokens=10)
+            records[0].update(eval_loss=5.0, eval_en_loss=5.0, eval_zh_loss=5.0)
+            records[-1].update(eval_loss=4.0, eval_en_loss=4.0, eval_zh_loss=4.0)
+            metrics_path = run.artifacts.path / "metrics.jsonl"
+            metrics_path.write_text(
+                "".join(json.dumps(value) + "\n" for value in records), encoding="utf-8"
+            )
+            report = verify_reference_run(
+                reference_spec, run.artifacts.path, workdir=root
+            )
+            self.assertFalse(report.has_failures, report.to_json())
+
+            # Aggregate improves, but one language regresses: this must fail.
+            records[-1].update(eval_loss=4.0, eval_en_loss=2.0, eval_zh_loss=6.0)
+            metrics_path.write_text(
+                "".join(json.dumps(value) + "\n" for value in records), encoding="utf-8"
+            )
+            report = verify_reference_run(
+                reference_spec, run.artifacts.path, workdir=root
+            )
+            self.assertTrue(report.has_failures)
+            self.assertEqual(
+                [
+                    check.name
+                    for check in report.checks
+                    if check.status is CheckStatus.FAIL
+                ],
+                ["metrics"],
+            )
+
+            spec["requirements"]["require_final_language_improvement"] = False
+            spec["requirements"]["expected_evaluation_samples"] = 64
+            reference_spec.write_text(yaml.safe_dump(spec), encoding="utf-8")
+            report = verify_reference_run(
+                reference_spec, run.artifacts.path, workdir=root
+            )
+            self.assertIn(
+                "evaluations",
+                [
+                    check.name
+                    for check in report.checks
+                    if check.status is CheckStatus.FAIL
+                ],
+            )
 
 
 def _prepare_data(root: Path) -> Path:

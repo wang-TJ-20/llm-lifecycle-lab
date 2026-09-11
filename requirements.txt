@@ -1,10 +1,12 @@
 # Install from the repository root inside an activated Conda environment:
 #   python -m pip install -r requirements.txt
 #
-# pyproject.toml is the single source for the runtime dependencies:
-# PyYAML, numpy, torch, tokenizers, huggingface-hub, and pyarrow.
+# These are third-party runtime dependencies only. The scripts load the local
+# src/ tree directly, so this file does not install llm-lifecycle-lab itself.
 # Install a hardware-compatible PyTorch wheel first when using Linux CPU/CUDA.
--e .[training,public-data]
-
-# Keep the BPE implementation aligned with the current tokenizer baseline.
+PyYAML>=6.0,<7
+numpy>=1.26,<3
+torch>=2.4,<3
 tokenizers==0.21.4
+huggingface-hub==0.36.2
+pyarrow==25.0.1

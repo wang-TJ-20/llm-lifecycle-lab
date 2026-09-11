@@ -6,10 +6,13 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import torch
+
 from llm_lifecycle_lab.data import prepare_dataset
 from llm_lifecycle_lab.data.fingerprint import sha256_file
 from llm_lifecycle_lab.data.packing import (
     DiskPackedPretrainingDataset,
+    collate_pretraining_batch,
     materialize_packed_pretraining_dataset,
     verify_packed_pretraining_manifest,
 )
@@ -21,6 +24,36 @@ from llm_lifecycle_lab.tokenizer import (
 
 
 class PackedPretrainingTests(unittest.TestCase):
+    def test_collate_omits_only_an_all_valid_cpu_mask(self) -> None:
+        full = {
+            "input_ids": torch.tensor([1, 2, 3]),
+            "attention_mask": torch.tensor([True, True, True]),
+            "labels": torch.tensor([1, 2, 3]),
+            "language_ids": torch.tensor([0, 0, 0]),
+            "byte_weights": torch.tensor([0.0, 1.0, 1.0]),
+            "source_bytes": torch.tensor(2.0),
+        }
+        batch = collate_pretraining_batch([full, full])
+        self.assertNotIn("attention_mask", batch)
+        self.assertIn("attention_mask", full)
+        for key in batch:
+            torch.testing.assert_close(batch[key], torch.stack([full[key], full[key]]))
+
+        padded = {
+            **full,
+            "input_ids": torch.tensor([1, 2, 0]),
+            "attention_mask": torch.tensor([True, True, False]),
+            "labels": torch.tensor([1, 2, -100]),
+            "language_ids": torch.tensor([0, 0, -1]),
+            "byte_weights": torch.tensor([0.0, 1.0, 0.0]),
+            "source_bytes": torch.tensor(1.0),
+        }
+        mixed = collate_pretraining_batch([full, padded])
+        for key in full:
+            torch.testing.assert_close(
+                mixed[key], torch.stack([full[key], padded[key]])
+            )
+
     def test_disk_pack_reconstructs_source_tokens_and_detects_tampering(
         self,
     ) -> None:

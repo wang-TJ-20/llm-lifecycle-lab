@@ -7,11 +7,11 @@ from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
 
-from llm_lifecycle_lab.cli import main
 from llm_lifecycle_lab.data import (
     available_public_recipes,
     load_public_source_manifest,
     materialize_public_dataset,
+    prepare_dataset,
 )
 from llm_lifecycle_lab.data.public import PublicDatasetRecipe
 from llm_lifecycle_lab.exceptions import DataValidationError
@@ -167,29 +167,15 @@ class PublicDatasetTests(unittest.TestCase):
             self.assertEqual(source_manifest.records, 20)
 
             prepared = root / "prepared"
-            with patch(
-                "llm_lifecycle_lab.data.public.load_public_recipe",
-                return_value=_recipe(),
-            ):
-                exit_code = main(
-                    [
-                        "data",
-                        "prepare",
-                        "--input",
-                        str(source_path),
-                        "--output",
-                        str(prepared),
-                        "--dataset-id",
-                        "fixture-public-v1",
-                        "--kind",
-                        "pretrain",
-                        "--license",
-                        "MIT",
-                        "--group-by",
-                        "source_id",
-                    ]
-                )
-            self.assertEqual(exit_code, 0)
+            prepare_dataset(
+                source_path,
+                prepared,
+                dataset_id="fixture-public-v1",
+                record_kind="pretrain",
+                license_name="MIT",
+                group_by="source_id",
+                source_metadata=source_manifest.to_dict(),
+            )
             prepared_manifest = json.loads(
                 (prepared / "data_manifest.json").read_text(encoding="utf-8")
             )

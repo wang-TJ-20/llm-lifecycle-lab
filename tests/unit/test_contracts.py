@@ -23,16 +23,45 @@ class RunConfigTests(unittest.TestCase):
                 groups=1,
             )
 
-    def test_native_smoke_config_serializes_enum_values(self) -> None:
-        config = RunConfig(
-            model_route=ModelRoute.NATIVE_SMOKE,
+    def test_native_profiles_share_one_model_route(self) -> None:
+        smoke = RunConfig(
+            model_route=ModelRoute.NATIVE,
             run_profile=RunProfile.SMOKE,
             stage=Stage.PRETRAIN,
             model={"provider": "native", "model_id": "smoke-10m"},
         )
+        learn = RunConfig(
+            model_route=ModelRoute.NATIVE,
+            run_profile=RunProfile.LEARN,
+            stage=Stage.PRETRAIN,
+            model={"provider": "native", "model_id": "tiny-60m"},
+        )
 
-        self.assertEqual(config.to_dict()["model_route"], "native-smoke")
-        self.assertEqual(config.to_dict()["stage"], "pretrain")
+        self.assertEqual(smoke.to_dict()["model_route"], "native")
+        self.assertEqual(learn.to_dict()["model_route"], "native")
+        self.assertEqual(smoke.to_dict()["run_profile"], "smoke")
+        self.assertEqual(learn.to_dict()["run_profile"], "learn")
+
+    def test_legacy_native_routes_are_rejected(self) -> None:
+        for route in ("native-smoke", "native-learn"):
+            with (
+                self.subTest(route=route),
+                self.assertRaisesRegex(
+                    ContractError,
+                    "invalid run config value",
+                ),
+            ):
+                RunConfig.from_dict(
+                    {
+                        "model_route": route,
+                        "run_profile": "smoke",
+                        "stage": "pretrain",
+                        "model": {
+                            "provider": "native",
+                            "model_id": "smoke-10m",
+                        },
+                    }
+                )
 
     def test_qwen_route_rejects_pretraining(self) -> None:
         with self.assertRaisesRegex(
@@ -72,7 +101,7 @@ class RunConfigTests(unittest.TestCase):
 
     def test_nested_config_is_immutable_after_validation(self) -> None:
         config = RunConfig(
-            model_route=ModelRoute.NATIVE_SMOKE,
+            model_route=ModelRoute.NATIVE,
             run_profile=RunProfile.SMOKE,
             stage=Stage.PRETRAIN,
             model={"provider": "native", "model_id": "smoke-10m"},
@@ -86,7 +115,7 @@ class RunConfigTests(unittest.TestCase):
     def test_non_finite_config_value_is_rejected(self) -> None:
         with self.assertRaisesRegex(ContractError, "must be finite"):
             RunConfig(
-                model_route=ModelRoute.NATIVE_SMOKE,
+                model_route=ModelRoute.NATIVE,
                 run_profile=RunProfile.SMOKE,
                 stage=Stage.PRETRAIN,
                 model={"provider": "native", "model_id": "smoke-10m"},
@@ -97,7 +126,7 @@ class RunConfigTests(unittest.TestCase):
         with self.assertRaisesRegex(ContractError, "unknown run config fields"):
             RunConfig.from_dict(
                 {
-                    "model_route": "native-smoke",
+                    "model_route": "native",
                     "run_profile": "smoke",
                     "stage": "pretrain",
                     "model": {
@@ -112,7 +141,7 @@ class RunConfigTests(unittest.TestCase):
         with self.assertRaisesRegex(ContractError, "invalid run config value"):
             RunConfig.from_dict(
                 {
-                    "model_route": "native-smoke",
+                    "model_route": "native",
                     "run_profile": "smoke",
                     "stage": "pretrain",
                     "model": {

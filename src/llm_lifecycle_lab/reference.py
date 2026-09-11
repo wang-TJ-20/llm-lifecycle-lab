@@ -1,16 +1,23 @@
-"""Machine-readable acceptance checks for published reference runs."""
+"""检查冻结的基线输入、训练条件和已完成 run 的验收结果。
+
+Verify frozen baseline inputs, training prerequisites, and completed runs.
+"""
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import re
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
+import torch
+
 from llm_lifecycle_lab.config import (
+    canonical_json,
     config_sha256,
     load_mapping,
     load_run_config,
@@ -19,16 +26,25 @@ from llm_lifecycle_lab.contracts import (
     SCHEMA_VERSION,
     CheckpointMetadata,
     JsonContract,
+    RunConfig,
     RunManifest,
     utc_now,
 )
 from llm_lifecycle_lab.data.fingerprint import sha256_file
+from llm_lifecycle_lab.data.packing import (
+    load_packed_pretraining_manifest,
+    verify_packed_pretraining_manifest,
+)
+from llm_lifecycle_lab.data.prepare import load_data_manifest, verify_data_manifest
 from llm_lifecycle_lab.doctor.result import CheckResult, CheckStatus
 from llm_lifecycle_lab.exceptions import ArtifactError, ConfigError, ContractError
 from llm_lifecycle_lab.model.native import (
     NativeModelConfig,
     load_native_model_config,
 )
+from llm_lifecycle_lab.provenance import capture_runtime_provenance, source_tree_sha256
+from llm_lifecycle_lab.tokenizer import NativeTokenizer
+from llm_lifecycle_lab.training.engine import EngineConfig
 
 _COMMIT_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
@@ -39,6 +55,7 @@ class ReferenceRunReport(JsonContract):
     reference_id: str
     run_path: str
     checks: tuple[CheckResult, ...]
+    scope: str = "completed-run"
     created_at: str = field(default_factory=utc_now)
 
     @property
@@ -64,6 +81,15 @@ class ReferenceRunReport(JsonContract):
 
 
 @dataclass(frozen=True, slots=True)
+class _FrozenBaseline:
+    execution_sha256: str
+    source_sha256: str
+    packed_manifest_sha256: str
+    python_major_minor: str
+    packages: tuple[tuple[str, str], ...]
+
+
+@dataclass(frozen=True, slots=True)
 class _ReferenceSpec:
     reference_id: str
     pipeline_config: Path
@@ -85,6 +111,9 @@ class _ReferenceSpec:
     minimum_device_memory_gib: float
     require_clean_git: bool
     require_eval_improvement: bool
+    freeze: _FrozenBaseline | None = None
+    require_final_language_improvement: bool = False
+    expected_evaluation_samples: int | None = None
 
     def __post_init__(self) -> None:
         if self.expected_budget_mode not in {
@@ -127,6 +156,144 @@ class _ReferenceSpec:
             or self.minimum_device_memory_gib < 0
         ):
             raise ConfigError("reference minimum device memory is invalid")
+        if self.expected_evaluation_samples is not None and (
+            type(self.expected_evaluation_samples) is not int
+            or self.expected_evaluation_samples <= 0
+        ):
+            raise ConfigError("reference expected_evaluation_samples must be positive")
+
+
+def reference_execution_sha256(config: RunConfig, *, workdir: str | Path = ".") -> str:
+    """Pin effective model/trainer defaults as well as the pipeline YAML values."""
+    model_path = _input_path(config.model, "config", Path(workdir).resolve())
+    execution = {
+        "pipeline": config.to_dict(),
+        "model": asdict(load_native_model_config(model_path)),
+        "training": asdict(EngineConfig.from_dict(config.training)),
+    }
+    return hashlib.sha256(canonical_json(execution).encode("utf-8")).hexdigest()
+
+
+def verify_reference_inputs(
+    spec_path: str | Path,
+    *,
+    workdir: str | Path = ".",
+    config: RunConfig | None = None,
+    check_runtime: bool = True,
+) -> ReferenceRunReport:
+    """Read-only preflight; an inputs-only success is not permission to train."""
+    root = Path(workdir).resolve()
+    scope = "preflight" if check_runtime else "inputs-only"
+    spec = _load_reference_spec(Path(spec_path), root=root)
+    expected = load_run_config(spec.pipeline_config)
+    checks = _configuration_checks(spec, expected, root)
+    if config is not None:
+        checks.append(
+            _check(
+                "selected-pipeline",
+                config_sha256(config) == config_sha256(expected),
+                "selected pipeline matches the frozen baseline",
+                "selected pipeline differs from the baseline; no run was started",
+            )
+        )
+    if any(check.status is CheckStatus.FAIL for check in checks):
+        return ReferenceRunReport(spec.reference_id, str(root), tuple(checks), scope)
+
+    data_path = _input_path(expected.data, "manifest", root)
+    packed_path = _input_path(expected.data, "packed_manifest", root)
+    tokenizer_path = _input_path(expected.model, "tokenizer", root)
+    model_path = _input_path(expected.model, "config", root)
+    data = load_data_manifest(data_path)
+    packed = load_packed_pretraining_manifest(packed_path)
+    tokenizer = NativeTokenizer.from_directory(tokenizer_path)
+    model = load_native_model_config(model_path)
+    failures = verify_data_manifest(data_path)
+    failures.extend(verify_packed_pretraining_manifest(packed_path))
+    provenance_ok = (
+        not failures
+        and sha256_file(data_path) == spec.expected_data_manifest_sha256
+        and tokenizer.manifest.source_data_sha256 == spec.expected_data_manifest_sha256
+        and tokenizer.manifest.content_sha256 == spec.expected_tokenizer_sha256
+        and packed.data_manifest_sha256 == spec.expected_data_manifest_sha256
+        and packed.tokenizer_sha256 == spec.expected_tokenizer_sha256
+        and sha256_file(model_path) == spec.expected_model_config_sha256
+        and tokenizer.vocab_size == model.vocab_size
+        and model.model_id == expected.model.get("model_id")
+        and data.dataset_id == packed.dataset_id
+        and packed.sequence_length == spec.expected_packed_sequence_length
+        and _packed_array_sha256(packed.to_dict())
+        == dict(spec.expected_packed_array_sha256)
+    )
+    if spec.freeze is not None:
+        provenance_ok = provenance_ok and (
+            sha256_file(packed_path) == spec.freeze.packed_manifest_sha256
+        )
+    checks.append(
+        _check(
+            "input-artifacts",
+            provenance_ok,
+            "prepared files, tokenizer and all packed arrays match the baseline",
+            "baseline input mismatch: "
+            + "; ".join(failures or ["hash or metadata differs"]),
+        )
+    )
+    engine = EngineConfig.from_dict(expected.training)
+    train_split = next(
+        (split for split in packed.splits if split.name == "train"), None
+    )
+    if train_split is None:
+        raise ConfigError("reference packed data requires a train split")
+    _, budget = engine.resolve_budget(
+        examples_per_epoch=train_split.examples,
+        supervised_tokens_per_epoch=train_split.supervised_tokens,
+    )
+    checks.append(
+        _check(
+            "input-budget",
+            budget.mode == spec.expected_budget_mode
+            and budget.max_steps == spec.expected_global_step
+            and budget.target_train_tokens == spec.expected_target_train_tokens
+            and engine.sequence_length == packed.sequence_length
+            and engine.sequence_length <= model.max_sequence_length,
+            "resolved budget matches the frozen baseline",
+            "resolved budget or sequence length differs from the baseline",
+            budget.to_dict(),
+        )
+    )
+    if spec.freeze is not None:
+        checks.append(
+            _check(
+                "source-lock",
+                source_tree_sha256(root) == spec.freeze.source_sha256,
+                "Python source matches the frozen baseline",
+                "Python source differs from the baseline; use its original checkout",
+            )
+        )
+    if check_runtime:
+        runtime = capture_runtime_provenance(
+            workdir=root, device=torch.device(engine.device)
+        )
+        checks.append(_runtime_check(spec, runtime))
+        if engine.device == "cuda":
+            bf16_ok = torch.cuda.is_available() and (
+                engine.dtype != "bfloat16" or torch.cuda.is_bf16_supported()
+            )
+            checks.append(
+                _check(
+                    "cuda-compute",
+                    bf16_ok,
+                    "CUDA supports the requested training dtype",
+                    "CUDA or the required BF16 support is unavailable",
+                )
+            )
+        if spec.freeze is not None:
+            checks.append(_frozen_runtime_check(spec.freeze, runtime))
+    return ReferenceRunReport(
+        spec.reference_id,
+        str(root),
+        tuple(checks),
+        scope,
+    )
 
 
 def verify_reference_run(
@@ -177,6 +344,9 @@ def verify_reference_run(
         )
 
     expected_config = load_run_config(spec.pipeline_config)
+    checks.extend(_configuration_checks(spec, expected_config, root))
+    if any(check.status is CheckStatus.FAIL for check in checks):
+        return ReferenceRunReport(spec.reference_id, str(run), tuple(checks))
     run_manifest = _load_contract(
         run / "run_manifest.json",
         RunManifest.from_dict,
@@ -238,6 +408,11 @@ def verify_reference_run(
         == spec.expected_packed_sequence_length
         and packed_array_sha256 == dict(spec.expected_packed_array_sha256)
     )
+    if spec.freeze is not None:
+        provenance_ok = provenance_ok and (
+            sha256_file(run / "packed_data_snapshot.json")
+            == spec.freeze.packed_manifest_sha256
+        )
     checks.append(
         _check(
             "data-provenance",
@@ -330,6 +505,8 @@ def verify_reference_run(
             and best_loss is not None
             and best_loss < baseline_loss
         )
+    if spec.require_final_language_improvement:
+        metrics_ok = metrics_ok and _final_language_improved(baseline, final_metrics)
     checks.append(
         _check(
             "metrics",
@@ -382,6 +559,7 @@ def verify_reference_run(
         suites=spec.evaluation_suites,
         required_metric_keys=spec.required_evaluation_metric_keys,
         expected_step=spec.expected_global_step,
+        expected_samples=spec.expected_evaluation_samples,
     )
     checks.append(
         _check(
@@ -397,6 +575,18 @@ def verify_reference_run(
         run / "runtime_environment.json",
         "runtime environment",
     )
+    checks.append(_runtime_check(spec, runtime))
+    if spec.freeze is not None:
+        checks.append(_frozen_runtime_check(spec.freeze, runtime))
+
+    return ReferenceRunReport(
+        reference_id=spec.reference_id,
+        run_path=str(run),
+        checks=tuple(checks),
+    )
+
+
+def _runtime_check(spec: _ReferenceSpec, runtime: Mapping[str, Any]) -> CheckResult:
     accelerator = _mapping(runtime.get("accelerator"))
     devices = accelerator.get("devices")
     device_memories = (
@@ -418,26 +608,27 @@ def verify_reference_run(
             and bool(_COMMIT_PATTERN.fullmatch(str(code["commit"])))
             and code.get("dirty") is False
         )
-    checks.append(
-        _check(
-            "runtime-provenance",
-            environment_ok,
-            "runtime platform, accelerator, and source state meet requirements",
-            "runtime platform, accelerator, or source state is not publishable",
-            {
-                "platform": _mapping(runtime.get("platform")).get("system"),
-                "device_type": accelerator.get("type"),
-                "maximum_device_memory_bytes": max(device_memories, default=0),
-                "git_commit": code.get("commit"),
-                "git_dirty": code.get("dirty"),
-            },
+    if spec.freeze is not None and spec.device_type == "cuda":
+        environment_ok = environment_ok and (
+            accelerator.get("selected_device") in {"cuda", "cuda:0"}
+            and bool(device_memories)
+            and device_memories[0] >= minimum_memory_bytes
         )
-    )
-
-    return ReferenceRunReport(
-        reference_id=spec.reference_id,
-        run_path=str(run),
-        checks=tuple(checks),
+    return _check(
+        "runtime-provenance",
+        environment_ok,
+        "runtime platform, accelerator, and source state meet requirements",
+        "runtime platform, accelerator, or source state is not publishable",
+        {
+            "platform": _mapping(runtime.get("platform")).get("system"),
+            "device_type": accelerator.get("type"),
+            "selected_device": accelerator.get("selected_device"),
+            "first_device_memory_bytes": device_memories[0] if device_memories else 0,
+            "maximum_device_memory_bytes": max(device_memories, default=0),
+            "minimum_device_memory_bytes": minimum_memory_bytes,
+            "git_commit": code.get("commit"),
+            "git_dirty": code.get("dirty"),
+        },
     )
 
 
@@ -514,6 +705,12 @@ def _load_reference_spec(path: Path, *, root: Path) -> _ReferenceSpec:
                 requirements["require_eval_improvement"],
                 "require_eval_improvement",
             ),
+            freeze=_load_freeze(value.get("freeze")),
+            require_final_language_improvement=_required_bool(
+                requirements.get("require_final_language_improvement", False),
+                "require_final_language_improvement",
+            ),
+            expected_evaluation_samples=requirements.get("expected_evaluation_samples"),
         )
     except (KeyError, TypeError, ValueError) as exc:
         raise ConfigError(f"invalid reference requirements: {exc}") from exc
@@ -581,6 +778,7 @@ def _missing_evaluation_suites(
     suites: tuple[str, ...],
     required_metric_keys: tuple[str, ...],
     expected_step: int,
+    expected_samples: int | None = None,
 ) -> list[str]:
     missing: list[str] = []
     for suite in suites:
@@ -593,11 +791,139 @@ def _missing_evaluation_suites(
         if (
             report.get("run_id") != run_id
             or report.get("suite") != suite
+            or (
+                expected_samples is not None
+                and report.get("sample_count") != expected_samples
+            )
             or any(not _finite(metrics.get(key)) for key in required_metric_keys)
             or not _language_loss_is_consistent(metrics)
         ):
             missing.append(suite)
     return missing
+
+
+def _input_path(values: Mapping[str, Any], name: str, root: Path) -> Path:
+    value = values.get(name)
+    if not isinstance(value, str) or not value:
+        raise ConfigError(f"reference pipeline requires {name}")
+    path = Path(value)
+    return path if path.is_absolute() else root / path
+
+
+def _configuration_checks(
+    spec: _ReferenceSpec, config: RunConfig, root: Path
+) -> list[CheckResult]:
+    if spec.freeze is None:
+        return []
+    actual = reference_execution_sha256(config, workdir=root)
+    return [
+        _check(
+            "execution-lock",
+            actual == spec.freeze.execution_sha256,
+            "pipeline and effective model/training defaults match the baseline",
+            "pipeline or effective defaults changed; create a new experiment version",
+            {"expected_sha256": spec.freeze.execution_sha256, "actual_sha256": actual},
+        )
+    ]
+
+
+def _load_freeze(value: Any) -> _FrozenBaseline | None:
+    if value is None:
+        return None
+    keys = {
+        "execution_sha256",
+        "source_sha256",
+        "packed_manifest_sha256",
+        "python_major_minor",
+        "packages",
+    }
+    if not isinstance(value, Mapping) or set(value) != keys:
+        raise ConfigError(
+            "reference freeze must declare exactly: " + ", ".join(sorted(keys))
+        )
+    version = value["python_major_minor"]
+    packages = value["packages"]
+    if not isinstance(version, str) or not re.fullmatch(r"\d+\.\d+", version):
+        raise ConfigError("reference python_major_minor must be a major.minor string")
+    if (
+        not isinstance(packages, Mapping)
+        or not packages
+        or any(
+            not isinstance(name, str)
+            or not name
+            or not isinstance(version, str)
+            or not version
+            for name, version in packages.items()
+        )
+    ):
+        raise ConfigError("reference freeze packages must map names to version strings")
+    return _FrozenBaseline(
+        execution_sha256=_required_sha256(
+            value["execution_sha256"], "execution_sha256"
+        ),
+        source_sha256=_required_sha256(value["source_sha256"], "source_sha256"),
+        packed_manifest_sha256=_required_sha256(
+            value["packed_manifest_sha256"], "packed_manifest_sha256"
+        ),
+        python_major_minor=version,
+        packages=tuple(sorted(packages.items())),
+    )
+
+
+def _frozen_runtime_check(
+    freeze: _FrozenBaseline, runtime: Mapping[str, Any]
+) -> CheckResult:
+    version = _mapping(runtime.get("python")).get("version", "")
+    packages = _mapping(runtime.get("packages"))
+    mismatches = [
+        name
+        for name, expected in freeze.packages
+        if (
+            str(packages.get(name, "")).split("+")[0]
+            if name == "torch"
+            else packages.get(name)
+        )
+        != expected
+    ]
+    matches = (
+        isinstance(version, str)
+        and ".".join(version.split(".")[:2]) == freeze.python_major_minor
+        and not mismatches
+        and _mapping(runtime.get("code")).get("source_sha256") == freeze.source_sha256
+    )
+    return _check(
+        "frozen-runtime",
+        matches,
+        "Python, training packages and source snapshot match the baseline",
+        "Python, training packages or source snapshot differ from the baseline",
+        {
+            "python": version,
+            "expected_python": freeze.python_major_minor,
+            "package_mismatches": {
+                name: {"expected": expected, "actual": packages.get(name)}
+                for name, expected in freeze.packages
+                if name in mismatches
+            },
+            "source_sha256": _mapping(runtime.get("code")).get("source_sha256"),
+            "expected_source_sha256": freeze.source_sha256,
+        },
+    )
+
+
+def _final_language_improved(
+    baseline: Mapping[str, Any], final: Mapping[str, Any]
+) -> bool:
+    for key in ("eval_loss", "eval_en_loss", "eval_zh_loss"):
+        before, after = _as_float(baseline.get(key)), _as_float(final.get(key))
+        if (
+            before is None
+            or after is None
+            or not math.isfinite(before)
+            or not math.isfinite(after)
+            or not 0 < after < before
+        ):
+            return False
+    return True
 
 
 def _language_loss_is_consistent(metrics: Mapping[str, Any]) -> bool:

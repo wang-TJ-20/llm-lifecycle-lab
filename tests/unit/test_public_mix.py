@@ -7,13 +7,13 @@ from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
 
-from llm_lifecycle_lab.cli import main
 from llm_lifecycle_lab.data.mix import (
     PublicMixtureRecipe,
     available_public_mixture_recipes,
     load_public_mixture_manifest,
     materialize_public_mixture,
 )
+from llm_lifecycle_lab.data.prepare import prepare_dataset
 from llm_lifecycle_lab.data.public import (
     PublicDatasetRecipe,
     materialize_public_dataset,
@@ -194,35 +194,15 @@ class PublicMixtureTests(unittest.TestCase):
             self.assertEqual(loaded, manifest)
 
             prepared = root / "prepared"
-            with (
-                patch(
-                    "llm_lifecycle_lab.data.mix.load_public_mixture_recipe",
-                    return_value=_mixture_recipe(manifest.source_sha256),
-                ),
-                patch(
-                    "llm_lifecycle_lab.data.public.load_public_recipe",
-                    side_effect=lambda recipe_id: recipes[recipe_id],
-                ),
-            ):
-                exit_code = main(
-                    [
-                        "data",
-                        "prepare",
-                        "--input",
-                        str(root / "mixture" / "source.jsonl"),
-                        "--output",
-                        str(prepared),
-                        "--dataset-id",
-                        "bilingual-fixture-v1",
-                        "--kind",
-                        "pretrain",
-                        "--license",
-                        "Apache-2.0 AND MIT",
-                        "--group-by",
-                        "source_id",
-                    ]
-                )
-            self.assertEqual(exit_code, 0)
+            prepare_dataset(
+                root / "mixture" / "source.jsonl",
+                prepared,
+                dataset_id="bilingual-fixture-v1",
+                record_kind="pretrain",
+                license_name="Apache-2.0 AND MIT",
+                group_by="source_id",
+                source_metadata=loaded.to_dict(),
+            )
             data_manifest = json.loads(
                 (prepared / "data_manifest.json").read_text(encoding="utf-8")
             )
