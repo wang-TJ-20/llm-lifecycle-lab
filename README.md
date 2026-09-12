@@ -1,69 +1,133 @@
+<div align="center">
+
 # LLM Lifecycle Lab
 
-面向中文用户的 LLM 学习与实验项目：从随机初始化的自有 10M/60M 模型开始，
-用可追溯的数据、配置、checkpoint 和双语评测观察训练过程。
+**从一次参数更新开始，亲手理解语言模型的训练过程**
 
-当前已实现 Native 模型、BPE Tokenizer、不可变磁盘 Packing、Pretrain、恢复和评测。
-SFT、DPO、GRPO、Qwen 迁移、导出和服务尚未实现；仓库不附带训练好的权重。
-10M 与 60M 统一使用 `model_route: native`，由 Pipeline 的 `run_profile` 区分
-Smoke、教学训练和 Reference 验收规模。
+原生 PyTorch 小模型 · 中英文数据 · 七篇实践教程 · 可复现的训练实验
 
-## 学习与查阅
+[在线阅读](https://wang-tj-20.github.io/llm-lifecycle-lab/) · [教程目录](#教程目录) · [快速开始](#快速开始) · [项目进展](#项目进展) · [参与贡献](#参与贡献)
 
-**在线教材式阅读**：仓库已提供 Docsify 文档站。从根目录启动本地预览：
+</div>
 
-```bash
-python -m http.server 8000 --bind 127.0.0.1 --directory docs
-```
+---
 
-打开 `http://127.0.0.1:8000/`，或直接阅读下面的 Markdown。
-GitHub Pages 发布方式和新增章节约定见 [文档站维护](./docs/SITE_GUIDE.md)。
+## 项目介绍
 
-**按顺序学习**：从 [实践系列目录](./docs/tutorials/README.md) 开始。
-第一篇 [从一次参数更新开始](./docs/tutorials/01-first-parameter-update.md)
-不需要下载语料或使用 GPU，沿实际脚本解释前向、loss、反向和更新，并附单变量实验。
-第二篇 [准备中英文训练数据](./docs/tutorials/02-bilingual-training-data.md)
-解释来源、配方与分组切分，并用离线实验观察数据泄漏。
-第三篇 [让模型读懂文本的表示](./docs/tutorials/03-tokenizer-and-packing.md)
-解释字节级 BPE、规范化与 Packing，用离线对照检查词表和监督目标。
-第四篇 [搭建自己的小型 Transformer](./docs/tutorials/04-small-transformer.md)
-沿张量解释模型结构，并用小实验检查 Attention、RoPE 和 KV Cache。
-第五至七篇依次讲解 [预训练](./docs/tutorials/05-first-pretraining.md)、
-[评测](./docs/tutorials/06-evaluating-a-model.md) 与
-[恢复和实验比较](./docs/tutorials/07-resume-and-compare.md)，七篇主线已完整。
-三篇共用临时双语微型实验 `python scripts/pretrain_experiment.py --mode train`，
-无需下载数据或使用 GPU，不改动已有训练产物。
+一个随机初始化的模型，怎样逐步学会预测下一个 token？训练时，参数为什么会改变？
+loss 下降能说明什么？进程中断后，怎样继续同一次实验？
 
-**按需查阅**：完整操作步骤、配置说明和排错集中维护在以下三份指南中。
+**LLM Lifecycle Lab 是一个面向中文读者的 LLM 学习与实验项目。**
+我们把可读的代码、连续的教程和最小对照实验放在同一个仓库，
+从自有小模型出发，串起数据准备、Tokenizer、Transformer、预训练、评测与恢复。
+读者可以先在 CPU 上观察机制，再进入真实双语数据与 60M 教学训练。
 
-| 文档 | 内容 |
+适合能阅读基础 Python、希望进一步理解模型训练的学习者。
+不要求先掌握全部 Transformer 公式；每篇沿着
+**问题 → 例子与图解 → 原理与代码 → 实验 → 结果与边界** 展开。
+
+### 在这里可以学到什么
+
+- **看懂一次更新**：从张量形状进入 forward、loss、backward 和 optimizer step。
+- **把文本变成训练样本**：准备中英文数据，按原文分组切分，训练 BPE 并生成 Packing。
+- **理解模型内部**：沿代码验证 RMSNorm、RoPE、GQA、SwiGLU、因果注意力与 KV Cache。
+- **读懂训练结果**：区分 step、监督 token 和预算，结合双语指标与生成解释模型表现。
+- **做可比较的实验**：固定输入和配置，检查 checkpoint、数据位置与中断恢复。
+
+> 当前已完成七篇预训练主线及配套实现。仓库不附带训练好的权重，
+> 60M 完整 CUDA 参考实验尚未完成；微型实验和两步 Smoke 不代表语言能力。
+
+## 选择你的起点
+
+| 路径 | 运行条件 | 适合做什么 |
+| --- | --- | --- |
+| 离线机制实验 | CPU；安装依赖后无需下载语料 | 观察参数更新，验证微型训练、评测和恢复 |
+| 10M 双语 Smoke | CPU / Apple Silicon MPS / CUDA；需准备公共语料 | 跑通真实数据上的两步训练与评测 |
+| 60M 教学与 Reference | 目标为 Linux + 单张 24GB NVIDIA GPU；需配套数据 | 正式训练、结构对照与固定基线验收 |
+
+**第一次接触，先看第一篇并运行离线实验。**
+10M 用于快速验证，60M 是效果研究的主基线；无需先购买 GPU 才开始学习。
+Reference 比普通教学训练有更严格的输入、环境和结果要求。
+
+## 教程目录
+
+七篇主线均已完成，可在 [文档站](https://wang-tj-20.github.io/llm-lifecycle-lab/#/tutorials/)
+连续阅读，也可直接打开仓库 Markdown。
+
+| 章节 | 核心问题与实验 |
 | --- | --- |
-| [数据介绍与准备](./docs/DATA_GUIDE.md) | 中英文数据来源与许可、公开/自有数据、切分、Tokenizer、Packing、校验与迁移 |
-| [自有模型介绍](./docs/NATIVE_MODEL_GUIDE.md) | 10M/60M 结构、参数预算、张量形状、RMSNorm/RoPE/GQA、前向与 KV Cache 实验 |
-| [Pretrain 训练文档](./docs/NATIVE_PRETRAIN_GUIDE.md) | Conda 安装、Smoke/60M 训练、配置、指标、恢复、评测、Reference 验收与排错 |
+| [01 从一次参数更新开始](./docs/tutorials/01-first-parameter-update.md) | 参数怎样改变？用单变量实验观察梯度、更新与一致性。 |
+| [02 准备中英文训练数据](./docs/tutorials/02-bilingual-training-data.md) | 数据从哪里来？通过原文分组对照检查评测泄漏。 |
+| [03 让模型读懂文本的表示](./docs/tutorials/03-tokenizer-and-packing.md) | 文本怎样变成 ID？比较词表预算、规范化和窗口组织。 |
+| [04 搭建自己的小型 Transformer](./docs/tutorials/04-small-transformer.md) | 各组件怎样连接？验证 Attention、RoPE、因果性与 Cache。 |
+| [05 跑通一次预训练](./docs/tutorials/05-first-pretraining.md) | batch、累积、学习率和预算怎样共同决定训练过程？ |
+| [06 判断模型到底学到了什么](./docs/tutorials/06-evaluating-a-model.md) | 总体 loss 变好是否足够？核对双语覆盖、指标与生成。 |
+| [07 让实验可以恢复和比较](./docs/tutorials/07-resume-and-compare.md) | 保存权重为什么不够？比较连续训练与中断恢复的状态。 |
 
-完整训练的首次实践顺序：安装环境 -> 按数据文档准备 Smoke 数据 -> 运行两步训练与评测。
+阅读顺序与实验约定见 [实践系列导读](./docs/tutorials/README.md)。
+教程解释“为什么”，操作指南维护完整参数与排错步骤。
 
 ## 快速开始
 
-从仓库根目录执行。Linux CPU/CUDA 请先按
-[环境准备](./docs/NATIVE_PRETRAIN_GUIDE.md#2-环境准备) 选择 PyTorch wheel。
+### 1. 准备环境
+
+新机器上克隆仓库并创建环境；已有仓库或同名环境时直接进入、激活即可。
+后续命令均从仓库根目录执行。
 
 ```bash
+git clone https://github.com/wang-TJ-20/llm-lifecycle-lab.git
+cd llm-lifecycle-lab
 conda create -n llm-lifecycle-lab python=3.11 pip -y
 conda activate llm-lifecycle-lab
+```
+
+macOS Apple Silicon 可直接安装下面的依赖；Linux CPU/CUDA 请先按
+[环境准备](./docs/NATIVE_PRETRAIN_GUIDE.md#2-环境准备) 选择对应的 PyTorch wheel。
+
+```bash
 python -m pip install -r requirements.txt
+python -m pip check
 python scripts/doctor.py
 ```
 
-不下载语料，先观察一次模型前向、梯度、参数更新与 KV Cache：
+Python 要求为 3.11 或更高。脚本直接加载仓库中的 `src/`，
+**不需要 `pip install -e .` 或手动设置 `PYTHONPATH`**。
+基础 Doctor 不替代真实训练前的配置化检查。
+
+### 2. 不下载数据，先观察一次参数更新
 
 ```bash
 python scripts/model_experiment.py
 ```
 
-按 [数据文档](./docs/DATA_GUIDE.md#4-第一次实践10m-双语-smoke) 完成下载、混合、切分、
-Tokenizer 和 Packing 后：
+默认在 CPU 上运行随机初始化的 10M 模型，完成前向、loss、反向和一次参数更新，
+再检查 KV Cache 与模型保存加载的一致性。
+输入为 `[2, 16]`，logits 为 `[2, 16, 16384]`，有效预测目标为 30 个。
+
+重点检查 `weight_update_max > 0`、`cache_matches_full=True` 和
+`checkpoint_matches_full=True`。随机 token 的 loss 不用于判断语言能力。
+逐步解释见 [第一篇](./docs/tutorials/01-first-parameter-update.md)。
+
+### 3. 跑通微型训练、评测与恢复
+
+```bash
+python scripts/pretrain_experiment.py --mode train
+python scripts/pretrain_experiment.py --mode evaluate
+python scripts/pretrain_experiment.py --mode resume
+```
+
+三个模式各自在临时目录生成双语模板数据、训练 Tokenizer，并运行配套微型模型。
+`train` 检查三步训练与产物；`evaluate` 核对双语指标和生成；
+`resume` 比较连续训练与受控中断恢复的状态。
+
+**这些命令不修改已有 `data/` 或 `runs/`，退出后自动清理临时产物。**
+这里的微型模型不是正式 10M/60M 配方，模板数据也不用于证明语言能力。
+完整解读见 [第五至七篇](./docs/tutorials/05-first-pretraining.md)。
+
+### 4. 在真实双语数据上运行 Smoke
+
+先按 [数据指南](./docs/DATA_GUIDE.md#4-第一次实践10m-双语-smoke)
+确认许可，完成下载、混合、切分、Tokenizer 训练和 Packing，再执行：
 
 ```bash
 python scripts/doctor.py --config configs/pipelines/native-smoke.yaml
@@ -72,46 +136,119 @@ python scripts/train_pretrain.py \
   --run-id native-smoke-001
 python scripts/eval_pretrain.py \
   --config configs/pipelines/native-smoke.yaml \
-  --checkpoint runs/native-smoke-001/checkpoints/step-00000002
+  --checkpoint runs/native-smoke-001/checkpoints/step-00000002 \
+  --split dev
 ```
 
-已有同名数据或 run 时不要覆盖；有效数据可以校验复用，新训练使用新 run ID。
-10M Smoke 支持 CPU/MPS/CUDA，用于验证链路，不代表语言能力。
-60M 目标环境为 Linux + 单张 24GB NVIDIA GPU，完整 CUDA 参考实验尚未完成。
+结果保存在 `runs/native-smoke-001/`，包括配置、预算、环境、指标和 checkpoint。
+已有同名 run 时换新 ID，不要删除旧记录来绕开覆盖保护。
+恢复只用于完成原预算，不能给已经结束的两步 Smoke 直接追加训练。
+
+60M 的数据规模、CUDA/BF16 环境和训练入口见
+[60M 正式实践](./docs/NATIVE_PRETRAIN_GUIDE.md#6-60m-正式实践)。
+
+## 模型与数据
+
+### 两档模型，同一份实现
+
+Native 是自有的 decoder-only Transformer，从随机权重训练，不是裁剪或微调 Qwen。
+结构采用 RMSNorm、RoPE、SwiGLU、GQA 和权重绑定，支持因果前向与 KV Cache 生成。
+模型和训练循环基于 PyTorch，BPE 使用 Hugging Face `tokenizers`。
+
+| 配置 | 参数量 | 层数 × Hidden | Q / KV 头 | 最大长度 |
+| --- | ---: | --- | --- | ---: |
+| [smoke-10m](./configs/models/smoke-10m.yaml) | 9,915,200 | 4 × 320 | 5 / 1 | 256 |
+| [tiny-60m](./configs/models/tiny-60m.yaml) | 62,927,616 | 8 × 768 | 12 / 4 | 512 |
+
+两档默认词表均为 16,384，QK-Norm 关闭，但各自 Tokenizer 的 ID 映射不能互换。
+模型长度上限不等于训练长度：10M Smoke 默认训练 seq128，60M 为 seq512。
+两者共用 `model_route: native`，具体结构由模型配置选择，
+实践级别由 `run_profile` 区分。
+
+### 默认覆盖中文与英文
+
+| 语言 | 数据来源 | 内容与来源许可 |
+| --- | --- | --- |
+| 英文 | [SimpleStories](https://huggingface.co/datasets/SimpleStories/SimpleStories) | 合成故事；MIT |
+| 中文 | [Wikimedia Wikipedia](https://huggingface.co/datasets/wikimedia/wikipedia) | 中文百科；CC-BY-SA-3.0 |
+
+Recipe 固定来源、版本与选取方式，Manifest 记录实际产物和 hash。
+默认流程显式按 `source_id` 切分，Tokenizer 只在 train 上学习，
+dev/test 使用同一词表独立编码。单语配置用于对照，不是默认学习路线。
+使用数据前需自行核对来源许可，格式校验和 hash 不能代替内容质量、隐私与去重检查。
+
+```mermaid
+flowchart TD
+  accTitle: 从中英文数据到可检查的训练实验
+  accDescr: 数据按来源组切分，训练 BPE 并生成 Packing，接入 Native 预训练，再进行固定范围评测与检查点恢复对照。
+  A["中英文数据 · 分组切分"] --> B["BPE Tokenizer"]
+  B --> C["Packing · 训练窗口"]
+  C --> D["Native · 预训练"]
+  D --> E["固定范围评测"]
+  D --> F["Checkpoint · 恢复"]
+```
+
+各阶段的完整代码、张量形状与校验边界见 [模型指南](./docs/NATIVE_MODEL_GUIDE.md)
+和 [数据指南](./docs/DATA_GUIDE.md)。
+
+## 项目进展
+
+| 状态 | 内容 |
+| --- | --- |
+| 已完成 | 七篇中文教程、Docsify 在线阅读站与 CPU 离线实验 |
+| 已实现 | Native 10M/60M、双语 BPE、磁盘 Packing、Pretrain、评测与 checkpoint 恢复 |
+| 已固定，待完整运行验收 | 60M Reference 的配置、输入、源码、环境与预算规范 |
+| 后续方向，尚未实现 | SFT、DPO、GRPO、Qwen 迁移、模型导出与服务 |
 
 第一份冻结基线为
 [`native-60m-baseline-v1`](./configs/reference/native-60m-baseline-v1.yaml)：
-宽浅 62.93M、QK-Norm 关闭、1 epoch、46,184,530 个目标监督 token。
-它锁住配置、输入产物、源码和训练依赖，尚不代表已验证的模型权重。
-已有配套 60M 数据时，可先运行只读校验：
-
-```bash
-python scripts/verify_reference.py \
-  --spec configs/reference/native-60m-baseline-v1.yaml --inputs-only
-```
-
-正式环境检查、带门控的训练和最终双语验收见
+62.93M、QK-Norm 关闭、1 epoch、46,184,530 个目标监督 token。
+**固定了规范，不等于已经获得通过验收的模型权重。**
+正式训练前的输入与环境门控、训练后验收见
 [固定 60M 基线](./docs/NATIVE_PRETRAIN_GUIDE.md#92-固定-60m-基线)。
 
-## 目录
+当前精确恢复对照覆盖 CPU；不承诺所有设备和精度逐位一致。
+评测受配置中的样本预算限制，不默认代表全量 dev/test。
+这些边界与实验结论一起记录，不用 Smoke 指标代替正式模型效果。
+
+## 文档与代码
+
+| 入口 | 用途 |
+| --- | --- |
+| [数据介绍与准备](./docs/DATA_GUIDE.md) | 来源、许可、公开/自有数据、切分、Tokenizer、Packing 与迁移 |
+| [自有模型介绍](./docs/NATIVE_MODEL_GUIDE.md) | 模型结构、参数预算、前向、生成与结构消融 |
+| [Pretrain 训练文档](./docs/NATIVE_PRETRAIN_GUIDE.md) | 环境、训练、评测、恢复、Reference 验收与排错 |
+| [脚本阅读指南](./scripts/README.md) | 从每个脚本的 `main()` 进入核心实现 |
+| [文档站维护](./docs/SITE_GUIDE.md) | 本地预览、GitHub Pages 发布与新增章节 |
 
 ```text
-configs/       模型、Pipeline 和 Reference 验收 YAML
-docs/          三份操作与原理指南，以及 tutorials/ 连续实践文章
-scripts/       面向学习者的 Python 操作入口
-src/           共享实现
-tests/         单元与集成测试
+configs/       模型、Pipeline 与 Reference 配置
+docs/          七篇教程、操作指南与阅读站
+scripts/       可直接运行的实践入口
+src/           模型、数据与训练共享实现
+tests/         单元、集成与文档站检查
 .github/       CI
-data/          本地训练数据，不进入 Git
-runs/          本地实验产物，不进入 Git
+data/          本地语料与数据产物，Git 忽略
+runs/          本地训练记录与权重，Git 忽略
 ```
 
-`requirements.txt` 只安装第三方运行依赖；`scripts/*.py` 会直接加载仓库的 `src/`
-共享实现，无需把项目安装进 Conda 环境。`pyproject.toml` 保留项目元数据和可选打包入口，
-`uv.lock` 用于严格锁环境。阅读代码时从 [scripts/README.md](./scripts/README.md) 和对应
-脚本的 `main()` 开始，再沿脚本直接导入的核心函数进入算法实现。
+从脚本进入实现，从教程理解实验；权重、数据和历史 run 不是可以随意清理的缓存。
+严格锁环境使用 `uv.lock`，具体安装方式见 [环境准备](./docs/NATIVE_PRETRAIN_GUIDE.md#2-环境准备)。
 
-## 开发验证
+## 参与贡献
+
+欢迎通过 [Issue](https://github.com/wang-TJ-20/llm-lifecycle-lab/issues)
+报告问题、讨论学习中的疑问，或提交
+[Pull Request](https://github.com/wang-TJ-20/llm-lifecycle-lab/pulls)
+改进代码、教程与实验。
+
+- 报错请附命令、配置、Python/PyTorch 版本、设备和脱敏日志。
+- 修改行为时补充对应测试，并同步受影响的教程与示例输出。
+- 提交实验结果时记录数据版本、预算和对照条件，区分观察与推测。
+- 不提交训练语料、模型权重、凭据或本地运行产物。
+
+<details>
+<summary>开发验证命令</summary>
 
 ```bash
 python -m pip install -r requirements-dev.txt
@@ -120,4 +257,21 @@ python -m ruff check src scripts tests
 python -m ruff format --check src scripts tests
 ```
 
-权重、数据和历史运行不是缓存，不应随普通构建缓存一起删除。完整目录职责与清理边界见训练文档。
+[CI](./.github/workflows/ci.yml) 在 Python 3.11 CPU 环境检查
+requirements 与锁环境两条安装路径。
+文档站浏览器检查另见 [文档站维护](./docs/SITE_GUIDE.md#浏览器检查)。
+
+</details>
+
+## 参考与致谢
+
+- [Happy-LLM](https://github.com/datawhalechina/happy-llm)：从基础概念到 LLM 训练实践的系统性教程。
+- [MiniMind](https://github.com/jingyaogong/minimind)：小语言模型的结构、训练与实验实践。
+
+感谢这些项目公开分享教学与实践资料。本 README 借鉴其课程导航与实践入口的组织方式；
+本项目的能力、命令和验证状态以本仓库实现为准。
+
+## 开源许可
+
+本仓库采用 [Apache License 2.0](./LICENSE)。
+所使用的公开数据与第三方资源各自遵循原有许可，不因本仓库许可而自动改变。
