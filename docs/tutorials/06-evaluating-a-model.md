@@ -70,6 +70,17 @@ dev 用来观察和选择配置；test 留作方法固定后的检查。
 直接平均 `(4+2)/2=3`，会给较小 batch 过高权重。
 正确聚合是 `(10×4+90×2)/100=2.2`。
 
+<figure class="tutorial-figure">
+
+![双语评测加权图：不同数量的中英文监督 token 不能直接平均 batch loss，应按有效目标数加权并同时报告分语言指标](../assets/tutorials/06-evaluating-a-model/weighted-bilingual-loss.webp)
+
+<figcaption>图 1｜总体指标是一种加权结果。多数语言可以掩盖少数语言的退化，因此总分与分语言指标必须一起报告。</figcaption>
+</figure>
+
+同一个原则也适用于不同语言、不同长度区间或不同数据来源：先累计每个目标的 NLL，
+再除以对应有效目标总数。对组均值做简单平均，隐含的是“每组权重相同”，
+而不是“每个监督目标权重相同”。
+
 项目在 [engine.py](../../src/llm_lifecycle_lab/training/engine.py)
 的 `evaluate_objective()` 中，先累计 `loss × supervised_tokens`，
 再除以总 token 数。
@@ -253,6 +264,9 @@ python scripts/pretrain_experiment.py --mode evaluate
 这里显示的是 **teacher forcing 评测与自主生成的差别**：
 评测每个位置都能看到真实前缀；生成后续位置则会看到自己刚生成的内容，
 错误可以不断传播。一个分数变好，不保证任何提示都会得到流畅文本。
+
+两者回答的问题不同：离线 loss 适合稳定比较条件一致的 checkpoint，生成样例则暴露重复、
+跑题和长程一致性等行为。可信结论需要二者相互补充，而不是用其中一个替代另一个。
 
 也不要走到另一个极端：抽一个提示生成得不好，不足以证明全部评测都无意义。
 合适的做法是同时固定数值评测与一组事先选定的中英文提示，

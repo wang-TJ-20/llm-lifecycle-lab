@@ -99,6 +99,17 @@ flowchart TD
 因此一条 `step=2` 日志已经出现，checkpoint 2 仍可能尚未存在。
 恢复依据完整 checkpoint，不依据“日志最后一行写了几”。
 
+<figure class="tutorial-figure">
+
+![Checkpoint 时间线图：训练中断后只能回到最近的完整保存点，尚未提交的梯度累积与计算需要重做](../assets/tutorials/07-resume-and-compare/checkpoint-anchor.webp)
+
+<figcaption>图 1｜Checkpoint 是训练时间线上的可靠锚点。中断发生在两个锚点之间时，只能回退到最近的完整状态再重做。</figcaption>
+</figure>
+
+这也是“日志进度”和“可恢复进度”必须分开理解的原因。日志可以记录刚完成的计算，
+只有权重、优化器、随机状态和数据位置共同落盘并成功发布，才形成可恢复边界。
+在梯度累积中途发生的中断会丢弃尚未执行 `optimizer.step()` 的部分梯度。
+
 普通训练异常通常写 `failure.json` 并标记 failed。
 强杀进程或某些中断不保证执行清理，所以没有 failure 文件也不证明训练成功。
 应结合 run 状态、最终结果与完整 checkpoint 判断。
@@ -151,6 +162,17 @@ python scripts/pretrain_experiment.py --mode resume
 CPU 本次对照使用 `atol=0, rtol=0`。
 相同 JSON 字段可以相等，但时间戳、run ID、运行时长和路径不应要求一致。
 序列化文件的 hash 也不是这里的数值等价判据。
+
+<figure class="tutorial-figure">
+
+![连续训练与中断恢复的数值等价图：两条路径共享起点，恢复完整状态后最终汇合到相同参数与数据位置](../assets/tutorials/07-resume-and-compare/resume-equivalence.webp)
+
+<figcaption>图 2｜恢复实验比较的是训练轨迹的数值状态，而不是文件字节是否相同。完整快照应让恢复路径重新汇入连续训练路径。</figcaption>
+</figure>
+
+一次严格的恢复对照至少要同时检查三层：后续读取的 batch 是否相同、每一步状态转移是否一致、
+最终模型与优化器张量是否在约定容差内一致。只对比最终 loss，可能让两条已经分叉的轨迹
+因为偶然得到相近标量而蒙混过关。
 
 <details>
 <summary>查阅：受控中断和实际恢复调用</summary>

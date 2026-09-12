@@ -63,6 +63,10 @@ flowchart TD
 项目日志中的 `step` 和 `max_steps` 都按 optimizer step 计数。
 当前这条 Native 训练路径是单设备训练，不要在公式里凭空乘一个多卡数量。
 
+如果每个 micro-batch 的样本数相同且没有 PAD，一个 step 覆盖的窗口数可以近似写成
+`micro_batch_size × gradient_accumulation_steps`。这里的“有效 batch”描述一次更新汇总了
+多少样本，不表示它们曾同时驻留在显存中。
+
 若每个窗口长为 `L`，没有 PAD，micro-batch 大小为 `B`，累积次数为 `A`：
 
 ```math
@@ -134,6 +138,9 @@ T_{\mathrm{target}}/\widehat{T}_{\mathrm{step}}
 
 `M` 是每轮 micro-batch 数，帽子表示估计，`K` 是最终运行的 step 上限。
 代码中的 `EngineConfig.resolve_budget()` 做的就是这件事。
+
+预算换算不是改变训练目标，而是把用户表达的目标翻译成循环能够执行的整数步数。
+因此报告实验时应同时记录“请求预算”和“实际完成的监督 token”，不能只写配置中的目标值。
 
 例如设 `E=100, S=1000, B=2, A=5`，每步估计 100 个目标。
 请求 550 个目标会换算成 6 步，估计实际训练 600 个目标。

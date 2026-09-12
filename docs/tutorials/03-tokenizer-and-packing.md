@@ -70,6 +70,17 @@ Embedding 则在语言模型训练中通过梯度更新。
 BPE，全称 Byte Pair Encoding，可以先理解为：
 **反复把训练语料中常见的相邻符号对合成一个新符号。**
 
+<figure class="tutorial-figure">
+
+![字节级 BPE 图解：从基础字节积木出发，依据频率反复合并相邻符号，形成更长的常用 token](../assets/tutorials/03-tokenizer-and-packing/bpe-building-blocks.webp)
+
+<figcaption>图 1｜字节级 BPE 像在有限词表预算内组装预制积木：高频片段获得短表示，低频文本仍可退回基础字节表示。</figcaption>
+</figure>
+
+这种机制同时保留了两种能力：基础字节保证任意 UTF-8 文本原则上都能被表示，
+频率驱动的合并则让常见片段使用更少 token。每新增一个合并项都要占用词表名额，
+所以 BPE 学到的是在语料分布与词表预算之间的一种压缩方案。
+
 为了看清这件事，暂时不用中文和完整字节表。假设语料只有：
 
 | 文本 | 出现次数 | 初始拆分 |
@@ -281,6 +292,17 @@ train、dev、test 各有独立的流，绝不会为了凑长度而跨集合连�
 
 `e` 没有成为任何窗口的预测目标，`d -> e` 这一步丢了。
 项目改为让下一个窗口从上一个窗口的最后一个 token 开始：
+
+<figure class="tutorial-figure">
+
+![Packing 窗口重叠图：长度为 L 的相邻窗口以步长 L-1 滑动，共享一个边界 token，保留跨窗口的下一 token 目标](../assets/tutorials/03-tokenizer-and-packing/packing-overlap.webp)
+
+<figcaption>图 2｜窗口重叠的不是重复监督，而是保留边界上下文。共享的最后一个 token 让下一窗口能够训练原本会掉进缝隙的预测关系。</figcaption>
+</figure>
+
+窗口长度为 `L` 时采用步长 `L-1`，每移动一次只共享一个 token。
+前一窗口用它作为最后上下文，后一窗口用它预测新的后继；只要标签错位仍在窗口内完成，
+这个共享 token 不会让同一个 next-token 目标被计算两遍。
 
 ```text
 窗口 1：a b c d       目标：b c d

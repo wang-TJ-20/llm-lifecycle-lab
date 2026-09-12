@@ -13,7 +13,38 @@ const finalChapters = [
   { route: "/tutorials/06-evaluating-a-model", title: "06 判断", diagrams: 2, formulas: 4, search: "Loss 为什么要按" },
   { route: "/tutorials/07-resume-and-compare", title: "07 让实验", diagrams: 2, formulas: 0, search: "数据顺序也必须恢复" },
 ];
+const expectedFigures = new Map([
+  ["/tutorials/01-first-parameter-update", 2],
+  ["/tutorials/02-bilingual-training-data", 1],
+  ["/tutorials/03-tokenizer-and-packing", 2],
+  ["/tutorials/04-small-transformer", 1],
+  ["/tutorials/05-first-pretraining", 0],
+  ["/tutorials/06-evaluating-a-model", 1],
+  ["/tutorials/07-resume-and-compare", 2],
+]);
 const errors = [];
+
+async function figuresLoaded(page, label) {
+  const figures = page.locator(".tutorial-figure img");
+  const total = await figures.count();
+  for (let index = 0; index < total; index += 1) {
+    const image = figures.nth(index);
+    assert((await image.getAttribute("alt"))?.trim(),
+      `${label}: every illustration must have alt text`);
+    assert.equal(await image.getAttribute("loading"), index === 0 ? "eager" : "lazy");
+    assert.equal(await image.getAttribute("decoding"), "async");
+    await image.scrollIntoViewIfNeeded();
+    await page.waitForFunction((position) => {
+      const node = document.querySelectorAll(".tutorial-figure img")[position];
+      return node && node.complete;
+    }, index).catch(() => {});
+    const source = await image.getAttribute("src");
+    assert(await image.evaluate((node) => node.naturalWidth > 0),
+      `${label}: the illustration ${source} must load`);
+  }
+  await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
+  return total;
+}
 
 async function ready(page, route, title) {
   await page.goto(`${base}/#${route}`, { waitUntil: "domcontentloaded" });
@@ -22,6 +53,12 @@ async function ready(page, route, title) {
     document.querySelector(".markdown-section")?.dataset.route === expected,
   route.split("?")[0]);
   await page.locator(".search input").waitFor({ state: "attached" });
+  const routePath = route.split("?")[0];
+  const total = await figuresLoaded(page, title);
+  if (expectedFigures.has(routePath)) {
+    assert.equal(total, expectedFigures.get(routePath),
+      `${title}: illustration count must match the reviewed set`);
+  }
 }
 
 async function noOverflow(page) {
@@ -366,8 +403,13 @@ async function main() {
     await prefixed.locator(".chapter-links a").filter({ hasText: "上一篇" }).first().click();
     await prefixed.locator(".markdown-section h1").filter({ hasText: "06 判断" }).waitFor();
     assert(new URL(prefixed.url()).pathname.startsWith("/pages-preview/"));
+    assert.equal(await figuresLoaded(prefixed, "Pages 子路径"), 1,
+      "Chapter 6 must retain its reviewed illustration under a Pages subpath");
+    assert(await prefixed.locator(".tutorial-figure img").evaluateAll((nodes) =>
+      nodes.every((node) => new URL(node.currentSrc || node.src).pathname.startsWith("/pages-preview/"))
+    ), "Illustrations must resolve inside the Pages subpath");
     assert.deepEqual(errors, [], "No uncaught browser errors");
-    console.log("PASS: seven-chapter navigation, desktop/mobile, diagrams, formulas, theme, clipboard, search, source links, deep links, 404, Pages subpath, and overflow checks.");
+    console.log("PASS: seven-chapter navigation, desktop/mobile, diagrams, illustrations, formulas, theme, clipboard, search, source links, deep links, 404, Pages subpath, and overflow checks.");
   } finally {
     await browser.close();
   }

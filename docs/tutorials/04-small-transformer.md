@@ -167,6 +167,17 @@ return (self.weight.to(dtype=torch.float32) * normalized).to(dtype=input_dtype)
 这是理解计算的类比，不是人工给每个向量写了含义。
 三个投影矩阵都需要训练；Q/K/V 来自同一段隐藏状态，因此是 **self-attention**。
 
+<figure class="tutorial-figure">
+
+![Attention 加权信息混合图：Query 与各位置 Key 计算相关性，再以注意力权重汇总对应 Value](../assets/tutorials/04-small-transformer/attention-weighted-mixture.webp)
+
+<figcaption>图 1｜Query 决定当前需要什么，Key 参与计算“去哪里找”，Value 才是按权重取回并混合的内容。</figcaption>
+</figure>
+
+从线性代数角度看，Attention 不是从历史位置中挑出唯一答案，而是先得到一组归一化权重，
+再对可见 Value 做加权和。因此输出通常融合了多个位置的信息；某个权重最大，
+也不意味着其它位置完全没有贡献。
+
 先只看一个头。设当前 Query 为 `q_i`，可见位置 `j` 的 Key、Value 为 `k_j/v_j`，
 每头维度为 `d_h`：
 

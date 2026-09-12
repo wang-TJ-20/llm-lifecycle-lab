@@ -48,6 +48,25 @@ python -m http.server 8000 --bind 127.0.0.1 --directory docs
 图解使用 `mermaid` 代码围栏，尽量使用纵向结构，并写明 `accTitle` 和 `accDescr`，
 使手机端和辅助技术也能理解图意。数学公式和 Mermaid 也能在 GitHub Markdown 中阅读。
 
+概念插图放在 `docs/assets/tutorials/<章节目录>/` 下，使用 1600×900 的 WebP，
+单张控制在 300KB 以内。插图统一写成下面的结构，并保留空行：
+
+```markdown
+<figure class="tutorial-figure">
+
+![说明性的 alt 文本](../assets/tutorials/01-first-parameter-update/training-step-overview.webp)
+
+<figcaption>图 1｜一句话说明这张图解决了什么理解障碍。</figcaption>
+</figure>
+```
+
+图片必须使用 Markdown 语法而不是 `<img>` 标签：Docsify 会按 Markdown 文件位置改写相对路径，
+直接写 `<img src="../assets/...">` 在 GitHub Pages 项目子路径下会解析到站点根目录而 404。
+`loading`、`decoding` 由 `docs/assets/site.js` 统一补齐，正文中不需要手写。
+
+插图是解释材料，不是事实来源。图中的公式、数量关系和结论必须先与当前代码路径核对；
+带有“必然提升”“完全由……决定”等无条件表述的图，不应靠正文补充免责声明后继续使用。
+
 完整命令、校验代码可以放入 `<details>` 和 `<summary>` 查阅区。
 HTML 标签与内部 Markdown 之间保留空行，确保 GitHub 与 Docsify 都能解析。
 正文先解释问题和例子，真正影响结果的边界不要全藏到折叠区。

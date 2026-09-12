@@ -219,6 +219,10 @@
         if (paragraph.querySelector("a") && /系列目录/.test(paragraph.textContent) &&
           paragraph.textContent.length < 100) paragraph.classList.add("chapter-links");
       });
+      fragment.querySelectorAll(".tutorial-figure img").forEach((image, order) => {
+        image.setAttribute("loading", order === 0 ? "eager" : "lazy");
+        image.setAttribute("decoding", "async");
+      });
       return fragment.body.innerHTML;
     });
 
