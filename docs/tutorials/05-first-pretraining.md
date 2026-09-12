@@ -63,6 +63,13 @@ flowchart TD
 项目日志中的 `step` 和 `max_steps` 都按 optimizer step 计数。
 当前这条 Native 训练路径是单设备训练，不要在公式里凭空乘一个多卡数量。
 
+<figure class="tutorial-figure">
+
+![梯度累积图解：多个 micro-batch 依次贡献梯度，达到累积次数后才执行一次优化器更新；它缓解激活显存压力，但不保证优化效果](../assets/tutorials/05-first-pretraining/gradient-accumulation.webp)
+
+<figcaption>图 1｜梯度累积让多个较小 micro-batch 共同形成一次更新。它降低单次前向的激活显存需求，但不会减少模型和优化器状态，也不必然改善稳定性或泛化。</figcaption>
+</figure>
+
 如果每个 micro-batch 的样本数相同且没有 PAD，一个 step 覆盖的窗口数可以近似写成
 `micro_batch_size × gradient_accumulation_steps`。这里的“有效 batch”描述一次更新汇总了
 多少样本，不表示它们曾同时驻留在显存中。
@@ -138,6 +145,13 @@ T_{\mathrm{target}}/\widehat{T}_{\mathrm{step}}
 
 `M` 是每轮 micro-batch 数，帽子表示估计，`K` 是最终运行的 step 上限。
 代码中的 `EngineConfig.resolve_budget()` 做的就是这件事。
+
+<figure class="tutorial-figure">
+
+![训练预算换算图：项目根据每轮窗口数、有效监督 token、micro-batch 和梯度累积估计每个 optimizer step 的监督 token，再换算 Token、Epoch 或 Step 预算](../assets/tutorials/05-first-pretraining/budget-conversion.webp)
+
+<figcaption>图 2｜`resolve_budget()` 使用每轮实际监督 token 与尾批感知的 micro-batch 数估计单步吞吐，再换算整数 optimizer step；当前 Native 路径不引入数据并行乘数。</figcaption>
+</figure>
 
 预算换算不是改变训练目标，而是把用户表达的目标翻译成循环能够执行的整数步数。
 因此报告实验时应同时记录“请求预算”和“实际完成的监督 token”，不能只写配置中的目标值。

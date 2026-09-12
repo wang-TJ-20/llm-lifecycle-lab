@@ -109,6 +109,13 @@ flowchart TD
 
 解决办法是让这两个片段保留同一个原文身份，一起被分到同一个集合：
 
+<figure class="tutorial-figure">
+
+![按 source_id 稳定哈希切分图：同一 source_id 的所有片段必须进入同一集合，不同 source_id 仍可能进入同一个 train、dev 或 test 集合](../assets/tutorials/02-bilingual-training-data/hash-split-boundary.webp)
+
+<figcaption>图 2｜稳定哈希保证同一 `source_id` 的片段具有相同分配结果；它不要求不同 ID 进入不同集合，也不能替代内容去重。</figcaption>
+</figure>
+
 > **边界提醒：分组不是去重。** `source_id` 解决的是已知来源关系，不能发现被复制、改名或
 > 轻微改写后获得新 ID 的内容。正式数据管线仍应在切分前做全局精确去重与近似去重，
 > 并把去重规则和版本写入可审计的产物记录。

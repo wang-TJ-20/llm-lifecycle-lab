@@ -265,6 +265,13 @@ python scripts/pretrain_experiment.py --mode evaluate
 评测每个位置都能看到真实前缀；生成后续位置则会看到自己刚生成的内容，
 错误可以不断传播。一个分数变好，不保证任何提示都会得到流畅文本。
 
+<figure class="tutorial-figure">
+
+![Teacher Forcing 与自由生成对照图：评测使用真实历史，自回归生成使用模型自己的输出，并可能保持连贯，也可能累积误差、跑题或重复](../assets/tutorials/06-evaluating-a-model/teacher-forcing-vs-generation.webp)
+
+<figcaption>图 2｜Teacher forcing 衡量给定真实历史时的下一步预测；自由生成还受模型自身输出与解码策略影响，重复、跑题和低熵是可能风险而非必然结果。</figcaption>
+</figure>
+
 两者回答的问题不同：离线 loss 适合稳定比较条件一致的 checkpoint，生成样例则暴露重复、
 跑题和长程一致性等行为。可信结论需要二者相互补充，而不是用其中一个替代另一个。
 

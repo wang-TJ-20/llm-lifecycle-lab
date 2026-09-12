@@ -14,12 +14,12 @@ const finalChapters = [
   { route: "/tutorials/07-resume-and-compare", title: "07 让实验", diagrams: 2, formulas: 0, search: "数据顺序也必须恢复" },
 ];
 const expectedFigures = new Map([
-  ["/tutorials/01-first-parameter-update", 2],
-  ["/tutorials/02-bilingual-training-data", 1],
+  ["/tutorials/01-first-parameter-update", 4],
+  ["/tutorials/02-bilingual-training-data", 2],
   ["/tutorials/03-tokenizer-and-packing", 2],
-  ["/tutorials/04-small-transformer", 1],
-  ["/tutorials/05-first-pretraining", 0],
-  ["/tutorials/06-evaluating-a-model", 1],
+  ["/tutorials/04-small-transformer", 2],
+  ["/tutorials/05-first-pretraining", 2],
+  ["/tutorials/06-evaluating-a-model", 2],
   ["/tutorials/07-resume-and-compare", 2],
 ]);
 const errors = [];
@@ -403,8 +403,8 @@ async function main() {
     await prefixed.locator(".chapter-links a").filter({ hasText: "上一篇" }).first().click();
     await prefixed.locator(".markdown-section h1").filter({ hasText: "06 判断" }).waitFor();
     assert(new URL(prefixed.url()).pathname.startsWith("/pages-preview/"));
-    assert.equal(await figuresLoaded(prefixed, "Pages 子路径"), 1,
-      "Chapter 6 must retain its reviewed illustration under a Pages subpath");
+    assert.equal(await figuresLoaded(prefixed, "Pages 子路径"), 2,
+      "Chapter 6 must retain its reviewed illustrations under a Pages subpath");
     assert(await prefixed.locator(".tutorial-figure img").evaluateAll((nodes) =>
       nodes.every((node) => new URL(node.currentSrc || node.src).pathname.startsWith("/pages-preview/"))
     ), "Illustrations must resolve inside the Pages subpath");

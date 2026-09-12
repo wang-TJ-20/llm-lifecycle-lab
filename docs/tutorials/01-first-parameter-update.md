@@ -233,6 +233,13 @@ loss = 所有有效目标的损失之和 / 有效目标数
 这里的 `Δθ` 由 AdamW 根据当前梯度、历史一阶/二阶矩估计、学习率与权重衰减共同决定，
 因此不能简单理解为某一个梯度乘以学习率。
 
+<figure class="tutorial-figure">
+
+![AdamW 参数更新图：梯度经过裁剪、一阶矩与二阶矩估计、偏差修正和解耦权重衰减后，才转化为参数更新](../assets/tutorials/01-first-parameter-update/gradient-parameter-update.webp)
+
+<figcaption>图 3｜梯度提供局部方向信息，AdamW 结合历史矩估计、学习率与解耦权重衰减形成实际更新；它不等于“裁剪梯度乘学习率”。</figcaption>
+</figure>
+
 ```python
 optimizer.zero_grad(set_to_none=True)
 loss.backward()
@@ -387,6 +394,13 @@ loss、梯度范数和更新量应有限，观察到的更新量应大于零。
 如果出现 `error:`，先处理错误，不把不完整运行当作成功实验。
 
 ## 8. 本篇到这里，下一步换成真实数据
+
+<figure class="tutorial-figure">
+
+![随机 token 单步实验边界图：预测、误差、求导与更新可以验证训练闭环，但不能证明模型学到了语言结构或统计规律](../assets/tutorials/01-first-parameter-update/first-learning-step.webp)
+
+<figcaption>图 4｜随机 token 上的一次更新只能证明预测、求导和参数更新能够闭环运行，不能据此推断模型已经学到结构、统计规律或语言能力。</figcaption>
+</figure>
 
 现在，我们可以把开头那条路径读成一个完整的机制闭环：
 

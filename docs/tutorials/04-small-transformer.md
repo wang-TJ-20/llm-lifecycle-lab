@@ -395,6 +395,13 @@ v' &= u\sin\varphi+v\cos\varphi
 (R_m q)^\top(R_n k)=q^\top R_{n-m}k
 ```
 
+<figure class="tutorial-figure">
+
+![RoPE 相对位置图：固定未旋转的 Query 和 Key 内容向量时，旋转引入的位置关系取决于位置差，最终分数仍同时依赖内容](../assets/tutorials/04-small-transformer/rope-relative-position.webp)
+
+<figcaption>图 2｜固定未旋转的 Q/K 时，RoPE 引入的旋转项由相对距离决定；真实注意力分数仍同时取决于内容向量，不能简化成“只看距离”。</figcaption>
+</figure>
+
 这里先固定未旋转的 `q/k`，`m/n` 是位置。
 两个位置一起平移、保持距离不变时，旋转引入的点积关系不变。
 真实网络的 Q/K 还依赖内容和上下文，
