@@ -30,23 +30,35 @@
 
 ## 接下来会走到哪里
 
+**第五篇 · [跑通一次预训练](./tutorials/05-first-pretraining.md)**
+
+把数据、模型和训练循环接起来，核对 batch、梯度累积、学习率与监督 token 预算。
+
+**第六篇 · [判断模型到底学到了什么](./tutorials/06-evaluating-a-model.md)**
+
+从加权 loss、双语覆盖和生成结果，区分链路通过、指标改善与语言能力。
+
+**第七篇 · [让实验可以恢复和比较](./tutorials/07-resume-and-compare.md)**
+
+用受控中断比较完整训练状态，理解 checkpoint、日志重放和实验条件的边界。
+
 ```mermaid
 flowchart TD
   A["01 参数更新 · 已完成"] --> B["02 中英文数据 · 已完成"]
   B --> C["03 Tokenizer 与 Packing · 已完成"]
   C --> D["04 Transformer · 已完成"]
-  D --> E["05 预训练"]
-  E --> F["06 评测"] --> G["07 恢复与对照实验"]
+  D --> E["05 预训练 · 已完成"]
+  E --> F["06 评测 · 已完成"] --> G["07 恢复与对照 · 已完成"]
 ```
 
-后三篇逐步补充。当前代码已经实现 Native 模型、BPE Tokenizer、磁盘 Packing、
+七篇主线已完整。当前代码已经实现 Native 模型、BPE Tokenizer、磁盘 Packing、
 Pretrain、恢复和评测，可以先沿操作指南进行实践。
 SFT、DPO、GRPO 等后续训练阶段尚未实现。
 
 ## 开始前
 
 你需要基本的 Python 阅读能力，以及 Python 3.11 或更高版本。
-前四篇的离线实验不要求 GPU；首次安装参考
+七篇的离线微型实验不要求 GPU；真实数据与 60M 训练另有前提。首次安装参考
 [环境准备](./NATIVE_PRETRAIN_GUIDE.md#2-环境准备)。
 
 10M Smoke 用来验证链路，不代表语言能力。

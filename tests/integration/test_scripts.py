@@ -17,6 +17,7 @@ SCRIPT_NAMES = (
     "inspect_model",
     "inspect_tokenizer",
     "model_experiment",
+    "pretrain_experiment",
     "train_pretrain",
     "train_tokenizer",
     "validate_config",
@@ -63,6 +64,41 @@ def run_script(
 def test_script_help_uses_its_own_name(name: str, tmp_path: Path) -> None:
     result = run_script(name, "--help", cwd=tmp_path)
     assert f"usage: python scripts/{name}.py" in result.stdout
+
+
+@pytest.mark.parametrize("mode", ("train", "evaluate", "resume"))
+def test_pretrain_experiment_is_standalone_and_temporary(
+    mode: str, tmp_path: Path
+) -> None:
+    report = json.loads(
+        run_script("pretrain_experiment", "--mode", mode, cwd=tmp_path).stdout
+    )
+    assert list(tmp_path.iterdir()) == []
+    if mode == "train":
+        assert report["status"] == "completed"
+        assert report["steps"] == 3
+        assert report["tokens_seen"] == sum(report["tokens_per_step"]) == 180
+        assert report["learning_rates"] == [0.001, 0.000775, 0.000325]
+        assert len(report["train_losses"]) == 3
+    elif mode == "evaluate":
+        assert report["sample_count"] == 4
+        assert report["eval_tokens"] == report["en_tokens"] + report["zh_tokens"]
+        assert report["en_tokens"] > 0 and report["zh_tokens"] > 0
+        assert report["language_weighted_loss_matches"]
+        assert report["standalone_eval_matches"]
+        assert len(report["generated_token_ids"]) == 4
+    else:
+        assert report["restored_checkpoint_step"] == 1
+        assert report["final_step"] == 3
+        assert report["logged_train_steps"] == [1, 2, 2, 3]
+        for key in (
+            "weights_equal",
+            "optimizer_scheduler_rng_equal",
+            "trainer_and_stream_equal",
+            "changed_budget_rejected",
+            "completed_resume_rejected",
+        ):
+            assert report[key]
 
 
 def test_script_error_codes_and_nested_help(tmp_path: Path) -> None:

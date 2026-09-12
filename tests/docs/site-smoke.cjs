@@ -8,6 +8,11 @@ const screenshots = path.resolve("build/docs-screenshots");
 const chapter = "/tutorials/02-bilingual-training-data";
 const tokenizerChapter = "/tutorials/03-tokenizer-and-packing";
 const transformerChapter = "/tutorials/04-small-transformer";
+const finalChapters = [
+  { route: "/tutorials/05-first-pretraining", title: "05 跑通", diagrams: 1, formulas: 2, search: "梯度累积不总是" },
+  { route: "/tutorials/06-evaluating-a-model", title: "06 判断", diagrams: 2, formulas: 4, search: "Loss 为什么要按" },
+  { route: "/tutorials/07-resume-and-compare", title: "07 让实验", diagrams: 2, formulas: 0, search: "数据顺序也必须恢复" },
+];
 const errors = [];
 
 async function ready(page, route, title) {
@@ -45,6 +50,7 @@ async function main() {
     await page.locator(".mermaid-source svg").waitFor();
     await noOverflow(page);
     assert.equal(await page.locator(".chapter-pagination .next").count(), 1);
+    assert.equal(await page.locator('.sidebar a[href^="#/tutorials/0"]').count(), 7);
     await page.screenshot({ path: path.join(screenshots, "desktop-home.png") });
 
     await page.locator('.sidebar a[href="#/tutorials/02-bilingual-training-data"]').click();
@@ -158,7 +164,8 @@ async function main() {
     assert.equal(await page.locator(".math-block .katex").count(), 7);
     assert.equal(await page.locator(".katex-error, .diagram-error").count(), 0);
     assert.equal(await page.locator(".markdown-section p").filter({ hasText: "**" }).count(), 0);
-    assert.equal(await page.locator(".chapter-pagination .next").count(), 0);
+    assert.equal(await page.locator(".chapter-pagination .next").getAttribute("href"),
+      `#${finalChapters[0].route}`);
     assert.equal(await page.locator(".chapter-pagination a").first().getAttribute("href"),
       `#${tokenizerChapter}`);
     assert.equal(await page.getByRole("link", { name: "transformer.py", exact: true }).getAttribute("href"),
@@ -183,6 +190,47 @@ async function main() {
     await search.fill("SwiGLU 怎样加工");
     await page.locator(`.matching-post a[href*="${transformerChapter}"]`).first().waitFor();
     await page.getByRole("button", { name: "清除搜索" }).click();
+
+    for (const [index, lesson] of finalChapters.entries()) {
+      await ready(page, lesson.route, lesson.title);
+      await page.waitForFunction((count) =>
+        document.querySelectorAll(".mermaid-source svg").length === count,
+      lesson.diagrams);
+      assert.equal(await page.locator(".math-block .katex").count(), lesson.formulas);
+      assert.equal(await page.locator(".katex-error, .diagram-error").count(), 0);
+      assert(await page.locator(".markdown-section p").evaluateAll((nodes) =>
+        nodes.every((node) => {
+          const copy = node.cloneNode(true);
+          copy.querySelectorAll("code").forEach((code) => code.remove());
+          return !copy.textContent.includes("**");
+        })
+      ), `${lesson.title}: emphasis must render outside code spans`);
+      assert.equal(await page.locator(".chapter-pagination a").first().getAttribute("href"),
+        `#${index === 0 ? transformerChapter : finalChapters[index - 1].route}`);
+      if (index < finalChapters.length - 1) {
+        assert.equal(await page.locator(".chapter-pagination .next").getAttribute("href"),
+          `#${finalChapters[index + 1].route}`);
+        await page.locator(".chapter-pagination .next").click();
+        await page.locator(".markdown-section h1").filter({
+          hasText: finalChapters[index + 1].title,
+        }).waitFor();
+        await ready(page, lesson.route, lesson.title);
+      } else {
+        assert.equal(await page.locator(".chapter-pagination .next").count(), 0);
+      }
+      await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
+      await noOverflow(page);
+      await page.screenshot({ path: path.join(screenshots, `desktop-chapter${index + 5}.png`), animations: "disabled" });
+      const command = page.locator(".markdown-section > pre").filter({
+        hasText: "python scripts/pretrain_experiment.py --mode",
+      }).first();
+      const code = await command.locator("code").textContent();
+      await command.getByRole("button", { name: "复制代码", exact: true }).click();
+      assert.equal(await page.evaluate(() => navigator.clipboard.readText()), code);
+      await search.fill(lesson.search);
+      await page.locator(`.matching-post a[href*="${lesson.route}"]`).first().waitFor();
+      await page.getByRole("button", { name: "清除搜索" }).click();
+    }
 
     await ready(page, "/NATIVE_MODEL_GUIDE", "自有模型介绍");
     await noOverflow(page);
@@ -272,6 +320,39 @@ async function main() {
       await noOverflow(phone);
     }
 
+    for (const width of [390, 320]) {
+      await phone.setViewportSize({ width, height: width === 320 ? 720 : 844 });
+      for (const [index, lesson] of finalChapters.entries()) {
+        await ready(phone, lesson.route, lesson.title);
+        await phone.waitForFunction((count) =>
+          document.querySelectorAll(".mermaid-source svg").length === count,
+        lesson.diagrams);
+        await phone.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
+        await noOverflow(phone);
+        assert(await phone.locator(".math-block").evaluateAll((nodes) =>
+          nodes.every((node) => node.scrollWidth <= node.clientWidth + 1)
+        ), `${lesson.title}: formulas must fit on mobile`);
+        await phone.screenshot({
+          path: path.join(screenshots, `mobile-chapter${index + 5}-${width}.png`),
+          animations: "disabled",
+        });
+        await phone.locator(".diagram").first().scrollIntoViewIfNeeded();
+        await phone.screenshot({
+          path: path.join(screenshots, `mobile-chapter${index + 5}-diagram-${width}.png`),
+          animations: "disabled",
+        });
+        if (lesson.formulas) {
+          await phone.locator(".math-block").last().scrollIntoViewIfNeeded();
+          await phone.screenshot({
+            path: path.join(screenshots, `mobile-chapter${index + 5}-formula-${width}.png`),
+            animations: "disabled",
+          });
+        }
+        await phone.locator("details summary").first().click();
+        await noOverflow(phone);
+      }
+    }
+
     const prefixed = await context.newPage();
     await prefixed.route(`${base}/pages-preview/**`, async (route) => {
       const response = await route.fetch({
@@ -279,14 +360,14 @@ async function main() {
       });
       await route.fulfill({ response });
     });
-    await prefixed.goto(`${base}/pages-preview/#${transformerChapter}`, { waitUntil: "domcontentloaded" });
-    await prefixed.locator(".markdown-section h1").filter({ hasText: "04 搭建" }).waitFor();
-    await prefixed.locator(".math-block .katex").first().waitFor();
+    await prefixed.goto(`${base}/pages-preview/#${finalChapters[2].route}`, { waitUntil: "domcontentloaded" });
+    await prefixed.locator(".markdown-section h1").filter({ hasText: "07 让实验" }).waitFor();
+    await prefixed.locator(".mermaid-source svg").first().waitFor();
     await prefixed.locator(".chapter-links a").filter({ hasText: "上一篇" }).first().click();
-    await prefixed.locator(".markdown-section h1").filter({ hasText: "03 让" }).waitFor();
+    await prefixed.locator(".markdown-section h1").filter({ hasText: "06 判断" }).waitFor();
     assert(new URL(prefixed.url()).pathname.startsWith("/pages-preview/"));
     assert.deepEqual(errors, [], "No uncaught browser errors");
-    console.log("PASS: desktop/mobile, chapters 2/3/4, diagrams, formulas, theme persistence, clipboard, search, source links, deep links, 404, Pages subpath, and overflow checks.");
+    console.log("PASS: seven-chapter navigation, desktop/mobile, diagrams, formulas, theme, clipboard, search, source links, deep links, 404, Pages subpath, and overflow checks.");
   } finally {
     await browser.close();
   }

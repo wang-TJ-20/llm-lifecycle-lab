@@ -21,6 +21,7 @@
 | 检查 Tokenizer | `inspect_tokenizer.py` | `NativeTokenizer.encode/decode` |
 | 理解模型规模 | `inspect_model.py` | `src/llm_lifecycle_lab/model/native/` |
 | 实践一次参数更新 | `model_experiment.py` | 脚本中直接展示 forward、loss、backward、step 和 Cache 检查 |
+| 离线预训练、评测与恢复对照 | `pretrain_experiment.py` | 临时双语数据与真实 `run_native_pretraining` / `evaluate_native_pretraining` |
 | 训练模型 | `train_pretrain.py` | `src/llm_lifecycle_lab/training/pretrain.py` |
 | 评测模型 | `eval_pretrain.py` | `evaluate_native_pretraining` |
 | 冻结基线与验收 | `verify_reference.py` | `src/llm_lifecycle_lab/reference.py` |
@@ -34,6 +35,18 @@
 
 逐步讲解与单变量实验见 [从一次参数更新开始](../docs/tutorials/01-first-parameter-update.md)，
 连续学习路线见 [实践系列目录](../docs/tutorials/README.md)。
+
+第五至七篇共用临时实验，无需下载数据或 GPU：
+
+```bash
+python scripts/pretrain_experiment.py --mode train
+python scripts/pretrain_experiment.py --mode evaluate
+python scripts/pretrain_experiment.py --mode resume
+```
+
+每个模式独立准备模板双语数据和微型模型，退出时自动清理全部实验产物。
+`resume` 只在临时 run 中注入受控异常，不影响已有训练。
+实验用于机制检查，不代表真实双语模型能力或完整 CUDA 验证。
 
 ## 60M 基线入口
 

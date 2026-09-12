@@ -28,7 +28,11 @@ GitHub Pages 发布方式和新增章节约定见 [文档站维护](./docs/SITE_
 解释字节级 BPE、规范化与 Packing，用离线对照检查词表和监督目标。
 第四篇 [搭建自己的小型 Transformer](./docs/tutorials/04-small-transformer.md)
 沿张量解释模型结构，并用小实验检查 Attention、RoPE 和 KV Cache。
-后续按预训练、评测和实验复现继续展开。
+第五至七篇依次讲解 [预训练](./docs/tutorials/05-first-pretraining.md)、
+[评测](./docs/tutorials/06-evaluating-a-model.md) 与
+[恢复和实验比较](./docs/tutorials/07-resume-and-compare.md)，七篇主线已完整。
+三篇共用临时双语微型实验 `python scripts/pretrain_experiment.py --mode train`，
+无需下载数据或使用 GPU，不改动已有训练产物。
 
 **按需查阅**：完整操作步骤、配置说明和排错集中维护在以下三份指南中。
 

@@ -31,12 +31,14 @@ Linux + 单张 24GB NVIDIA GPU。CPU 实验通过不代表已经完成 CUDA 训�
 | [02 准备中英文训练数据](./02-bilingual-training-data.md) | 数据从哪里来？怎样切分并避免数据泄漏？ | 已完成 |
 | [03 让模型读懂文本的表示](./03-tokenizer-and-packing.md) | BPE、词表和 Packing 怎样把文本变成训练样本？ | 已完成 |
 | [04 搭建自己的小型 Transformer](./04-small-transformer.md) | 沿着张量流动理解 Attention、RoPE、RMSNorm、SwiGLU 和 GQA | 已完成 |
-| 05 跑通一次预训练 | batch、梯度累积、学习率和训练预算如何共同作用？ | 待写 |
-| 06 判断模型到底学到了什么 | 如何结合 loss、双语指标和生成结果评价模型？ | 待写 |
-| 07 让实验可以恢复和比较 | Checkpoint 保存什么？如何固定数据、配置和对照条件？ | 待写 |
+| [05 跑通一次预训练](./05-first-pretraining.md) | batch、梯度累积、学习率和训练预算如何共同作用？ | 已完成 |
+| [06 判断模型到底学到了什么](./06-evaluating-a-model.md) | 如何结合 loss、双语指标和生成结果评价模型？ | 已完成 |
+| [07 让实验可以恢复和比较](./07-resume-and-compare.md) | Checkpoint 保存什么？如何固定数据、配置和对照条件？ | 已完成 |
 
-建议按顺序阅读，但不需要等所有文章完成才开始实践。
-尚未成文的部分，可以先查阅下面的现有指南；后续文章完成后会在本目录补上链接。
+七篇预训练主线已完整，建议按顺序阅读。
+每篇都有可以局部验证的实验，不必先准备正式训练硬件。
+第五至七篇使用 `scripts/pretrain_experiment.py` 的临时双语微型实验，
+不下载数据、不覆盖已有产物；真实 Smoke 与 60M 操作另有明确前提。
 
 ## 文章与指南的分工
 
@@ -49,6 +51,9 @@ Linux + 单张 24GB NVIDIA GPU。CPU 实验通过不代表已经完成 CUDA 训�
 | 理解双语数据选择、来源记录和防泄漏切分 | [第二篇](./02-bilingual-training-data.md) |
 | 理解 BPE、规范化、词表预算和训练窗口的监督目标 | [第三篇](./03-tokenizer-and-packing.md) |
 | 沿张量理解 Transformer，检查因果性、位置旋转和 KV Cache | [第四篇](./04-small-transformer.md) |
+| 理解训练预算、累积和日志，跑通微型预训练 | [第五篇](./05-first-pretraining.md) |
+| 理解指标聚合、双语覆盖和生成检查 | [第六篇](./06-evaluating-a-model.md) |
+| 验证中断恢复，固定实验条件与验收边界 | [第七篇](./07-resume-and-compare.md) |
 | 下载或接入自己的数据，训练 Tokenizer，生成 Packing | [数据介绍与准备](../DATA_GUIDE.md) |
 | 查模型结构、参数预算和张量形状 | [自有模型介绍](../NATIVE_MODEL_GUIDE.md) |
 | 安装环境，运行训练、恢复和评测，定位报错 | [Pretrain 训练文档](../NATIVE_PRETRAIN_GUIDE.md) |

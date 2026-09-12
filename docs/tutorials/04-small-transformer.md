@@ -1,7 +1,7 @@
 # 04 搭建自己的小型 Transformer
 
 [系列目录](./README.md) | [上一篇：让模型读懂文本的表示](./03-tokenizer-and-packing.md)
-| 下一篇：跑通一次预训练（待写）
+| [下一篇：跑通一次预训练](./05-first-pretraining.md)
 
 第三篇把文本变成了 token ID，再通过 Embedding 查出向量。
 但查表本身不看上下文：同一个 ID，无论前面写了什么，最初取出的都是同一行参数。
@@ -722,4 +722,4 @@ python scripts/inspect_model.py --config configs/models/tiny-60m.yaml
 以及两步 Smoke 究竟能证明什么、不能证明什么。
 
 [返回系列目录](./README.md) | [上一篇：让模型读懂文本的表示](./03-tokenizer-and-packing.md)
-| 下一篇：跑通一次预训练（待写）
+| [下一篇：跑通一次预训练](./05-first-pretraining.md)

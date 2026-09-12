@@ -7,9 +7,9 @@
   - [02 准备中英文训练数据](/tutorials/02-bilingual-training-data)
   - [03 让模型读懂文本的表示](/tutorials/03-tokenizer-and-packing)
   - [04 搭建自己的小型 Transformer](/tutorials/04-small-transformer)
-  - <span class="pending">05 跑通一次预训练 · 待写</span>
-  - <span class="pending">06 判断模型学到了什么 · 待写</span>
-  - <span class="pending">07 恢复与比较实验 · 待写</span>
+  - [05 跑通一次预训练](/tutorials/05-first-pretraining)
+  - [06 判断模型到底学到了什么](/tutorials/06-evaluating-a-model)
+  - [07 让实验可以恢复和比较](/tutorials/07-resume-and-compare)
 
 - **操作与原理参考**
   - [数据介绍与准备](/DATA_GUIDE)
