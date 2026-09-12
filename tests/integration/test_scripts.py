@@ -14,9 +14,11 @@ SCRIPT_NAMES = (
     "data",
     "doctor",
     "eval_pretrain",
+    "generate_pretrain",
     "inspect_model",
     "inspect_tokenizer",
     "model_experiment",
+    "plot_training_curves",
     "pretrain_experiment",
     "train_pretrain",
     "train_tokenizer",
@@ -114,6 +116,56 @@ def test_script_error_codes_and_nested_help(tmp_path: Path) -> None:
     )
     assert "config file does not exist" in result.stderr
     assert not (tmp_path / "runs").exists()
+    result = run_script(
+        "generate_pretrain",
+        "--config",
+        "missing.yaml",
+        "--checkpoint",
+        "missing",
+        cwd=tmp_path,
+        expected_code=2,
+    )
+    assert "config file does not exist" in result.stderr
+
+
+def test_plot_training_curves_writes_available_series(tmp_path: Path) -> None:
+    run = tmp_path / "run"
+    run.mkdir()
+    rows = [
+        {
+            "step": 1,
+            "train_loss": 4.0,
+            "learning_rate": 0.001,
+            "cuda_max_memory_allocated_bytes": 1024**3,
+        },
+        {
+            "step": 2,
+            "train_loss": 3.0,
+            "learning_rate": 0.0005,
+            "cuda_max_memory_allocated_bytes": 2 * 1024**3,
+        },
+    ]
+    (run / "metrics.jsonl").write_text(
+        "".join(json.dumps(row) + "\n" for row in rows),
+        encoding="utf-8",
+    )
+
+    result = run_script(
+        "plot_training_curves",
+        "--run",
+        str(run),
+        "--output",
+        "charts",
+        cwd=tmp_path,
+    )
+
+    report = json.loads(result.stdout)
+    assert {Path(value).name for value in report["charts"]} == {
+        "loss.svg",
+        "learning_rate.svg",
+        "memory.svg",
+    }
+    assert "<svg" in (tmp_path / "charts/loss.svg").read_text(encoding="utf-8")
 
 
 @pytest.fixture

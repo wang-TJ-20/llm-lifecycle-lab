@@ -717,7 +717,9 @@ python scripts/inspect_model.py --config configs/models/tiny-60m.yaml
 [自有模型介绍](../NATIVE_MODEL_GUIDE.md#2-两档模型)。
 比较宽浅/深窄或 QK-Norm 时，应固定数据、Tokenizer、训练预算和评测方式，
 不能拿随机初始化输出给哪种结构更好下结论。
-当前 60M 完整 CUDA 参考训练尚未完成。
+第一次完整 60M CUDA
+[Reference 运行](../experiments/native-60m-baseline-v1.md) 已完成并被接受；
+它记录了结构、显存、双语指标及一项明确的 dirty-Git provenance 例外。
 
 </details>
 

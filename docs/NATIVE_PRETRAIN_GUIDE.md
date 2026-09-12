@@ -358,7 +358,9 @@ python scripts/eval_pretrain.py \
 ```
 
 改变预算后不得照抄上述 step，以训练输出的 `final_checkpoint` 为准。
-当前仓库尚未完成 60M 全程 CUDA 参考运行，不提供虚构的耗时、成本或质量预期。
+第一次 60M 全程 CUDA [Reference 运行](./experiments/native-60m-baseline-v1.md)
+已完成 5,649 steps。它记录了实际耗时、显存和双语指标，
+项目已在保留 dirty-Git provenance 例外的前提下接受它作为正式 Reference。
 
 ## 7. 自定义实验配置
 
@@ -500,8 +502,9 @@ python scripts/train_pretrain.py \
 也没有从旧 checkpoint 分叉的新 run 命令。新 ID 默认从随机初始化开始，不等于续训。
 改变预算、数据或模型时应明确规划新的实验。
 
-精确恢复测试目前覆盖 CPU 路径；FP16 GradScaler 和 MPS RNG 尚未纳入保存，
-不能据此承诺全部设备/精度逐位恢复。
+checkpoint 现已保存 FP16 GradScaler 和 MPS RNG，旧 checkpoint 缺少字段时仍可读取。
+精确连续训练对恢复的自动测试目前覆盖 CPU float32；
+CUDA scaler 与 MPS RNG 有独立状态往返测试，不能据此承诺跨设备或跨依赖版本逐位一致。
 
 ## 9. 结构消融与 Reference 验收
 
@@ -547,7 +550,10 @@ token 预算相同不等于 FLOPs 或耗时相同。应一起比较双语指标�
 `freeze.source_sha256` 锁住 `src/llm_lifecycle_lab/**/*.py` 的相对路径和文件内容，
 与 checkout 的绝对路径、时间戳无关。文档与脚本不参与该源码摘要。
 不要在原基线上调学习率、初始化或默认值后重算 hash 放行，应另建实验版本。
-当前只是冻结了可执行规范和输入，**尚无通过该规范的完整 CUDA 训练结果**。
+第一次完整 CUDA [Reference 运行](./experiments/native-60m-baseline-v1.md)
+已获得训练和双语评测结果。其自动检查为 10 pass / 1 `runtime-provenance`
+fail；项目已记录一次性例外并接受该结果，不要求重跑。
+规范仍保留 `require_clean_git: true`，未来 Reference 继续执行该门禁。
 
 ### 9.3 输入与环境门控
 
@@ -686,11 +692,10 @@ python scripts/verify_reference.py \
 和 [恢复工具](https://github.com/jingyaogong/minimind/blob/6fc918beb68a0d8c40452338df6319fe168014ba/trainer/trainer_utils.py)，
 后续优先顺序为：
 
-1. 补齐 FP16 GradScaler/MPS RNG 恢复，并用连续训练对中断恢复检验。
-2. 明确不同有效 token 数下的梯度累积归一化：当前 micro batch 均值等权，
-   不一定等于全 token 均值，虽然日志是 token 加权；改动须独立验证训练语义。
-3. 分离稳定数据内容身份与时间/路径来源，完善跨机器 Reference。
-4. 完成固定 60M CUDA 实验后，再评估 SDPA 快速路径、预取、compile 和可视化。
+1. 增加 CUDA FP16 与 MPS 的端到端连续训练/恢复对照；当前只完成状态往返单测。
+2. 分离稳定数据内容身份与时间/路径来源，完善跨机器 Reference。
+3. 以已接受的 60M Reference 为基线开展结构消融，再评估 SDPA、预取和 compile。
+4. 在 Pretrain 证据稳定后进入 SFT，不提前叠加 DPO/GRPO。
 
 MiniMind 的 scaler、workers、pin memory 与可选 SwanLab 可供借鉴，但不能因此移除
 本项目现有 hash、baseline、双语评测和不可覆盖 checkpoint，也不能把未验证优化计为收益。

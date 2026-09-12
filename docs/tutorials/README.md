@@ -75,7 +75,9 @@ Linux + 单张 24GB NVIDIA GPU。CPU 实验通过不代表已经完成 CUDA 训�
 文档站预览、图解与公式写法见 [文档站维护](../SITE_GUIDE.md)。
 
 当前项目已实现 Native 模型、BPE Tokenizer、磁盘 Packing、Pretrain、恢复和评测，
-但仓库不附带训练好的权重，完整 CUDA 参考实验尚未完成。
+但仓库不附带训练好的权重。第一次完整 60M CUDA
+[Reference 运行](../experiments/native-60m-baseline-v1.md) 已完成并被接受；
+其 dirty-Git provenance 例外保留在实验记录中。
 文章不会把两步 Smoke 或随机 token 实验写成语言能力结论。
 
 ## 后续如何继续

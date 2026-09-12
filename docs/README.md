@@ -63,7 +63,9 @@ SFT、DPO、GRPO 等后续训练阶段尚未实现。
 
 10M Smoke 用来验证链路，不代表语言能力。
 60M 教学训练的目标环境为 Linux 和单张 24GB NVIDIA GPU；
-完整 CUDA 参考实验尚未完成，仓库不附带训练好的权重。
+第一次完整 CUDA [Reference 运行](./experiments/native-60m-baseline-v1.md) 已完成。
+自动验收保留一项 dirty-Git provenance 失败，项目已记录例外并接受该结果。
+仓库不附带训练好的权重。
 
 ## 按需查阅
 
@@ -72,5 +74,6 @@ SFT、DPO、GRPO 等后续训练阶段尚未实现。
 | 数据从哪里来，怎样下载、切分和打包？ | [数据介绍与准备](./DATA_GUIDE.md) |
 | 模型各层怎样连接，张量形状是什么？ | [自有模型介绍](./NATIVE_MODEL_GUIDE.md) |
 | 怎样训练、恢复、评测与排错？ | [Pretrain 训练文档](./NATIVE_PRETRAIN_GUIDE.md) |
+| 60M CUDA 实际表现怎样？ | [Reference 实验记录](./experiments/native-60m-baseline-v1.md) |
 
 完整的章节安排与写作约定见 [实践系列导读](./tutorials/README.md)。

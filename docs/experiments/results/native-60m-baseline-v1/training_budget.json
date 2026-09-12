@@ -1,0 +1,14 @@
+{
+  "estimated_epochs": 1.000033192932785,
+  "estimated_tokens_per_step": 8175.9714984344055,
+  "estimated_train_tokens": 46186063,
+  "examples_per_epoch": 90381,
+  "max_steps": 5649,
+  "micro_batches_per_epoch": 90381,
+  "mode": "num_epochs",
+  "requested_max_steps": null,
+  "requested_max_train_tokens": null,
+  "requested_num_epochs": 1.0,
+  "supervised_tokens_per_epoch": 46184530,
+  "target_train_tokens": 46184530
+}

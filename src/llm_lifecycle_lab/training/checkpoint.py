@@ -54,6 +54,7 @@ class CheckpointManager:
         scheduler: torch.optim.lr_scheduler.LRScheduler,
         stream: DeterministicBatchStream,
         state: TrainerState,
+        scaler: torch.amp.GradScaler | None = None,
     ) -> Path:
         checkpoint_id = f"step-{state.global_step:08d}"
         target = self.artifacts.artifact_path(f"checkpoints/{checkpoint_id}")
@@ -93,12 +94,14 @@ class CheckpointManager:
                 {
                     "optimizer": optimizer.state_dict(),
                     "scheduler": scheduler.state_dict(),
+                    "scaler": scaler.state_dict() if scaler is not None else None,
                     "torch_rng_state": torch.get_rng_state(),
                     "cuda_rng_state": (
                         torch.cuda.get_rng_state_all()
                         if torch.cuda.is_available()
                         else None
                     ),
+                    "mps_rng_state": _mps_rng_state(),
                 },
             )
             os.replace(temporary, target)
@@ -123,6 +126,7 @@ class CheckpointManager:
         optimizer: torch.optim.Optimizer,
         scheduler: torch.optim.lr_scheduler.LRScheduler,
         stream: DeterministicBatchStream,
+        scaler: torch.amp.GradScaler | None = None,
     ) -> TrainerState:
         source = self._resolve_checkpoint(checkpoint)
         metadata = _load_checkpoint_metadata(source)
@@ -150,12 +154,16 @@ class CheckpointManager:
             )
             optimizer.load_state_dict(torch_state["optimizer"])
             scheduler.load_state_dict(torch_state["scheduler"])
+            if scaler is not None and torch_state.get("scaler") is not None:
+                scaler.load_state_dict(torch_state["scaler"])
             torch.set_rng_state(torch_state["torch_rng_state"])
             if (
                 torch.cuda.is_available()
                 and torch_state.get("cuda_rng_state") is not None
             ):
                 torch.cuda.set_rng_state_all(torch_state["cuda_rng_state"])
+            if torch_state.get("mps_rng_state") is not None:
+                _set_mps_rng_state(torch_state["mps_rng_state"])
         except (OSError, KeyError, TypeError, ValueError, RuntimeError) as exc:
             raise ArtifactError(f"cannot restore checkpoint {source}: {exc}") from exc
         if state.global_step != metadata.step:
@@ -229,3 +237,18 @@ def _save_torch_state(path: Path, value: dict[str, Any]) -> None:
         torch.save(value, path)
     except (OSError, RuntimeError) as exc:
         raise ArtifactError(f"cannot write optimizer state {path}: {exc}") from exc
+
+
+def _mps_available() -> bool:
+    return bool(hasattr(torch.backends, "mps") and torch.backends.mps.is_available())
+
+
+def _mps_rng_state() -> torch.Tensor | None:
+    if _mps_available():
+        return torch.mps.get_rng_state()
+    return None
+
+
+def _set_mps_rng_state(state: torch.Tensor) -> None:
+    if _mps_available():
+        torch.mps.set_rng_state(state)

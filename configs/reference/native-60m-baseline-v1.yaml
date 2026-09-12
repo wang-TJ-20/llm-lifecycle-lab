@@ -3,7 +3,9 @@ reference_id: native-60m-baseline-v1
 pipeline_config: configs/pipelines/native-60m-reference.yaml
 freeze:
   execution_sha256: 227c96173e3438981174d4b7f69b6877a6779790540d3a2af700c9be7073c83e
-  source_sha256: 809e81e28c90993c478ac32fe6370e154b9a14d3a8922b0f0e8ab1d1271be21a
+  # Refreshed for token-weighted gradient accumulation, FP16 GradScaler state,
+  # and MPS RNG persistence. Trainer defaults and execution_sha256 are unchanged.
+  source_sha256: 142361e52641c2dcd5ea7de3f55030bd3e2434a5132fb39abd1303c2bc597729
   packed_manifest_sha256: 49c7bf3b7d0c142d8e9c98ee3dda11da12b29a59055b05cca261cce5eab0b84a
   python_major_minor: "3.11"
   packages:

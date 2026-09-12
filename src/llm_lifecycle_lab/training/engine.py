@@ -299,6 +299,10 @@ class TrainingEngine:
             raise ContractError("model has no trainable parameters")
         optimizer = _build_optimizer(named_parameters, self.config)
         scheduler = _build_scheduler(optimizer, self.config)
+        scaler = torch.amp.GradScaler(
+            "cuda",
+            enabled=self.compute_dtype is torch.float16,
+        )
         state = TrainerState()
         if resume_from is not None:
             state = self.checkpoint_manager.load(
@@ -307,14 +311,11 @@ class TrainingEngine:
                 optimizer=optimizer,
                 scheduler=scheduler,
                 stream=train_stream,
+                scaler=scaler,
             )
         if state.global_step >= self.budget.max_steps:
             raise ConfigError("resume checkpoint already reached or exceeded max_steps")
 
-        scaler = torch.amp.GradScaler(
-            "cuda",
-            enabled=self.compute_dtype is torch.float16,
-        )
         optimizer.zero_grad(set_to_none=True)
         self.artifacts.update_status("running")
         started_at = time.monotonic()
@@ -366,18 +367,31 @@ class TrainingEngine:
                     )
                     with _autocast_context(self.device, self.compute_dtype):
                         output = objective(model, batch)
-                        scaled_loss = (
-                            output.loss / self.config.gradient_accumulation_steps
-                        )
-                    if not bool(torch.isfinite(scaled_loss.detach())):
-                        raise ContractError("training loss became non-finite")
-                    scaler.scale(scaled_loss).backward()
                     supervised_tokens = int(output.metrics.get("supervised_tokens", 0))
+                    if supervised_tokens <= 0:
+                        raise ContractError("training batch has zero supervised tokens")
+                    # Accumulate the raw token-level NLL sum for this micro-batch
+                    # instead of its token mean. Micro-batches may carry a
+                    # different number of effective (supervised) tokens, so a
+                    # per-micro-batch mean would weight them equally per batch
+                    # rather than equally per token.
+                    token_loss = output.loss * supervised_tokens
+                    if not bool(torch.isfinite(token_loss.detach())):
+                        raise ContractError("training loss became non-finite")
+                    scaler.scale(token_loss).backward()
                     loss_sum += float(output.loss.detach()) * supervised_tokens
                     tokens_this_step += supervised_tokens
                     bytes_this_step += float(output.metrics.get("source_bytes", 0))
 
                 scaler.unscale_(optimizer)
+                # Convert the accumulated token-level NLL sum into the mean over
+                # the step's effective supervised tokens. Scaling gradients by a
+                # constant after backpropagation is exact, so every micro-batch
+                # contributes in proportion to its token count.
+                normalization = 1.0 / tokens_this_step
+                for _, parameter in named_parameters:
+                    if parameter.grad is not None:
+                        parameter.grad.mul_(normalization)
                 gradient_norm = torch.nn.utils.clip_grad_norm_(
                     [parameter for _, parameter in named_parameters],
                     self.config.gradient_clipping,
@@ -463,6 +477,7 @@ class TrainingEngine:
                         scheduler=scheduler,
                         stream=train_stream,
                         state=state,
+                        scaler=scaler,
                     )
         except Exception as exc:
             self.artifacts.write_json(

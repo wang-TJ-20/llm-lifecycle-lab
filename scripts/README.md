@@ -24,6 +24,8 @@
 | 离线预训练、评测与恢复对照 | `pretrain_experiment.py` | 临时双语数据与真实 `run_native_pretraining` / `evaluate_native_pretraining` |
 | 训练模型 | `train_pretrain.py` | `src/llm_lifecycle_lab/training/pretrain.py` |
 | 评测模型 | `eval_pretrain.py` | `evaluate_native_pretraining` |
+| 固定提示续写 | `generate_pretrain.py` | 校验 checkpoint/Tokenizer/配置绑定后执行确定性贪心生成 |
+| 绘制训练曲线 | `plot_training_curves.py` | 从 `metrics.jsonl` 生成无额外依赖的 SVG |
 | 冻结基线与验收 | `verify_reference.py` | `src/llm_lifecycle_lab/reference.py` |
 
 以 `train_tokenizer.py` 为例，先读 `main()`，可以看到输入 manifest、训练参数和输出；
@@ -61,3 +63,7 @@ python scripts/pretrain_experiment.py --mode resume
 正式基线训练使用 `train_pretrain.py --reference-spec <规范路径>`，其 `main()` 中直接
 先做门控，再调用训练流程。门控失败不会创建或恢复 run；普通教学训练不强制该参数。
 完整命令见 [训练文档](../docs/NATIVE_PRETRAIN_GUIDE.md#92-固定-60m-基线)。
+
+第一次完整 60M CUDA 运行的指标、曲线和验收边界见
+[60M CUDA Reference v1](../docs/experiments/native-60m-baseline-v1.md)。
+该 run 的 dirty-Git provenance 失败被显式记录并作为一次性例外接受。

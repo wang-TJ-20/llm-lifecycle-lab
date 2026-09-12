@@ -11,6 +11,9 @@
   - [06 判断模型到底学到了什么](/tutorials/06-evaluating-a-model)
   - [07 让实验可以恢复和比较](/tutorials/07-resume-and-compare)
 
+- **实验记录**
+  - [60M CUDA Reference v1](/experiments/native-60m-baseline-v1)
+
 - **操作与原理参考**
   - [数据介绍与准备](/DATA_GUIDE)
   - [自有模型介绍](/NATIVE_MODEL_GUIDE)

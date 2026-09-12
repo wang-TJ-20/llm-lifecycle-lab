@@ -34,8 +34,9 @@ loss 下降能说明什么？进程中断后，怎样继续同一次实验？
 - **读懂训练结果**：区分 step、监督 token 和预算，结合双语指标与生成解释模型表现。
 - **做可比较的实验**：固定输入和配置，检查 checkpoint、数据位置与中断恢复。
 
-> 当前已完成七篇预训练主线及配套实现。仓库不附带训练好的权重，
-> 60M 完整 CUDA 参考实验尚未完成；微型实验和两步 Smoke 不代表语言能力。
+> 当前已完成七篇预训练主线及配套实现。第一次 60M CUDA Reference 已跑完并被接受；
+> 自动验收保留一项已记录的 dirty-Git provenance 例外。
+> 仓库不附带训练好的权重；微型实验和两步 Smoke 不代表语言能力。
 
 ## 选择你的起点
 
@@ -146,6 +147,8 @@ python scripts/eval_pretrain.py \
 
 60M 的数据规模、CUDA/BF16 环境和训练入口见
 [60M 正式实践](./docs/NATIVE_PRETRAIN_GUIDE.md#6-60m-正式实践)。
+第一次完整 CUDA 结果见
+[60M CUDA Reference v1](./docs/experiments/native-60m-baseline-v1.md)。
 
 ## 模型与数据
 
@@ -197,7 +200,8 @@ flowchart TD
 | --- | --- |
 | 已完成 | 七篇中文教程、Docsify 在线阅读站与 CPU 离线实验 |
 | 已实现 | Native 10M/60M、双语 BPE、磁盘 Packing、Pretrain、评测与 checkpoint 恢复 |
-| 已固定，待完整运行验收 | 60M Reference 的配置、输入、源码、环境与预算规范 |
+| 已完成 | 60M 单卡 RTX 4090 Reference、1 epoch；dev loss 9.8523 → 3.1032 |
+| 已记录例外 | 自动检查 10 pass / 1 provenance fail；项目接受该固定 run，不要求重跑 |
 | 后续方向，尚未实现 | SFT、DPO、GRPO、Qwen 迁移、模型导出与服务 |
 
 第一份冻结基线为
@@ -206,6 +210,8 @@ flowchart TD
 **固定了规范，不等于已经获得通过验收的模型权重。**
 正式训练前的输入与环境门控、训练后验收见
 [固定 60M 基线](./docs/NATIVE_PRETRAIN_GUIDE.md#92-固定-60m-基线)。
+该运行完成了 5,649 steps 和 46,186,063 个监督 token，
+指标与原始日志见 [实验记录](./docs/experiments/native-60m-baseline-v1.md)。
 
 当前精确恢复对照覆盖 CPU；不承诺所有设备和精度逐位一致。
 评测受配置中的样本预算限制，不默认代表全量 dev/test。

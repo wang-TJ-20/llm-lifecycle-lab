@@ -264,9 +264,11 @@ python scripts/train_pretrain.py \
 ## 6. 当前“精确恢复”保证到哪里
 
 本篇证明的是同一环境下的 CPU float32 对照，不是所有训练条件逐位可复现。
-目前保存了 Torch CPU/CUDA RNG，却没有保存 Python/NumPy RNG 或 MPS RNG；
-FP16 GradScaler 状态也尚未纳入 checkpoint。
-本实验使用的路径没有依赖这些遗漏状态，不应借此承诺其它路径等价。
+目前 checkpoint 保存 Torch CPU/CUDA/MPS RNG，并保存 FP16 GradScaler 状态；
+旧 checkpoint 没有这些新增字段时仍可读取。Python/NumPy RNG 尚未保存，
+当前训练路径也没有依赖它们生成随机训练状态。
+自动化的连续训练对恢复逐位比较仍覆盖 CPU float32；
+CUDA scaler 和 MPS RNG 有独立状态往返测试，不应据此承诺跨环境逐位一致。
 
 CUDA 内核、PyTorch 版本、低精度归约和硬件变化都可能带来差异。
 同 seed 不是跨环境数值一致的充分条件；
@@ -338,7 +340,9 @@ python scripts/verify_reference.py \
 完整启动命令见 [固定 60M 基线](../NATIVE_PRETRAIN_GUIDE.md#92-固定-60m-基线)。
 
 规范已冻结不代表已获得验收通过的权重。
-当前完整 CUDA Reference 训练尚未完成，不使用本篇 CPU 恢复实验替代它。
+第一次完整 60M CUDA
+[Reference 运行](../experiments/native-60m-baseline-v1.md) 已完成并被接受。
+它保留 dirty-Git provenance 例外；本篇 CPU 恢复实验仍不能替代真实 CUDA 结果。
 
 </details>
 
@@ -354,8 +358,8 @@ python scripts/verify_reference.py \
 6. 固定范围、分语言指标与生成共同支持有限的结论。
 7. Checkpoint 与实验条件让过程能够恢复和比较。
 
-这还不是一个训练完成的通用助手。下一阶段应先完成可靠的 60M 参考训练，
-保留完整结果，再讨论结构消融或新增 SFT、DPO、GRPO 等阶段。
+这还不是一个训练完成的通用助手。60M Reference 已形成可复用基线，
+下一阶段可以在保留该结果的前提下讨论结构消融或新增 SFT、DPO、GRPO 等阶段。
 新增功能时延续同一标准：**实现、最小验证和解释对应起来，结论不超过证据。**
 
 [返回系列目录](./README.md) | [上一篇：判断模型到底学到了什么](./06-evaluating-a-model.md)

@@ -91,32 +91,33 @@ T_{\mathrm{targets/step}} &= BA(L-1)
 实际训练量应读取 `tokens` 和 `tokens_seen`，不能永远用乘法估算替代。
 一个 step 的累积还可能跨越数据流的 epoch 边界。
 
-### 梯度累积不总是严格等于一个大 batch
+### 梯度累积怎样按有效 token 对齐
 
-当前实现对每个 micro-batch 的平均 loss 除以累积次数：
+每个 micro-batch 的 loss 是其有效目标的平均值。
+当前实现先还原该 micro-batch 的 NLL 总和，累积反向后，
+再把梯度除以整个 optimizer step 的有效监督 token 数：
 
 ```python
-scaled_loss = output.loss / self.config.gradient_accumulation_steps
-scaled_loss.backward()
+token_loss = output.loss * supervised_tokens
+scaler.scale(token_loss).backward()
+
+scaler.unscale_(optimizer)
+for parameter in parameters:
+    parameter.grad.mul_(1.0 / tokens_this_step)
 ```
 
-这是 float32 情况下的核心意思；实际循环通过 GradScaler 接口调用 backward。
-在关闭 dropout 等随机扰动、前向条件相同、每个 micro-batch 的有效 token 数相同时，
-这种平均与把它们放在一起求 token 平均在数学上对应，
-浮点数归约顺序仍可能带来微小差异。
-
-**有效 token 数不同时，两者不再相同。** 假设两个 micro-batch 分别有
+假设两个 micro-batch 分别有
 15 和 5 个目标，平均 loss 为 2 和 4：
 
 ```text
-当前反向目标：(2 + 4) / 2 = 3
-全部 token 平均：(15×2 + 5×4) / 20 = 2.5
+旧的 micro-batch 等权：(2 + 4) / 2 = 3
+当前 token 加权：(15×2 + 5×4) / 20 = 2.5
 ```
 
-目前日志中的 `train_loss` 使用后一种 token 加权方式，
-反向累积却平均 micro-batch loss。这是当前实现的边界，
-不能因为日志采用 token 加权就声称梯度也一定完全等价。
-比较 batch 设置时应特别关注尾批和 PAD，不能只改 `B/A` 后宣称对照完全一致。
+这样日志和反向都使用相同的 token 权重，尾批、PAD 和未来 SFT masking
+不会让较小 micro-batch 获得不成比例的权重。
+在关闭 dropout 等随机扰动且前向条件相同时，它与合并后的 token 平均在数学上对应；
+浮点数归约顺序仍可能带来微小差异。
 
 累积通常能降低一次前向所需的激活内存，但不会缩小模型权重、
 优化器状态，也不能让本来放不下的单个窗口自动放得下。
@@ -377,7 +378,9 @@ loss 不应照抄本篇微型模型数值，数据、规模和设备均不同。
 60M 教学训练使用 [`native-v1.yaml`](../../configs/pipelines/native-v1.yaml)，
 目标为 Linux + 单张 24GB NVIDIA GPU；正式冻结 Reference 则使用独立配置与规范，
 不能把两者混称为同一个已验收实验。
-完整 CUDA 参考实验目前尚未完成。
+第一次完整 60M CUDA
+[Reference 运行](../experiments/native-60m-baseline-v1.md) 已完成并被接受；
+自动验收中的 dirty-Git provenance 失败作为一次性例外保留。
 
 推进到效果研究之前，至少要固定：
 

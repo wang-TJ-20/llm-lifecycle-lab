@@ -364,7 +364,9 @@ python scripts/eval_pretrain.py \
 
 本项目冻结 Reference 要求最终总体和中英文指标都改善，
 并核对样本量、预算和输入版本，但**自动验收通过仍只支持规范覆盖的结论**。
-当前尚无完成该规范的 CUDA 参考结果，不能借微型实验代替它。
+第一次完整 CUDA [Reference 运行](../experiments/native-60m-baseline-v1.md)
+已经得到总体和双语结果，并在保留 dirty-Git provenance 例外的前提下被接受。
+本篇微型实验仍不能替代该结果。
 
 下一篇处理最后一块：如何保留足够的状态，
 让一次中断不改变实验路线，也让两次实验真的可比较。

@@ -1,0 +1,21 @@
+{
+  "created_at": "2026-09-12T10:33:22+00:00",
+  "metrics": {
+    "eval_bits_per_byte": 1.0970258928983312,
+    "eval_en_bits_per_byte": 0.717817644200081,
+    "eval_en_loss": 2.117833176891092,
+    "eval_en_perplexity": 8.313104930192448,
+    "eval_en_tokens": 16226.0,
+    "eval_loss": 3.103190578520298,
+    "eval_perplexity": 22.26888869350911,
+    "eval_tokens": 32704.0,
+    "eval_zh_bits_per_byte": 1.5037149047353724,
+    "eval_zh_loss": 4.0734788216582665,
+    "eval_zh_perplexity": 58.7610265668854,
+    "eval_zh_tokens": 16478.0
+  },
+  "run_id": "native-60m-baseline-v1",
+  "sample_count": 64,
+  "schema_version": "1.0",
+  "suite": "pretrain-dev"
+}
