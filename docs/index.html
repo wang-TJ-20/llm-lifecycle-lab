@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="从一次参数更新开始，理解中英文数据、模型、预训练与可复现实验。">
+    <meta name="color-scheme" content="light dark">
+    <title>LLM Lifecycle Lab · 实践教程</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+    <link rel="stylesheet" href="./assets/site.css">
+    <script>
+      try {
+        document.documentElement.dataset.theme = localStorage.getItem("llmlab-theme") || "light";
+      } catch (_) {
+        document.documentElement.dataset.theme = "light";
+      }
+    </script>
+    <script defer src="https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/mermaid@10.9.3/dist/mermaid.min.js"></script>
+    <script defer src="./assets/site.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/docsify@4.13.1/lib/docsify.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/docsify@4.13.1/lib/plugins/search.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-bash.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-python.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-yaml.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-json.min.js"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">跳到正文</a>
+    <header class="site-header">
+      <button id="menu-toggle" class="icon-button mobile-only" type="button"
+        aria-label="打开课程目录" aria-expanded="false" aria-controls="course-sidebar" title="课程目录">
+        <i data-lucide="menu" aria-hidden="true"></i>
+      </button>
+      <a class="site-brand" href="#/" aria-label="LLM Lifecycle Lab 教程首页">
+        <span class="brand-symbol"><i data-lucide="layers-2" aria-hidden="true"></i></span>
+        <span>LLM Lifecycle <strong>Lab</strong></span>
+      </a>
+      <span class="header-divider" aria-hidden="true"></span>
+      <a class="header-section" href="#/tutorials/">实践教程</a>
+      <nav class="header-actions" aria-label="站点导航">
+        <a class="header-guide" href="#/NATIVE_PRETRAIN_GUIDE">操作指南</a>
+        <a class="icon-button" href="https://github.com/wang-TJ-20/llm-lifecycle-lab"
+          target="_blank" rel="noopener noreferrer" title="GitHub 仓库" aria-label="GitHub 仓库">
+          <i data-lucide="github" aria-hidden="true"></i>
+        </a>
+        <button id="theme-toggle" class="icon-button" type="button" title="切换深色模式"
+          aria-label="切换深色模式" aria-pressed="false">
+          <i data-lucide="moon" aria-hidden="true"></i>
+        </button>
+      </nav>
+      <div class="reading-progress" aria-hidden="true"></div>
+    </header>
+    <div id="app">
+      <p class="loading-message">正在加载教程…</p>
+      <p class="loading-fallback" hidden>
+        教程资源未能加载。请检查网络后刷新，或
+        <a href="https://github.com/wang-TJ-20/llm-lifecycle-lab/tree/main/docs/tutorials">阅读 Markdown 原文</a>。
+      </p>
+    </div>
+    <nav id="page-outline" class="page-outline" aria-label="本章目录"></nav>
+    <button id="menu-backdrop" class="menu-backdrop" type="button"
+      aria-label="关闭课程目录" tabindex="-1" hidden></button>
+    <div id="copy-status" class="sr-only" role="status" aria-live="polite"></div>
+    <noscript><p class="loading-message">在线教程需要 JavaScript。也可在 GitHub 阅读 Markdown 原文。</p></noscript>
+    <script>
+      setTimeout(function () {
+        var fallback = document.querySelector(".loading-fallback");
+        if (fallback) fallback.hidden = false;
+      }, 12000);
+    </script>
+  </body>
+</html>

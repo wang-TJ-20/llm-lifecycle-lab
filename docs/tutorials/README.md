@@ -28,9 +28,9 @@ Linux + 单张 24GB NVIDIA GPU。CPU 实验通过不代表已经完成 CUDA 训�
 | 篇章 | 核心问题 | 状态 |
 | --- | --- | --- |
 | [01 从一次参数更新开始](./01-first-parameter-update.md) | forward、loss、backward 和 step 怎样连接起来？ | 已完成 |
-| 02 准备中英文训练数据 | 数据从哪里来？怎样切分并避免数据泄漏？ | 待写 |
-| 03 让模型读懂文本的表示 | BPE、词表和 Packing 怎样把文本变成训练样本？ | 待写 |
-| 04 搭建自己的小型 Transformer | 沿着张量流动理解 Attention、RoPE、RMSNorm 和 GQA | 待写 |
+| [02 准备中英文训练数据](./02-bilingual-training-data.md) | 数据从哪里来？怎样切分并避免数据泄漏？ | 已完成 |
+| [03 让模型读懂文本的表示](./03-tokenizer-and-packing.md) | BPE、词表和 Packing 怎样把文本变成训练样本？ | 已完成 |
+| [04 搭建自己的小型 Transformer](./04-small-transformer.md) | 沿着张量流动理解 Attention、RoPE、RMSNorm、SwiGLU 和 GQA | 已完成 |
 | 05 跑通一次预训练 | batch、梯度累积、学习率和训练预算如何共同作用？ | 待写 |
 | 06 判断模型到底学到了什么 | 如何结合 loss、双语指标和生成结果评价模型？ | 待写 |
 | 07 让实验可以恢复和比较 | Checkpoint 保存什么？如何固定数据、配置和对照条件？ | 待写 |
@@ -46,6 +46,9 @@ Linux + 单张 24GB NVIDIA GPU。CPU 实验通过不代表已经完成 CUDA 训�
 | 你现在想做什么 | 阅读入口 |
 | --- | --- |
 | 从一个最小实验开始理解训练 | [第一篇](./01-first-parameter-update.md) |
+| 理解双语数据选择、来源记录和防泄漏切分 | [第二篇](./02-bilingual-training-data.md) |
+| 理解 BPE、规范化、词表预算和训练窗口的监督目标 | [第三篇](./03-tokenizer-and-packing.md) |
+| 沿张量理解 Transformer，检查因果性、位置旋转和 KV Cache | [第四篇](./04-small-transformer.md) |
 | 下载或接入自己的数据，训练 Tokenizer，生成 Packing | [数据介绍与准备](../DATA_GUIDE.md) |
 | 查模型结构、参数预算和张量形状 | [自有模型介绍](../NATIVE_MODEL_GUIDE.md) |
 | 安装环境，运行训练、恢复和评测，定位报错 | [Pretrain 训练文档](../NATIVE_PRETRAIN_GUIDE.md) |
@@ -55,11 +58,16 @@ Linux + 单张 24GB NVIDIA GPU。CPU 实验通过不代表已经完成 CUDA 训�
 
 每篇保持同一条学习路径：
 
-**提出问题 -> 必要原理 -> 关键代码 -> 最小实验 -> 观察结果与边界。**
+**具体问题 -> 直观例子与图解 -> 必要原理 -> 关键代码 -> 最小实验 -> 结果与边界。**
 
 代码片段用于解释关键步骤，完整可运行入口仍然是仓库里的脚本。
 实验先固定基线，再尽量一次只改变一个变量；形状、计数和一致性检查
 与 loss、吞吐等依赖环境的数值分开解读。
+
+正文优先讲清一个概念为什么需要、怎样理解，再落到本项目实现。
+完整命令、hash 和校验代码放在查阅区或操作指南中，不打断主线；
+但会影响实验结论的限制仍要在正文中说明。第二篇作为这一写法的示范章。
+文档站预览、图解与公式写法见 [文档站维护](../SITE_GUIDE.md)。
 
 当前项目已实现 Native 模型、BPE Tokenizer、磁盘 Packing、Pretrain、恢复和评测，
 但仓库不附带训练好的权重，完整 CUDA 参考实验尚未完成。

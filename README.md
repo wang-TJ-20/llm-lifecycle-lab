@@ -10,10 +10,25 @@ Smoke、教学训练和 Reference 验收规模。
 
 ## 学习与查阅
 
+**在线教材式阅读**：仓库已提供 Docsify 文档站。从根目录启动本地预览：
+
+```bash
+python -m http.server 8000 --bind 127.0.0.1 --directory docs
+```
+
+打开 `http://127.0.0.1:8000/`，或直接阅读下面的 Markdown。
+GitHub Pages 发布方式和新增章节约定见 [文档站维护](./docs/SITE_GUIDE.md)。
+
 **按顺序学习**：从 [实践系列目录](./docs/tutorials/README.md) 开始。
 第一篇 [从一次参数更新开始](./docs/tutorials/01-first-parameter-update.md)
 不需要下载语料或使用 GPU，沿实际脚本解释前向、loss、反向和更新，并附单变量实验。
-后续按数据、Tokenizer、模型、预训练、评测和实验复现继续展开。
+第二篇 [准备中英文训练数据](./docs/tutorials/02-bilingual-training-data.md)
+解释来源、配方与分组切分，并用离线实验观察数据泄漏。
+第三篇 [让模型读懂文本的表示](./docs/tutorials/03-tokenizer-and-packing.md)
+解释字节级 BPE、规范化与 Packing，用离线对照检查词表和监督目标。
+第四篇 [搭建自己的小型 Transformer](./docs/tutorials/04-small-transformer.md)
+沿张量解释模型结构，并用小实验检查 Attention、RoPE 和 KV Cache。
+后续按预训练、评测和实验复现继续展开。
 
 **按需查阅**：完整操作步骤、配置说明和排错集中维护在以下三份指南中。
 
