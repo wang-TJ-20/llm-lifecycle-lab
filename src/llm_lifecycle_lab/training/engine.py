@@ -358,8 +358,10 @@ class TrainingEngine:
             while state.global_step < self.budget.max_steps:
                 step_started_at = time.monotonic()
                 loss_sum = 0.0
+                normalization_count = 0
                 tokens_this_step = 0
                 bytes_this_step = 0.0
+                reported_sums: dict[str, float] = {}
                 for _ in range(self.config.gradient_accumulation_steps):
                     batch = _batch_to_device(
                         train_stream.next_batch(),
@@ -370,25 +372,32 @@ class TrainingEngine:
                     supervised_tokens = int(output.metrics.get("supervised_tokens", 0))
                     if supervised_tokens <= 0:
                         raise ContractError("training batch has zero supervised tokens")
-                    # Accumulate the raw token-level NLL sum for this micro-batch
-                    # instead of its token mean. Micro-batches may carry a
-                    # different number of effective (supervised) tokens, so a
-                    # per-micro-batch mean would weight them equally per batch
-                    # rather than equally per token.
-                    token_loss = output.loss * supervised_tokens
-                    if not bool(torch.isfinite(token_loss.detach())):
+                    weight = int(
+                        output.metrics.get("normalization_count", supervised_tokens)
+                    )
+                    if weight <= 0:
+                        raise ContractError(
+                            "objective normalization_count must be positive"
+                        )
+                    weighted_loss = output.loss * weight
+                    if not bool(torch.isfinite(weighted_loss.detach())):
                         raise ContractError("training loss became non-finite")
-                    scaler.scale(token_loss).backward()
-                    loss_sum += float(output.loss.detach()) * supervised_tokens
+                    scaler.scale(weighted_loss).backward()
+                    loss_sum += float(output.loss.detach()) * weight
+                    normalization_count += weight
                     tokens_this_step += supervised_tokens
                     bytes_this_step += float(output.metrics.get("source_bytes", 0))
+                    for name, value in output.metrics.items():
+                        if name.startswith("report_"):
+                            reported_sums[name] = (
+                                reported_sums.get(name, 0.0) + float(value) * weight
+                            )
 
                 scaler.unscale_(optimizer)
-                # Convert the accumulated token-level NLL sum into the mean over
-                # the step's effective supervised tokens. Scaling gradients by a
-                # constant after backpropagation is exact, so every micro-batch
-                # contributes in proportion to its token count.
-                normalization = 1.0 / tokens_this_step
+                # Objectives declare their statistical unit: language modeling
+                # uses supervised tokens, while pairwise preference loss uses
+                # pairs. Scaling after backpropagation remains exact.
+                normalization = 1.0 / normalization_count
                 for _, parameter in named_parameters:
                     if parameter.grad is not None:
                         parameter.grad.mul_(normalization)
@@ -405,7 +414,7 @@ class TrainingEngine:
 
                 global_step = state.global_step + 1
                 tokens_seen = state.tokens_seen + tokens_this_step
-                final_loss = loss_sum / max(tokens_this_step, 1)
+                final_loss = loss_sum / normalization_count
                 best_eval_loss = state.best_eval_loss
                 step_seconds = time.monotonic() - step_started_at
                 metrics: dict[str, Any] = {
@@ -426,6 +435,12 @@ class TrainingEngine:
                     "tokens_per_second": tokens_this_step / max(step_seconds, 1e-9),
                     "elapsed_seconds": time.monotonic() - started_at,
                 }
+                metrics.update(
+                    {
+                        name: value / normalization_count
+                        for name, value in reported_sums.items()
+                    }
+                )
                 if bytes_this_step > 0:
                     metrics["train_bits_per_byte"] = (
                         loss_sum / math.log(2) / bytes_this_step
@@ -531,8 +546,10 @@ def evaluate_objective(
     was_training = model.is_training()
     model.set_training(False)
     weighted_loss = 0.0
+    normalization_count = 0
     supervised_tokens = 0
     source_bytes = 0.0
+    reported_sums: dict[str, float] = {}
     language_totals = {
         language: {"nll": 0.0, "tokens": 0, "source_bytes": 0.0}
         for language in ("en", "zh")
@@ -544,9 +561,20 @@ def evaluate_objective(
                 with _autocast_context(device, dtype):
                     output = objective(model, batch)
                 tokens = int(output.metrics.get("supervised_tokens", 0))
-                weighted_loss += float(output.loss) * tokens
+                weight = int(output.metrics.get("normalization_count", tokens))
+                if tokens <= 0 or weight <= 0:
+                    raise ContractError(
+                        "evaluation batch has invalid supervised/normalization count"
+                    )
+                weighted_loss += float(output.loss) * weight
+                normalization_count += weight
                 supervised_tokens += tokens
                 source_bytes += float(output.metrics.get("source_bytes", 0))
+                for name, value in output.metrics.items():
+                    if name.startswith("report_"):
+                        reported_sums[name] = (
+                            reported_sums.get(name, 0.0) + float(value) * weight
+                        )
                 for language, totals in language_totals.items():
                     totals["nll"] += float(
                         output.metrics.get(
@@ -570,12 +598,18 @@ def evaluate_objective(
         model.set_training(was_training)
     if supervised_tokens == 0:
         raise ContractError("evaluation has zero supervised tokens")
-    loss = weighted_loss / supervised_tokens
+    loss = weighted_loss / normalization_count
     metrics = {
         "eval_loss": loss,
         "eval_perplexity": math.exp(min(loss, 20.0)),
         "eval_tokens": float(supervised_tokens),
     }
+    metrics.update(
+        {
+            f"eval_{name.removeprefix('report_')}": value / normalization_count
+            for name, value in reported_sums.items()
+        }
+    )
     if source_bytes > 0:
         metrics["eval_bits_per_byte"] = weighted_loss / math.log(2) / source_bytes
     for language, totals in language_totals.items():

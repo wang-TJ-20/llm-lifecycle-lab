@@ -1,0 +1,2304 @@
+{
+  "corpus_audit": {
+    "dataset_id": "bilingual-60m-v1",
+    "eligible_queries": 16,
+    "excluded_short_queries": 12,
+    "heldout_exact_train_matches": 0,
+    "heldout_records": 45343,
+    "license": "CC-BY-SA-3.0 AND MIT",
+    "limitations": "Normalized full-text and query-substring checks only; no semantic or fuzzy detection. Short queries are excluded, not counted as clean. Membership refers to the supplied tokenizer-bound corpus, not proof that any particular optimizer step observed the selected document.",
+    "manifest_sha256": "11a0c0abf73abcb36fcd269565363ef60564d778cb6006b23ff381a069d577b8",
+    "matched_query_ids": [],
+    "scanned_records": {
+      "dev": 22853,
+      "test": 22490,
+      "train": 180657
+    },
+    "status": "checked"
+  },
+  "created_at": "2026-09-13T02:28:07+00:00",
+  "limitations": [
+    "手写双语诊断集样本很少；不得作为通用语言能力或生产可用性的证明。",
+    "BPB 使用 NFKC 后文本 UTF-8 字节数，不计 EOS；不是旧 Reference 的 Packing BPB。",
+    "续写重复率只度量退化，不度量事实性、流畅性或帮助程度。",
+    "多轮输入使用模型自己的历史回答，不注入标准答案；空回复/控制串仅为续轮转义。",
+    "偏好分数是回答 token 平均条件 log-prob，不含结束符；不是 reward model 准确率。",
+    "verifiable.reward 是任务规则的 0/1 奖励，不代表安全性或人类偏好对齐。",
+    "空输出规则基线是下界；随机基线是解析期望，不是随机初始化模型实测。",
+    "记忆探针对固定语料前缀做精确后缀匹配；不命中不能证明模型没有记忆。",
+    "重合检查只覆盖指定语料的规范化文本/子串，不能证明不存在泄漏。"
+  ],
+  "metrics": {
+    "continuation.nonempty": {
+      "baseline": {
+        "description": [
+          "Always-empty generator."
+        ],
+        "kind": "rule",
+        "value": 0.0
+      },
+      "count": 8,
+      "direction": "higher",
+      "status": "ok",
+      "value": 1.0
+    },
+    "continuation.nonempty.en": {
+      "baseline": {
+        "description": [
+          "Always-empty generator."
+        ],
+        "kind": "rule",
+        "value": 0.0
+      },
+      "count": 4,
+      "direction": "higher",
+      "status": "ok",
+      "value": 1.0
+    },
+    "continuation.nonempty.zh": {
+      "baseline": {
+        "description": [
+          "Always-empty generator."
+        ],
+        "kind": "rule",
+        "value": 0.0
+      },
+      "count": 4,
+      "direction": "higher",
+      "status": "ok",
+      "value": 1.0
+    },
+    "continuation.repeated_trigram": {
+      "baseline": {
+        "description": [
+          "Zero-overlap / no-degeneration diagnostic target."
+        ],
+        "kind": "rule",
+        "value": 0.0
+      },
+      "count": 8,
+      "direction": "lower",
+      "status": "ok",
+      "value": 0.24166666666666667
+    },
+    "continuation.repeated_trigram.en": {
+      "baseline": {
+        "description": [
+          "Zero-overlap / no-degeneration diagnostic target."
+        ],
+        "kind": "rule",
+        "value": 0.0
+      },
+      "count": 4,
+      "direction": "lower",
+      "status": "ok",
+      "value": 0.0
+    },
+    "continuation.repeated_trigram.zh": {
+      "baseline": {
+        "description": [
+          "Zero-overlap / no-degeneration diagnostic target."
+        ],
+        "kind": "rule",
+        "value": 0.0
+      },
+      "count": 4,
+      "direction": "lower",
+      "status": "ok",
+      "value": 0.48333333333333334
+    },
+    "corpus.bpb.all": {
+      "baseline": {
+        "description": "Uniform probability over tokenizer vocabulary.",
+        "kind": "analytic-random",
+        "value": 3.4682779456193353
+      },
+      "count": 331,
+      "direction": "lower",
+      "status": "ok",
+      "value": 2.0353061621379767
+    },
+    "corpus.bpb.en": {
+      "baseline": {
+        "description": "Uniform probability over tokenizer vocabulary.",
+        "kind": "analytic-random",
+        "value": 3.236994219653179
+      },
+      "count": 173,
+      "direction": "lower",
+      "status": "ok",
+      "value": 1.529442457413583
+    },
+    "corpus.bpb.zh": {
+      "baseline": {
+        "description": "Uniform probability over tokenizer vocabulary.",
+        "kind": "analytic-random",
+        "value": 3.721518987341772
+      },
+      "count": 158,
+      "direction": "lower",
+      "status": "ok",
+      "value": 2.5891949021210148
+    },
+    "corpus.loss.all": {
+      "baseline": {
+        "description": "Uniform probability over tokenizer vocabulary.",
+        "kind": "analytic-random",
+        "value": 9.704060527839234
+      },
+      "count": 82,
+      "direction": "lower",
+      "status": "ok",
+      "value": 5.694680328321893
+    },
+    "corpus.loss.en": {
+      "baseline": {
+        "description": "Uniform probability over tokenizer vocabulary.",
+        "kind": "analytic-random",
+        "value": 9.704060527839234
+      },
+      "count": 40,
+      "direction": "lower",
+      "status": "ok",
+      "value": 4.58505674507469
+    },
+    "corpus.loss.zh": {
+      "baseline": {
+        "description": "Uniform probability over tokenizer vocabulary.",
+        "kind": "analytic-random",
+        "value": 9.704060527839234
+      },
+      "count": 42,
+      "direction": "lower",
+      "status": "ok",
+      "value": 6.75146469331923
+    },
+    "format.success": {
+      "baseline": {
+        "description": [
+          "Always-empty response; a floor, not a competent solver."
+        ],
+        "kind": "rule",
+        "value": 0.0
+      },
+      "count": 2,
+      "direction": "higher",
+      "status": "ok",
+      "value": 0.0
+    },
+    "format.success.en": {
+      "baseline": {
+        "description": [
+          "Always-empty response; a floor, not a competent solver."
+        ],
+        "kind": "rule",
+        "value": 0.0
+      },
+      "count": 1,
+      "direction": "higher",
+      "status": "ok",
+      "value": 0.0
+    },
+    "format.success.zh": {
+      "baseline": {
+        "description": [
+          "Always-empty response; a floor, not a competent solver."
+        ],
+        "kind": "rule",
+        "value": 0.0
+      },
+      "count": 1,
+      "direction": "higher",
+      "status": "ok",
+      "value": 0.0
+    },
+    "instruction.success": {
+      "baseline": {
+        "description": [
+          "Always-empty response; a floor, not a competent solver.",
+          "Uniform selection from the declared answer choices."
+        ],
+        "kind": "mixed",
+        "value": 0.25
+      },
+      "count": 4,
+      "direction": "higher",
+      "status": "ok",
+      "value": 0.0
+    },
+    "instruction.success.en": {
+      "baseline": {
+        "description": [
+          "Always-empty response; a floor, not a competent solver.",
+          "Uniform selection from the declared answer choices."
+        ],
+        "kind": "mixed",
+        "value": 0.25
+      },
+      "count": 2,
+      "direction": "higher",
+      "status": "ok",
+      "value": 0.0
+    },
+    "instruction.success.zh": {
+      "baseline": {
+        "description": [
+          "Always-empty response; a floor, not a competent solver.",
+          "Uniform selection from the declared answer choices."
+        ],
+        "kind": "mixed",
+        "value": 0.25
+      },
+      "count": 2,
+      "direction": "higher",
+      "status": "ok",
+      "value": 0.0
+    },
+    "memory.test.suffix_exact": {
+      "baseline": {
+        "description": [
+          "Uniform independent tokens, fixed suffix length."
+        ],
+        "kind": "analytic-random",
+        "value": 2.6727647100921942e-51
+      },
+      "count": 4,
+      "direction": "diagnostic",
+      "status": "ok",
+      "value": 0.0
+    },
+    "memory.test.suffix_exact.en": {
+      "baseline": {
+        "description": [
+          "Uniform independent tokens, fixed suffix length."
+        ],
+        "kind": "analytic-random",
+        "value": 2.6727647100921942e-51
+      },
+      "count": 2,
+      "direction": "diagnostic",
+      "status": "ok",
+      "value": 0.0
+    },
+    "memory.test.suffix_exact.zh": {
+      "baseline": {
+        "description": [
+          "Uniform independent tokens, fixed suffix length."
+        ],
+        "kind": "analytic-random",
+        "value": 2.6727647100921942e-51
+      },
+      "count": 2,
+      "direction": "diagnostic",
+      "status": "ok",
+      "value": 0.0
+    },
+    "memory.train.suffix_exact": {
+      "baseline": {
+        "description": [
+          "Uniform independent tokens, fixed suffix length."
+        ],
+        "kind": "analytic-random",
+        "value": 2.6727647100921942e-51
+      },
+      "count": 4,
+      "direction": "diagnostic",
+      "status": "ok",
+      "value": 0.0
+    },
+    "memory.train.suffix_exact.en": {
+      "baseline": {
+        "description": [
+          "Uniform independent tokens, fixed suffix length."
+        ],
+        "kind": "analytic-random",
+        "value": 2.6727647100921942e-51
+      },
+      "count": 2,
+      "direction": "diagnostic",
+      "status": "ok",
+      "value": 0.0
+    },
+    "memory.train.suffix_exact.zh": {
+      "baseline": {
+        "description": [
+          "Uniform independent tokens, fixed suffix length."
+        ],
+        "kind": "analytic-random",
+        "value": 2.6727647100921942e-51
+      },
+      "count": 2,
+      "direction": "diagnostic",
+      "status": "ok",
+      "value": 0.0
+    },
+    "multiturn.all_correct": {
+      "baseline": {
+        "description": [
+          "Always-empty responses across all turns."
+        ],
+        "kind": "rule",
+        "value": 0.0
+      },
+      "count": 2,
+      "direction": "higher",
+      "status": "ok",
+      "value": 0.0
+    },
+    "multiturn.all_correct.en": {
+      "baseline": {
+        "description": [
+          "Always-empty responses across all turns."
+        ],
+        "kind": "rule",
+        "value": 0.0
+      },
+      "count": 1,
+      "direction": "higher",
+      "status": "ok",
+      "value": 0.0
+    },
+    "multiturn.all_correct.zh": {
+      "baseline": {
+        "description": [
+          "Always-empty responses across all turns."
+        ],
+        "kind": "rule",
+        "value": 0.0
+      },
+      "count": 1,
+      "direction": "higher",
+      "status": "ok",
+      "value": 0.0
+    },
+    "multiturn.success": {
+      "baseline": {
+        "description": [
+          "Always-empty response; a floor, not a competent solver."
+        ],
+        "kind": "rule",
+        "value": 0.0
+      },
+      "count": 6,
+      "direction": "higher",
+      "status": "ok",
+      "value": 0.0
+    },
+    "multiturn.success.en": {
+      "baseline": {
+        "description": [
+          "Always-empty response; a floor, not a competent solver."
+        ],
+        "kind": "rule",
+        "value": 0.0
+      },
+      "count": 3,
+      "direction": "higher",
+      "status": "ok",
+      "value": 0.0
+    },
+    "multiturn.success.zh": {
+      "baseline": {
+        "description": [
+          "Always-empty response; a floor, not a competent solver."
+        ],
+        "kind": "rule",
+        "value": 0.0
+      },
+      "count": 3,
+      "direction": "higher",
+      "status": "ok",
+      "value": 0.0
+    },
+    "overlap.heldout_fraction": {
+      "baseline": {
+        "description": "Zero-overlap / no-degeneration diagnostic target.",
+        "kind": "rule",
+        "value": 0.0
+      },
+      "count": 45343,
+      "direction": "lower",
+      "status": "ok",
+      "value": 0.0
+    },
+    "overlap.query_fraction": {
+      "baseline": {
+        "description": "Zero-overlap / no-degeneration diagnostic target.",
+        "kind": "rule",
+        "value": 0.0
+      },
+      "count": 16,
+      "direction": "lower",
+      "status": "ok",
+      "value": 0.0
+    },
+    "preference.accuracy": {
+      "baseline": {
+        "description": [
+          "Uniform pair ordering; ties receive half credit."
+        ],
+        "kind": "analytic-random",
+        "value": 0.5
+      },
+      "count": 4,
+      "direction": "higher",
+      "status": "ok",
+      "value": 0.75
+    },
+    "preference.accuracy.en": {
+      "baseline": {
+        "description": [
+          "Uniform pair ordering; ties receive half credit."
+        ],
+        "kind": "analytic-random",
+        "value": 0.5
+      },
+      "count": 2,
+      "direction": "higher",
+      "status": "ok",
+      "value": 0.5
+    },
+    "preference.accuracy.zh": {
+      "baseline": {
+        "description": [
+          "Uniform pair ordering; ties receive half credit."
+        ],
+        "kind": "analytic-random",
+        "value": 0.5
+      },
+      "count": 2,
+      "direction": "higher",
+      "status": "ok",
+      "value": 1.0
+    },
+    "qa.success": {
+      "baseline": {
+        "description": [
+          "Always-empty response; a floor, not a competent solver.",
+          "Uniform selection from the declared answer choices."
+        ],
+        "kind": "mixed",
+        "value": 0.25
+      },
+      "count": 4,
+      "direction": "higher",
+      "status": "ok",
+      "value": 0.0
+    },
+    "qa.success.en": {
+      "baseline": {
+        "description": [
+          "Always-empty response; a floor, not a competent solver.",
+          "Uniform selection from the declared answer choices."
+        ],
+        "kind": "mixed",
+        "value": 0.25
+      },
+      "count": 2,
+      "direction": "higher",
+      "status": "ok",
+      "value": 0.0
+    },
+    "qa.success.zh": {
+      "baseline": {
+        "description": [
+          "Always-empty response; a floor, not a competent solver.",
+          "Uniform selection from the declared answer choices."
+        ],
+        "kind": "mixed",
+        "value": 0.25
+      },
+      "count": 2,
+      "direction": "higher",
+      "status": "ok",
+      "value": 0.0
+    },
+    "verifiable.reward": {
+      "baseline": {
+        "description": [
+          "Always-empty response; a floor, not a competent solver.",
+          "Uniform selection from the declared answer choices."
+        ],
+        "kind": "mixed",
+        "value": 0.125
+      },
+      "count": 16,
+      "direction": "higher",
+      "status": "ok",
+      "value": 0.0
+    },
+    "verifiable.reward.en": {
+      "baseline": {
+        "description": [
+          "Always-empty response; a floor, not a competent solver.",
+          "Uniform selection from the declared answer choices."
+        ],
+        "kind": "mixed",
+        "value": 0.125
+      },
+      "count": 8,
+      "direction": "higher",
+      "status": "ok",
+      "value": 0.0
+    },
+    "verifiable.reward.zh": {
+      "baseline": {
+        "description": [
+          "Always-empty response; a floor, not a competent solver.",
+          "Uniform selection from the declared answer choices."
+        ],
+        "kind": "mixed",
+        "value": 0.125
+      },
+      "count": 8,
+      "direction": "higher",
+      "status": "ok",
+      "value": 0.0
+    }
+  },
+  "model": {
+    "checkpoint_id": "step-00005649",
+    "config_sha256": "64cfc541595cfd1e18fcada7cee887e0a0647a2309744b0da7e55f5e785a01a0",
+    "run_id": "native-60m-baseline-v1",
+    "stage": "pretrain",
+    "tokenizer_sha256": "7455ac1168f36a3d7dca03fee28784f97899fe233f496484a11e5da2e44a2f32",
+    "weights_sha256": "78cf72522ad87e71aca4977ce5708aa3ac3ffaa3db32a04514511593f8b49664"
+  },
+  "protocol": {
+    "continuation_protocol": "bos-raw-v1",
+    "corpus_protocol": {
+      "memory_per_language_split": 2,
+      "memory_prefix_tokens": 32,
+      "memory_suffix_tokens": 12,
+      "normalization": "NFKC-whitespace-collapse-v1",
+      "overlap_min_chars": 24,
+      "sampling": "first-eligible-in-manifest-order"
+    },
+    "device": "cpu",
+    "dtype": "float32",
+    "generation": {
+      "do_sample": false,
+      "max_new_tokens": 32,
+      "seed": 42
+    },
+    "implementation_sha256": "4d5b4d79e67352fd6e21a57c4c9a2627c3231af9b036d402b02236e996a87dae",
+    "packages": {
+      "PyYAML": "6.0.3",
+      "llm-lifecycle-lab": "0.1.0.dev0",
+      "numpy": "2.5.3",
+      "tokenizers": "0.21.4",
+      "torch": "2.14.0"
+    },
+    "preference_scoring": "mean-conditional-token-logprob-no-end-v1; tie=0.5",
+    "pretrain_manifest_sha256": "11a0c0abf73abcb36fcd269565363ef60564d778cb6006b23ff381a069d577b8",
+    "prompt_protocol": "plain-v1",
+    "scoring_version": "lifecycle-rules-v1",
+    "suite_id": "lifecycle-v1",
+    "suite_sha256": "24ff1f1e1723eb163967b79b1e4aba3fe1952575d940613d12650980831c99ef",
+    "threads": 1,
+    "tokenizer_sha256": "7455ac1168f36a3d7dca03fee28784f97899fe233f496484a11e5da2e44a2f32"
+  },
+  "protocol_sha256": "c51428a095ff2b0a392c5ec86ab1c8e19ff6201fb218f81e41ad3b1f599953e1",
+  "runtime": {
+    "accelerator": {
+      "cudnn_version": null,
+      "devices": [],
+      "selected_device": "cpu",
+      "torch_cuda_version": null,
+      "type": "cpu"
+    },
+    "code": {
+      "branch": "main",
+      "commit": "172a0a522be0c0134ee6949ae41c46cb26bae9e1",
+      "dirty": true,
+      "source_sha256": "2d4a1864963792c7f8388b9098df237169c61337a9bdf5acd649f8ddde00ab20",
+      "status_entries": 23
+    },
+    "created_at": "2026-09-13T02:27:31+00:00",
+    "packages": {
+      "PyYAML": "6.0.3",
+      "llm-lifecycle-lab": "0.1.0.dev0",
+      "numpy": "2.5.3",
+      "tokenizers": "0.21.4",
+      "torch": "2.14.0"
+    },
+    "platform": {
+      "machine": "arm64",
+      "release": "24.6.0",
+      "system": "Darwin"
+    },
+    "project_version": "0.1.0.dev0",
+    "python": {
+      "executable": "/Users/bytedance/Desktop/llm-lifecycle-lab/.venv/bin/python",
+      "version": "3.13.9"
+    },
+    "schema_version": "1.0"
+  },
+  "samples": [
+    {
+      "id": "corpus-en-1",
+      "kind": "corpus",
+      "language": "en",
+      "nll": 63.34295146167278,
+      "normalized_bytes": 82,
+      "tokens": 18
+    },
+    {
+      "id": "corpus-zh-1",
+      "kind": "corpus",
+      "language": "zh",
+      "nll": 146.33858215808868,
+      "normalized_bytes": 76,
+      "tokens": 23
+    },
+    {
+      "id": "corpus-en-2",
+      "kind": "corpus",
+      "language": "en",
+      "nll": 120.05931834131479,
+      "normalized_bytes": 91,
+      "tokens": 22
+    },
+    {
+      "id": "corpus-zh-2",
+      "kind": "corpus",
+      "language": "zh",
+      "nll": 137.22293496131897,
+      "normalized_bytes": 82,
+      "tokens": 19
+    },
+    {
+      "id": "continue-en-1",
+      "kind": "continuation",
+      "language": "en",
+      "output": {
+        "stop_reason": "length",
+        "text": ", a boy named Leo found a strange map in his attic. It was old and dusty, with strange symbols. \"What could this lead to?\" he wondered",
+        "token_ids": [
+          25,
+          272,
+          777,
+          966,
+          846,
+          621,
+          272,
+          1389,
+          1454,
+          334,
+          442,
+          4426,
+          27,
+          589,
+          362,
+          882,
+          302,
+          3531,
+          25,
+          401,
+          1389,
+          6368,
+          27,
+          343,
+          1087,
+          612,
+          912,
+          1773,
+          299,
+          599,
+          287,
+          2282
+        ]
+      },
+      "prompt": "Once upon a time"
+    },
+    {
+      "id": "continue-zh-1",
+      "kind": "continuation",
+      "language": "zh",
+      "output": {
+        "stop_reason": "length",
+        "text": "线的线线,是线线的线线,是线线,是线线,在线线,在线线为。\n\n线",
+        "token_ids": [
+          1409,
+          297,
+          1409,
+          1409,
+          25,
+          404,
+          1409,
+          1409,
+          297,
+          1409,
+          1409,
+          25,
+          404,
+          1409,
+          1409,
+          25,
+          404,
+          1409,
+          1409,
+          25,
+          435,
+          1409,
+          1409,
+          25,
+          435,
+          1409,
+          1409,
+          356,
+          288,
+          212,
+          212,
+          1409
+        ]
+      },
+      "prompt": "从前"
+    },
+    {
+      "id": "continue-en-2",
+      "kind": "continuation",
+      "language": "en",
+      "output": {
+        "stop_reason": "length",
+        "text": " named Mia found a shiny stone in her backyard. It was not just any stone; it was a magic stone. She picked it up and felt a warm glow",
+        "token_ids": [
+          966,
+          847,
+          621,
+          272,
+          2263,
+          1740,
+          334,
+          349,
+          6133,
+          27,
+          589,
+          362,
+          536,
+          867,
+          1749,
+          1740,
+          40,
+          380,
+          362,
+          272,
+          942,
+          1740,
+          27,
+          468,
+          2350,
+          380,
+          768,
+          302,
+          426,
+          272,
+          1194,
+          1352
+        ]
+      },
+      "prompt": "The little girl"
+    },
+    {
+      "id": "continue-zh-2",
+      "kind": "continuation",
+      "language": "zh",
+      "output": {
+        "stop_reason": "length",
+        "text": "的香港人,為臺灣的香港人,為臺灣的香港人,為臺灣的香港人。\n\n生平\n\n早年 \n香港中文",
+        "token_ids": [
+          297,
+          1837,
+          322,
+          25,
+          584,
+          3824,
+          297,
+          1837,
+          322,
+          25,
+          584,
+          3824,
+          297,
+          1837,
+          322,
+          25,
+          584,
+          3824,
+          297,
+          1837,
+          322,
+          288,
+          212,
+          212,
+          3820,
+          212,
+          212,
+          9421,
+          234,
+          212,
+          1837,
+          6308
+        ]
+      },
+      "prompt": "在中国"
+    },
+    {
+      "id": "continue-en-3",
+      "kind": "continuation",
+      "language": "en",
+      "output": {
+        "stop_reason": "length",
+        "text": " named Leo found a strange map in his attic. It was old and dusty, but it showed a path to a hidden treasure. He felt a spark of excitement",
+        "token_ids": [
+          966,
+          846,
+          621,
+          272,
+          1389,
+          1454,
+          334,
+          442,
+          4426,
+          27,
+          589,
+          362,
+          882,
+          302,
+          3531,
+          25,
+          458,
+          380,
+          2273,
+          272,
+          1788,
+          299,
+          272,
+          1412,
+          868,
+          27,
+          457,
+          426,
+          272,
+          1208,
+          335,
+          1929
+        ]
+      },
+      "prompt": "One day, a boy"
+    },
+    {
+      "id": "continue-zh-3",
+      "kind": "continuation",
+      "language": "zh",
+      "output": {
+        "stop_reason": "length",
+        "text": ",是《大魔王》的主角。\n\n故事 \n《大魔王》是《大魔王》的主角,是《大",
+        "token_ids": [
+          25,
+          404,
+          690,
+          407,
+          3432,
+          1429,
+          689,
+          297,
+          5484,
+          288,
+          212,
+          212,
+          4586,
+          234,
+          212,
+          690,
+          407,
+          3432,
+          1429,
+          689,
+          404,
+          690,
+          407,
+          3432,
+          1429,
+          689,
+          297,
+          5484,
+          25,
+          404,
+          690,
+          407
+        ]
+      },
+      "prompt": "这个故事"
+    },
+    {
+      "id": "continue-en-4",
+      "kind": "continuation",
+      "language": "en",
+      "output": {
+        "stop_reason": "length",
+        "text": " named Leo. He was a brave knight. He wanted to find the dragon's treasure. One day, he found a shiny stone. \"This must be the",
+        "token_ids": [
+          966,
+          846,
+          27,
+          457,
+          362,
+          272,
+          1510,
+          3322,
+          27,
+          457,
+          977,
+          299,
+          836,
+          276,
+          2082,
+          607,
+          868,
+          27,
+          1209,
+          605,
+          25,
+          287,
+          621,
+          272,
+          2263,
+          1740,
+          27,
+          343,
+          1829,
+          1687,
+          385,
+          276
+        ]
+      },
+      "prompt": "There was a dragon"
+    },
+    {
+      "id": "continue-zh-4",
+      "kind": "continuation",
+      "language": "zh",
+      "output": {
+        "stop_reason": "length",
+        "text": "香港的香港人,為香港人,由香港人,香港人,香港人,香港人,香港人,香港人,香港人,香港",
+        "token_ids": [
+          1837,
+          297,
+          1837,
+          322,
+          25,
+          584,
+          1837,
+          322,
+          25,
+          863,
+          1837,
+          322,
+          25,
+          1837,
+          322,
+          25,
+          1837,
+          322,
+          25,
+          1837,
+          322,
+          25,
+          1837,
+          322,
+          25,
+          1837,
+          322,
+          25,
+          1837,
+          322,
+          25,
+          1837
+        ]
+      },
+      "prompt": "北京是"
+    },
+    {
+      "id": "extract-en",
+      "kind": "instruction",
+      "language": "en",
+      "turns": [
+        {
+          "output": {
+            "stop_reason": "length",
+            "text": " Apple of the Serry of the Serry of the Serry of Serry\n\n外部链接 \n\n日本男子棒球運動員\n日本",
+            "token_ids": [
+              427,
+              488,
+              369,
+              335,
+              276,
+              376,
+              286,
+              1572,
+              335,
+              276,
+              376,
+              286,
+              1572,
+              335,
+              276,
+              376,
+              286,
+              1572,
+              335,
+              376,
+              286,
+              1572,
+              212,
+              212,
+              1933,
+              357,
+              212,
+              1473,
+              3862,
+              8259,
+              212,
+              1473
+            ]
+          },
+          "prompt": "Return only the text inside brackets: [silver].",
+          "rule": {
+            "answer": "silver",
+            "type": "exact"
+          },
+          "score": 0.0
+        }
+      ]
+    },
+    {
+      "id": "extract-zh",
+      "kind": "instruction",
+      "language": "zh",
+      "turns": [
+        {
+          "output": {
+            "stop_reason": "length",
+            "text": "                                ",
+            "token_ids": [
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234
+            ]
+          },
+          "prompt": "只输出方括号里的内容：[星光]。",
+          "rule": {
+            "answer": "星光",
+            "type": "exact"
+          },
+          "score": 0.0
+        }
+      ]
+    },
+    {
+      "id": "classify-en",
+      "kind": "instruction",
+      "language": "en",
+      "turns": [
+        {
+          "output": {
+            "stop_reason": "length",
+            "text": " Sambridge, J.M. (1887)\n\n外部链接 \n\n美国电影\n美国电影\n美国电影\n美国电影\n美国电影",
+            "token_ids": [
+              376,
+              372,
+              1502,
+              3988,
+              25,
+              888,
+              27,
+              58,
+              27,
+              1273,
+              1098,
+              4178,
+              22,
+              212,
+              212,
+              1933,
+              357,
+              212,
+              1925,
+              3569,
+              212,
+              1925,
+              3569,
+              212,
+              1925,
+              3569,
+              212,
+              1925,
+              3569,
+              212,
+              1925,
+              3569
+            ]
+          },
+          "prompt": "Classify 'I love this gift.' Reply only positive or negative.",
+          "rule": {
+            "answer": "positive",
+            "choices": [
+              "positive",
+              "negative"
+            ],
+            "type": "exact"
+          },
+          "score": 0.0
+        }
+      ]
+    },
+    {
+      "id": "classify-zh",
+      "kind": "instruction",
+      "language": "zh",
+      "turns": [
+        {
+          "output": {
+            "stop_reason": "length",
+            "text": "  是我知道我要你的,我不知道我不知道我不知道我不知道我不知道我不知道我不知道我",
+            "token_ids": [
+              234,
+              234,
+              404,
+              2535,
+              7789,
+              2535,
+              1148,
+              4201,
+              297,
+              25,
+              2535,
+              764,
+              7789,
+              2535,
+              764,
+              7789,
+              2535,
+              764,
+              7789,
+              2535,
+              764,
+              7789,
+              2535,
+              764,
+              7789,
+              2535,
+              764,
+              7789,
+              2535,
+              764,
+              7789,
+              2535
+            ]
+          },
+          "prompt": "判断“我讨厌这场演出”的情感。只回答：正面 或 负面。",
+          "rule": {
+            "answer": "负面",
+            "choices": [
+              "正面",
+              "负面"
+            ],
+            "type": "exact"
+          },
+          "score": 0.0
+        }
+      ]
+    },
+    {
+      "id": "count-en",
+      "kind": "qa",
+      "language": "en",
+      "turns": [
+        {
+          "output": {
+            "stop_reason": "length",
+            "text": " \"Mine.\" The potter is excited. \"What do you think it is?\" it asks. \"I think it is a treasure!\" The potter",
+            "token_ids": [
+              343,
+              58,
+              1912,
+              747,
+              317,
+              5843,
+              581,
+              669,
+              2062,
+              27,
+              343,
+              1087,
+              762,
+              523,
+              2469,
+              380,
+              669,
+              599,
+              380,
+              10744,
+              27,
+              343,
+              54,
+              2469,
+              380,
+              669,
+              272,
+              868,
+              460,
+              317,
+              5843,
+              581
+            ]
+          },
+          "prompt": "There are two cups on the table. One more cup is added. How many cups? Reply with a digit only.",
+          "rule": {
+            "answer": "3",
+            "type": "exact"
+          },
+          "score": 0.0
+        }
+      ]
+    },
+    {
+      "id": "count-zh",
+      "kind": "qa",
+      "language": "zh",
+      "turns": [
+        {
+          "output": {
+            "stop_reason": "length",
+            "text": "                                ",
+            "token_ids": [
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234
+            ]
+          },
+          "prompt": "桌上有两只杯子，又放上一只。现在有几只？只回答阿拉伯数字。",
+          "rule": {
+            "answer": "3",
+            "type": "exact"
+          },
+          "score": 0.0
+        }
+      ]
+    },
+    {
+      "id": "fact-en",
+      "kind": "qa",
+      "language": "en",
+      "turns": [
+        {
+          "output": {
+            "stop_reason": "length",
+            "text": " April, April, April, April, April, April, Ap",
+            "token_ids": [
+              427,
+              93,
+              363,
+              89,
+              25,
+              427,
+              93,
+              363,
+              89,
+              25,
+              427,
+              93,
+              363,
+              89,
+              25,
+              427,
+              93,
+              363,
+              89,
+              25,
+              427,
+              93,
+              363,
+              89,
+              25,
+              427,
+              93,
+              363,
+              89,
+              25,
+              427,
+              93
+            ]
+          },
+          "prompt": "Mira lives in Rome. Where does Mira live? Reply only Rome or Lima.",
+          "rule": {
+            "answer": "Rome",
+            "choices": [
+              "Rome",
+              "Lima"
+            ],
+            "type": "exact"
+          },
+          "score": 0.0
+        }
+      ]
+    },
+    {
+      "id": "fact-zh",
+      "kind": "qa",
+      "language": "zh",
+      "turns": [
+        {
+          "output": {
+            "stop_reason": "length",
+            "text": " 黄金, 黄金, 黄金, 黄金, 黄金, 黄金, 黄金, 黄金,",
+            "token_ids": [
+              234,
+              3593,
+              1318,
+              25,
+              234,
+              3593,
+              1318,
+              25,
+              234,
+              3593,
+              1318,
+              25,
+              234,
+              3593,
+              1318,
+              25,
+              234,
+              3593,
+              1318,
+              25,
+              234,
+              3593,
+              1318,
+              25,
+              234,
+              3593,
+              1318,
+              25,
+              234,
+              3593,
+              1318,
+              25
+            ]
+          },
+          "prompt": "小岚住在苏州。小岚住在哪里？只回答：苏州 或 杭州。",
+          "rule": {
+            "answer": "苏州",
+            "choices": [
+              "苏州",
+              "杭州"
+            ],
+            "type": "exact"
+          },
+          "score": 0.0
+        }
+      ]
+    },
+    {
+      "id": "json-en",
+      "kind": "format",
+      "language": "en",
+      "turns": [
+        {
+          "output": {
+            "stop_reason": "length",
+            "text": " Autrior of the Misty of the Misty of the Misty of the Misty of the Misty of the M",
+            "token_ids": [
+              427,
+              364,
+              363,
+              313,
+              335,
+              276,
+              555,
+              881,
+              102,
+              335,
+              276,
+              555,
+              881,
+              102,
+              335,
+              276,
+              555,
+              881,
+              102,
+              335,
+              276,
+              555,
+              881,
+              102,
+              335,
+              276,
+              555,
+              881,
+              102,
+              335,
+              276,
+              555
+            ]
+          },
+          "prompt": "Return a JSON object with only the key \"count\" and the integer value 4. No explanation.",
+          "rule": {
+            "answer": {
+              "count": 4
+            },
+            "type": "json"
+          },
+          "score": 0.0
+        }
+      ]
+    },
+    {
+      "id": "json-zh",
+      "kind": "format",
+      "language": "zh",
+      "turns": [
+        {
+          "output": {
+            "stop_reason": "length",
+            "text": "                                ",
+            "token_ids": [
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234
+            ]
+          },
+          "prompt": "只输出 JSON 对象，唯一的键是 \"count\"，值是整数 4。不要解释。",
+          "rule": {
+            "answer": {
+              "count": 4
+            },
+            "type": "json"
+          },
+          "score": 0.0
+        }
+      ]
+    },
+    {
+      "id": "memory-dialogue-en",
+      "kind": "multiturn",
+      "language": "en",
+      "turns": [
+        {
+          "output": {
+            "stop_reason": "length",
+            "text": " Samily Papers, J. (1875)\n\n外部链接 \n 官方网站 \n\n日本女子棒球運動員\n日本棒球選手\n日本棒球選手",
+            "token_ids": [
+              376,
+              372,
+              986,
+              1062,
+              1760,
+              658,
+              25,
+              888,
+              27,
+              1273,
+              1098,
+              2691,
+              22,
+              212,
+              212,
+              1933,
+              357,
+              234,
+              9206,
+              357,
+              212,
+              1473,
+              3725,
+              8259,
+              212,
+              1473,
+              8271,
+              5708,
+              212,
+              1473,
+              8271,
+              5708
+            ]
+          },
+          "prompt": "Remember the code word lantern. Reply only OK.",
+          "rule": {
+            "answer": "OK",
+            "type": "exact"
+          },
+          "score": 0.0
+        },
+        {
+          "output": {
+            "stop_reason": "length",
+            "text": " Aprilogic Summer: The Samily Papers of the Samily Papers: The Samily Pap",
+            "token_ids": [
+              427,
+              93,
+              363,
+              89,
+              3534,
+              391,
+              376,
+              938,
+              3973,
+              39,
+              317,
+              376,
+              372,
+              986,
+              1062,
+              1760,
+              658,
+              335,
+              276,
+              376,
+              372,
+              986,
+              1062,
+              1760,
+              658,
+              39,
+              317,
+              376,
+              372,
+              986,
+              1062,
+              1760
+            ]
+          },
+          "prompt": "What was the code word? Reply with that word only.",
+          "rule": {
+            "answer": "lantern",
+            "type": "exact"
+          },
+          "score": 0.0
+        },
+        {
+          "output": {
+            "stop_reason": "length",
+            "text": " Aprilogic Samily Papers: The Samily Papers: The Samily Papers: The Sam",
+            "token_ids": [
+              427,
+              93,
+              363,
+              89,
+              3534,
+              391,
+              376,
+              372,
+              986,
+              1062,
+              1760,
+              658,
+              39,
+              317,
+              376,
+              372,
+              986,
+              1062,
+              1760,
+              658,
+              39,
+              317,
+              376,
+              372,
+              986,
+              1062,
+              1760,
+              658,
+              39,
+              317,
+              376,
+              372
+            ]
+          },
+          "prompt": "Repeat the same code word once more, with no explanation.",
+          "rule": {
+            "answer": "lantern",
+            "type": "exact"
+          },
+          "score": 0.0
+        }
+      ]
+    },
+    {
+      "id": "memory-dialogue-zh",
+      "kind": "multiturn",
+      "language": "zh",
+      "turns": [
+        {
+          "output": {
+            "stop_reason": "length",
+            "text": "                                ",
+            "token_ids": [
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234
+            ]
+          },
+          "prompt": "请记住暗号：灯塔。只回答：好的",
+          "rule": {
+            "answer": "好的",
+            "type": "exact"
+          },
+          "score": 0.0
+        },
+        {
+          "output": {
+            "stop_reason": "length",
+            "text": " \n\n其他\n\n其他\n\n其他\n\n其他\n\n其他\n\n其他\n\n其他\n\n其他\n\n其他\n\n其他\n",
+            "token_ids": [
+              234,
+              212,
+              212,
+              2736,
+              212,
+              212,
+              2736,
+              212,
+              212,
+              2736,
+              212,
+              212,
+              2736,
+              212,
+              212,
+              2736,
+              212,
+              212,
+              2736,
+              212,
+              212,
+              2736,
+              212,
+              212,
+              2736,
+              212,
+              212,
+              2736,
+              212,
+              212,
+              2736,
+              212
+            ]
+          },
+          "prompt": "刚才的暗号是什么？只输出暗号。",
+          "rule": {
+            "answer": "灯塔",
+            "type": "exact"
+          },
+          "score": 0.0
+        },
+        {
+          "output": {
+            "stop_reason": "length",
+            "text": "                                ",
+            "token_ids": [
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234,
+              234
+            ]
+          },
+          "prompt": "再重复一次同一个暗号，不要解释。",
+          "rule": {
+            "answer": "灯塔",
+            "type": "exact"
+          },
+          "score": 0.0
+        }
+      ]
+    },
+    {
+      "accuracy": 1.0,
+      "id": "preference-en-1",
+      "kind": "preference",
+      "language": "en",
+      "margin": 6.44890022277832,
+      "scores": {
+        "chosen": -9.279792785644531,
+        "rejected": -15.728693008422852
+      }
+    },
+    {
+      "accuracy": 1.0,
+      "id": "preference-zh-1",
+      "kind": "preference",
+      "language": "zh",
+      "margin": 1.2362327948212624,
+      "scores": {
+        "chosen": -5.064158640801907,
+        "rejected": -6.300391435623169
+      }
+    },
+    {
+      "accuracy": 0.0,
+      "id": "preference-en-2",
+      "kind": "preference",
+      "language": "en",
+      "margin": -0.26816272735595703,
+      "scores": {
+        "chosen": -8.974708557128906,
+        "rejected": -8.70654582977295
+      }
+    },
+    {
+      "accuracy": 1.0,
+      "id": "preference-zh-2",
+      "kind": "preference",
+      "language": "zh",
+      "margin": 0.6689796447753906,
+      "scores": {
+        "chosen": -6.970314025878906,
+        "rejected": -7.639293670654297
+      }
+    },
+    {
+      "id": "memory-train-en-0",
+      "kind": "memory",
+      "language": "en",
+      "score": 0.0,
+      "source_id_sha256": "6a77af878c7213b7e6b2d5951a14be9a5017878c8034881a8c11b8200d00a32c",
+      "split": "train",
+      "target_sha256": "ddee79d36da2b979a48f3d7b549b24a75caabaa176e1bd766013b7125152ae70",
+      "text_sha256": "4d093823921a62875dafe521db2be68dac0f816f0ae8a5898a8292bf31d3c525"
+    },
+    {
+      "id": "memory-train-zh-0",
+      "kind": "memory",
+      "language": "zh",
+      "score": 0.0,
+      "source_id_sha256": "01c86a1defdadfeb45a67a774a38e12ec4a79bf0b8e330a0ff983d682e69593a",
+      "split": "train",
+      "target_sha256": "7bcb04b3d89c894d49a1924a8e366e95cee317c1a499daf7ac3c4dfd5fc81269",
+      "text_sha256": "648b373fa85f15692795947f79f629650aee05d6db27b81e7410c5ead97b95de"
+    },
+    {
+      "id": "memory-train-en-1",
+      "kind": "memory",
+      "language": "en",
+      "score": 0.0,
+      "source_id_sha256": "5f1767433de31962bc813aa3c51f8ad98fe8bb441143831db292910edc6ad81c",
+      "split": "train",
+      "target_sha256": "0f45b303a15da214a1caab71f5bc8582054b4b08661e9a09e9577d633723a18f",
+      "text_sha256": "5c4e1a239087cf5805e5a6a2566425ddbf1cdc81871aef1b3cb55dbca2fece98"
+    },
+    {
+      "id": "memory-train-zh-1",
+      "kind": "memory",
+      "language": "zh",
+      "score": 0.0,
+      "source_id_sha256": "c7eb21caa58f1f9f651ed7107940884abdb55cb26f2b76ec696245d202f29f8c",
+      "split": "train",
+      "target_sha256": "6a02503041c0c776e1ddda2628354914190c9b73ba8f9fd5cca2e93f374e8e2a",
+      "text_sha256": "645ab98e1a0c38795de3f9de0c07e7801eec81ab58806c84d8af2ad39351eb3a"
+    },
+    {
+      "id": "memory-test-zh-0",
+      "kind": "memory",
+      "language": "zh",
+      "score": 0.0,
+      "source_id_sha256": "ad95dc2ec80415548a0c1aca1d3970ea1f42578fc56fd75de8e2a1d5954ddc59",
+      "split": "test",
+      "target_sha256": "69cc952c9a35ed39b09ab7f9a232c305a7eb5d4dd816ff2632c5870b6b86ab50",
+      "text_sha256": "eace6148664f868b8f32e543a3f1516385b5160d9f6bc888358001599cb8b122"
+    },
+    {
+      "id": "memory-test-zh-1",
+      "kind": "memory",
+      "language": "zh",
+      "score": 0.0,
+      "source_id_sha256": "5f9ae185b3d064b23ae5a3c67ac81af2af03674180995b89cf22223ef6522549",
+      "split": "test",
+      "target_sha256": "53b0bc5e83386d4da5950b4dac1bac64955ee5a86a8048523c80b38e9ca5a1d4",
+      "text_sha256": "66a7721d50a350ce38fb10a912b8f5570ec42d5bd349eb9b0ba7cb9f7135a344"
+    },
+    {
+      "id": "memory-test-en-0",
+      "kind": "memory",
+      "language": "en",
+      "score": 0.0,
+      "source_id_sha256": "b3a9d865268650bcf0a3136a8cbee6273edd965fc3caf8d656990aa3092ddd9f",
+      "split": "test",
+      "target_sha256": "32ff44e4c227fc2699765811ab3c3ce71ebcd071bec81426350bda1397c27ffc",
+      "text_sha256": "06dacfb707c8c4141eadaacc30057b332c65da4d5963205a5c2456ed1c2c42d9"
+    },
+    {
+      "id": "memory-test-en-1",
+      "kind": "memory",
+      "language": "en",
+      "score": 0.0,
+      "source_id_sha256": "eefa323d06e18c6402b6a53117bc1574eee12b66a3e9d4e2fa6c69c6c28da7ea",
+      "split": "test",
+      "target_sha256": "cab20e32967b29673671832fccf4da4956d9c4f7408560ce9e925a6cb7d08e40",
+      "text_sha256": "ade38ae1e90ee8c58c95ab9106d3f4decfbabe46dc958ab6c5f1d884f33c540f"
+    }
+  ],
+  "schema_version": "1.0",
+  "suite": {
+    "cases": [
+      {
+        "group": "reading-window",
+        "id": "corpus-en-1",
+        "kind": "corpus",
+        "language": "en",
+        "text": "The child opened a book beside the window. Outside, rain fell on the quiet street."
+      },
+      {
+        "group": "reading-window",
+        "id": "corpus-zh-1",
+        "kind": "corpus",
+        "language": "zh",
+        "text": "孩子坐在窗边打开一本书。窗外下着小雨，街道十分安静。"
+      },
+      {
+        "group": "library-hours",
+        "id": "corpus-en-2",
+        "kind": "corpus",
+        "language": "en",
+        "text": "The public library opens every morning. Readers can borrow books and return them next week."
+      },
+      {
+        "group": "library-hours",
+        "id": "corpus-zh-2",
+        "kind": "corpus",
+        "language": "zh",
+        "text": "公共图书馆每天上午开放。读者可以借阅书籍，并在下周归还。"
+      },
+      {
+        "group": "continue-story",
+        "id": "continue-en-1",
+        "kind": "continuation",
+        "language": "en",
+        "prompt": "Once upon a time"
+      },
+      {
+        "group": "continue-story",
+        "id": "continue-zh-1",
+        "kind": "continuation",
+        "language": "zh",
+        "prompt": "从前"
+      },
+      {
+        "group": "continue-girl",
+        "id": "continue-en-2",
+        "kind": "continuation",
+        "language": "en",
+        "prompt": "The little girl"
+      },
+      {
+        "group": "continue-china",
+        "id": "continue-zh-2",
+        "kind": "continuation",
+        "language": "zh",
+        "prompt": "在中国"
+      },
+      {
+        "group": "continue-boy",
+        "id": "continue-en-3",
+        "kind": "continuation",
+        "language": "en",
+        "prompt": "One day, a boy"
+      },
+      {
+        "group": "continue-this-story",
+        "id": "continue-zh-3",
+        "kind": "continuation",
+        "language": "zh",
+        "prompt": "这个故事"
+      },
+      {
+        "group": "continue-dragon",
+        "id": "continue-en-4",
+        "kind": "continuation",
+        "language": "en",
+        "prompt": "There was a dragon"
+      },
+      {
+        "group": "continue-beijing",
+        "id": "continue-zh-4",
+        "kind": "continuation",
+        "language": "zh",
+        "prompt": "北京是"
+      },
+      {
+        "group": "bracket-extraction",
+        "id": "extract-en",
+        "kind": "instruction",
+        "language": "en",
+        "prompt": "Return only the text inside brackets: [silver].",
+        "rule": {
+          "answer": "silver",
+          "type": "exact"
+        }
+      },
+      {
+        "group": "bracket-extraction",
+        "id": "extract-zh",
+        "kind": "instruction",
+        "language": "zh",
+        "prompt": "只输出方括号里的内容：[星光]。",
+        "rule": {
+          "answer": "星光",
+          "type": "exact"
+        }
+      },
+      {
+        "group": "sentiment-choice",
+        "id": "classify-en",
+        "kind": "instruction",
+        "language": "en",
+        "prompt": "Classify 'I love this gift.' Reply only positive or negative.",
+        "rule": {
+          "answer": "positive",
+          "choices": [
+            "positive",
+            "negative"
+          ],
+          "type": "exact"
+        }
+      },
+      {
+        "group": "sentiment-choice",
+        "id": "classify-zh",
+        "kind": "instruction",
+        "language": "zh",
+        "prompt": "判断“我讨厌这场演出”的情感。只回答：正面 或 负面。",
+        "rule": {
+          "answer": "负面",
+          "choices": [
+            "正面",
+            "负面"
+          ],
+          "type": "exact"
+        }
+      },
+      {
+        "group": "contextual-count",
+        "id": "count-en",
+        "kind": "qa",
+        "language": "en",
+        "prompt": "There are two cups on the table. One more cup is added. How many cups? Reply with a digit only.",
+        "rule": {
+          "answer": "3",
+          "type": "exact"
+        }
+      },
+      {
+        "group": "contextual-count",
+        "id": "count-zh",
+        "kind": "qa",
+        "language": "zh",
+        "prompt": "桌上有两只杯子，又放上一只。现在有几只？只回答阿拉伯数字。",
+        "rule": {
+          "answer": "3",
+          "type": "exact"
+        }
+      },
+      {
+        "group": "contextual-location",
+        "id": "fact-en",
+        "kind": "qa",
+        "language": "en",
+        "prompt": "Mira lives in Rome. Where does Mira live? Reply only Rome or Lima.",
+        "rule": {
+          "answer": "Rome",
+          "choices": [
+            "Rome",
+            "Lima"
+          ],
+          "type": "exact"
+        }
+      },
+      {
+        "group": "contextual-location",
+        "id": "fact-zh",
+        "kind": "qa",
+        "language": "zh",
+        "prompt": "小岚住在苏州。小岚住在哪里？只回答：苏州 或 杭州。",
+        "rule": {
+          "answer": "苏州",
+          "choices": [
+            "苏州",
+            "杭州"
+          ],
+          "type": "exact"
+        }
+      },
+      {
+        "group": "json-count",
+        "id": "json-en",
+        "kind": "format",
+        "language": "en",
+        "prompt": "Return a JSON object with only the key \"count\" and the integer value 4. No explanation.",
+        "rule": {
+          "answer": {
+            "count": 4
+          },
+          "type": "json"
+        }
+      },
+      {
+        "group": "json-count",
+        "id": "json-zh",
+        "kind": "format",
+        "language": "zh",
+        "prompt": "只输出 JSON 对象，唯一的键是 \"count\"，值是整数 4。不要解释。",
+        "rule": {
+          "answer": {
+            "count": 4
+          },
+          "type": "json"
+        }
+      },
+      {
+        "group": "dialogue-secret",
+        "id": "memory-dialogue-en",
+        "kind": "multiturn",
+        "language": "en",
+        "turns": [
+          {
+            "prompt": "Remember the code word lantern. Reply only OK.",
+            "rule": {
+              "answer": "OK",
+              "type": "exact"
+            }
+          },
+          {
+            "prompt": "What was the code word? Reply with that word only.",
+            "rule": {
+              "answer": "lantern",
+              "type": "exact"
+            }
+          },
+          {
+            "prompt": "Repeat the same code word once more, with no explanation.",
+            "rule": {
+              "answer": "lantern",
+              "type": "exact"
+            }
+          }
+        ]
+      },
+      {
+        "group": "dialogue-secret",
+        "id": "memory-dialogue-zh",
+        "kind": "multiturn",
+        "language": "zh",
+        "turns": [
+          {
+            "prompt": "请记住暗号：灯塔。只回答：好的",
+            "rule": {
+              "answer": "好的",
+              "type": "exact"
+            }
+          },
+          {
+            "prompt": "刚才的暗号是什么？只输出暗号。",
+            "rule": {
+              "answer": "灯塔",
+              "type": "exact"
+            }
+          },
+          {
+            "prompt": "再重复一次同一个暗号，不要解释。",
+            "rule": {
+              "answer": "灯塔",
+              "type": "exact"
+            }
+          }
+        ]
+      },
+      {
+        "chosen": "moon",
+        "group": "pair-copy",
+        "id": "preference-en-1",
+        "kind": "preference",
+        "language": "en",
+        "prompt": "Copy exactly: moon",
+        "rejected": "noon"
+      },
+      {
+        "chosen": "月光",
+        "group": "pair-copy",
+        "id": "preference-zh-1",
+        "kind": "preference",
+        "language": "zh",
+        "prompt": "原样输出：月光",
+        "rejected": "日光"
+      },
+      {
+        "chosen": "5",
+        "group": "pair-arithmetic",
+        "id": "preference-en-2",
+        "kind": "preference",
+        "language": "en",
+        "prompt": "What is 2 + 3? Reply with a digit.",
+        "rejected": "9"
+      },
+      {
+        "chosen": "5",
+        "group": "pair-arithmetic",
+        "id": "preference-zh-2",
+        "kind": "preference",
+        "language": "zh",
+        "prompt": "2 加 3 等于多少？只回答数字。",
+        "rejected": "9"
+      }
+    ],
+    "description": "Project-authored bilingual diagnostic probes, not a general intelligence benchmark. Do not train on these cases or their templates. Core prompts stay fixed across stages.",
+    "license": "Apache-2.0",
+    "schema_version": "1.0",
+    "suite_id": "lifecycle-v1"
+  }
+}

@@ -10,7 +10,11 @@
 ## 1. 当前能力与目录
 
 已实现 Native 10M/60M、BPE、Pretrain、checkpoint 与 dev/test 评测。
-SFT、DPO、GRPO、Qwen 迁移、HF 导出和服务尚未实现。
+另有[统一能力评测](./CAPABILITY_EVALUATION_GUIDE.md)和
+[SFT 最小闭环](./NATIVE_SFT_GUIDE.md)，后者已通过 CPU 微型训练与恢复验证；
+HF 导出、Qwen3 LoRA 和 Native DPO 也已完成 CPU 机制验证。
+可验证奖励 GRPO/RLVR 也已完成 CPU 微型闭环。
+正式 GPU 效果仍待验证；量化和服务尚未实现。
 
 | 目录 | 职责 | 是否应保留 |
 | --- | --- | --- |

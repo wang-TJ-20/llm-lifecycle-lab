@@ -4,7 +4,8 @@
 
 这组文章围绕这个问题展开。我们从一次可以在 CPU 上完成的参数更新开始，
 依次准备中英文数据、训练 Tokenizer、理解模型结构、运行预训练，
-再用评测和对照实验判断模型究竟学到了什么。
+再用评测和对照实验判断模型究竟学到了什么，最后进入 SFT、DPO 和
+可验证奖励 GRPO。
 
 文章不是按目录逐个介绍文件，而是沿着学习过程解释：为什么需要这一步，
 代码在哪里实现，运行后应观察什么，以及这些结果不能证明什么。
@@ -34,11 +35,15 @@ Linux + 单张 24GB NVIDIA GPU。CPU 实验通过不代表已经完成 CUDA 训�
 | [05 跑通一次预训练](./05-first-pretraining.md) | batch、梯度累积、学习率和训练预算如何共同作用？ | 已完成 |
 | [06 判断模型到底学到了什么](./06-evaluating-a-model.md) | 如何结合 loss、双语指标和生成结果评价模型？ | 已完成 |
 | [07 让实验可以恢复和比较](./07-resume-and-compare.md) | Checkpoint 保存什么？如何固定数据、配置和对照条件？ | 已完成 |
+| [08 让 Base 模型学习回答](./08-supervised-fine-tuning.md) | chat template 与 assistant-only SFT 怎样改变监督范围？ | 已完成 |
+| [09 用偏好对比较回答](./09-direct-preference-optimization.md) | DPO 如何用 frozen reference 学习 chosen/rejected？ | 已完成 |
+| [10 用可验证奖励改进采样](./10-verifiable-reward-grpo.md) | GRPO 如何从程序奖励、组内优势和 rollout 更新策略？ | 已完成 |
 
-七篇预训练主线已完整，建议按顺序阅读。
+十篇生命周期主线已完整，建议按顺序阅读。
 每篇都有可以局部验证的实验，不必先准备正式训练硬件。
 第五至七篇使用 `scripts/pretrain_experiment.py` 的临时双语微型实验，
-不下载数据、不覆盖已有产物；真实 Smoke 与 60M 操作另有明确前提。
+第八至十篇分别使用 SFT、DPO、GRPO 临时实验；
+它们不下载数据、不覆盖已有产物。真实 Smoke 与 60M 操作另有明确前提。
 
 ## 文章与指南的分工
 
@@ -54,6 +59,9 @@ Linux + 单张 24GB NVIDIA GPU。CPU 实验通过不代表已经完成 CUDA 训�
 | 理解训练预算、累积和日志，跑通微型预训练 | [第五篇](./05-first-pretraining.md) |
 | 理解指标聚合、双语覆盖和生成检查 | [第六篇](./06-evaluating-a-model.md) |
 | 验证中断恢复，固定实验条件与验收边界 | [第七篇](./07-resume-and-compare.md) |
+| 理解对话模板、assistant-only mask 和阶段初始化 | [第八篇](./08-supervised-fine-tuning.md) |
+| 理解偏好对、冻结 reference 与 DPO pair loss | [第九篇](./09-direct-preference-optimization.md) |
+| 理解程序奖励、组内 advantage、KL 与 rollout | [第十篇](./10-verifiable-reward-grpo.md) |
 | 下载或接入自己的数据，训练 Tokenizer，生成 Packing | [数据介绍与准备](../DATA_GUIDE.md) |
 | 查模型结构、参数预算和张量形状 | [自有模型介绍](../NATIVE_MODEL_GUIDE.md) |
 | 安装环境，运行训练、恢复和评测，定位报错 | [Pretrain 训练文档](../NATIVE_PRETRAIN_GUIDE.md) |
@@ -74,15 +82,15 @@ Linux + 单张 24GB NVIDIA GPU。CPU 实验通过不代表已经完成 CUDA 训�
 但会影响实验结论的限制仍要在正文中说明。第二篇作为这一写法的示范章。
 文档站预览、图解与公式写法见 [文档站维护](../SITE_GUIDE.md)。
 
-当前项目已实现 Native 模型、BPE Tokenizer、磁盘 Packing、Pretrain、恢复和评测，
-但仓库不附带训练好的权重。第一次完整 60M CUDA
+当前项目已实现 Native 模型、BPE Tokenizer、磁盘 Packing、Pretrain、SFT、
+DPO、GRPO、恢复和统一评测，但仓库不附带训练好的权重。第一次完整 60M CUDA
 [Reference 运行](../experiments/native-60m-baseline-v1.md) 已完成并被接受；
 其 dirty-Git provenance 例外保留在实验记录中。
-文章不会把两步 Smoke 或随机 token 实验写成语言能力结论。
+文章不会把两步 Smoke、随机 token 或合成后训练实验写成语言能力结论。
 
 ## 后续如何继续
 
-- 新增学习阶段时扩展主线，例如 SFT、DPO、GRPO；等实现和最小验证完成后再写正文。
+- 新增学习阶段时，等实现和最小验证完成后再扩展正文。
 - 已有接口或行为改变时更新原篇，并重新验证示例，不要求读者靠新文章修补旧步骤。
 - 架构消融和真实训练结果单独整理为实验记录，注明代码版本、配置、数据与硬件条件，
   区分观察到的结果和仍待验证的解释。

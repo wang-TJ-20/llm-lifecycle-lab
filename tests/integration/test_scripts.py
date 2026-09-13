@@ -11,17 +11,33 @@ import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_NAMES = (
+    "benchmark_inference",
+    "build_model_release",
+    "chat",
     "data",
+    "dpo_experiment",
     "doctor",
     "eval_pretrain",
+    "evaluate_capabilities",
+    "export_hf",
     "generate_pretrain",
+    "grpo_experiment",
     "inspect_model",
     "inspect_tokenizer",
     "model_experiment",
     "plot_training_curves",
     "pretrain_experiment",
+    "prepare_transfer",
+    "run_published_model",
+    "serve_openai",
+    "sft_experiment",
     "train_pretrain",
+    "train_dpo",
+    "train_grpo",
+    "train_sft",
     "train_tokenizer",
+    "train_transfer",
+    "transfer_experiment",
     "validate_config",
     "verify_reference",
 )
@@ -66,6 +82,70 @@ def run_script(
 def test_script_help_uses_its_own_name(name: str, tmp_path: Path) -> None:
     result = run_script(name, "--help", cwd=tmp_path)
     assert f"usage: python scripts/{name}.py" in result.stdout
+
+
+@pytest.mark.parametrize("mode", ("train", "resume"))
+def test_sft_experiment_is_standalone_and_temporary(mode: str, tmp_path: Path) -> None:
+    report = json.loads(
+        run_script("sft_experiment", "--mode", mode, cwd=tmp_path).stdout
+    )
+    assert list(tmp_path.iterdir()) == []
+    assert report["base_steps"] == report["sft_steps"] == 3
+    assert report["sft_supervised_tokens"] > 0
+    assert report["same_evaluation_protocol"]
+    assert report["parent_weights_preserved"]
+    assert report["sft_weights_updated"]
+    assert report["compared_metrics"] > 0
+    if mode == "resume":
+        assert report["resume_weights_optimizer_scheduler_rng_equal"]
+
+
+@pytest.mark.parametrize("mode", ("train", "resume"))
+def test_transfer_experiment_is_standalone_and_temporary(
+    mode: str, tmp_path: Path
+) -> None:
+    report = json.loads(
+        run_script("transfer_experiment", "--mode", mode, cwd=tmp_path).stdout
+    )
+    assert list(tmp_path.iterdir()) == []
+    assert report["steps"] == 3
+    assert report["base_parameters_unchanged"]
+    assert report["lora_updated"]
+    assert 0 < report["trainable_parameters"] < report["total_parameters"]
+    assert "not Qwen/Qwen3-0.6B-Base weights" in report["fixture"]
+    if mode == "resume":
+        assert report["resume_weights_optimizer_scheduler_rng_equal"]
+
+
+@pytest.mark.parametrize("mode", ("train", "resume"))
+def test_dpo_experiment_is_standalone_and_temporary(mode: str, tmp_path: Path) -> None:
+    report = json.loads(
+        run_script("dpo_experiment", "--mode", mode, cwd=tmp_path).stdout
+    )
+    assert list(tmp_path.iterdir()) == []
+    assert report["dpo_steps"] == 3
+    assert report["response_tokens_seen"] > 0
+    assert report["sft_parent_unchanged"]
+    assert report["frozen_reference_scores"]
+    assert report["pair_weighted_loss"]
+    if mode == "resume":
+        assert report["resume_weights_optimizer_scheduler_rng_equal"]
+
+
+@pytest.mark.parametrize("mode", ("train", "resume"))
+def test_grpo_experiment_is_standalone_and_temporary(mode: str, tmp_path: Path) -> None:
+    report = json.loads(
+        run_script("grpo_experiment", "--mode", mode, cwd=tmp_path).stdout
+    )
+    assert list(tmp_path.iterdir()) == []
+    assert report["grpo_steps"] == 3
+    assert report["rollout_tokens_seen"] > 0
+    assert report["synthetic_variable_reward_groups"] > 0
+    assert report["parent_unchanged"]
+    assert report["programmatic_rewards_recorded"]
+    assert report["latest_rollouts_recorded"]
+    if mode == "resume":
+        assert report["resume_weights_optimizer_scheduler_rng_equal"]
 
 
 @pytest.mark.parametrize("mode", ("train", "evaluate", "resume"))

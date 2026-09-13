@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>LLM Lifecycle Lab · Local Chat</title>
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<main class="app-shell">
+  <aside class="control-rail" aria-label="生成设置">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">LL</span>
+      <span>
+        <strong>LLM Lifecycle Lab</strong>
+        <small>LOCAL INFERENCE</small>
+      </span>
+    </div>
+
+    <div class="model-status">
+      <span class="status-dot" id="status-dot" aria-hidden="true"></span>
+      <span>
+        <small id="stage-label">CONNECTING</small>
+        <strong id="model-label">Local model</strong>
+      </span>
+    </div>
+
+    <section class="control-section">
+      <h2>模式</h2>
+      <div class="segmented" role="group" aria-label="生成模式">
+        <button class="segment is-active" id="chat-mode" type="button">Chat</button>
+        <button class="segment" id="completion-mode" type="button">Completion</button>
+      </div>
+    </section>
+
+    <section class="control-section settings-grid">
+      <h2>生成</h2>
+      <label class="field compact-field">
+        <span>Max tokens</span>
+        <input id="max-tokens" type="number" min="1" max="512" value="48">
+      </label>
+      <label class="field">
+        <span>Temperature <output id="temperature-value">0.0</output></span>
+        <input id="temperature" type="range" min="0" max="2" step="0.1" value="0">
+      </label>
+      <label class="field">
+        <span>Top P <output id="top-p-value">1.0</output></span>
+        <input id="top-p" type="range" min="0.1" max="1" step="0.1" value="1">
+      </label>
+      <label class="field compact-field">
+        <span>Seed</span>
+        <input id="seed" type="number" min="0" value="42">
+      </label>
+    </section>
+
+    <section class="control-section" id="system-section">
+      <label class="field">
+        <span>System</span>
+        <textarea id="system-prompt" rows="4" placeholder="可选"></textarea>
+      </label>
+    </section>
+
+    <div class="rail-footer">
+      <span id="api-status">等待服务</span>
+      <span>v1 / local</span>
+    </div>
+  </aside>
+
+  <section class="conversation" aria-label="模型会话">
+    <header class="conversation-header">
+      <div>
+        <small id="mode-kicker">CHAT SESSION</small>
+        <h1 id="conversation-title">新会话</h1>
+      </div>
+      <button class="icon-button" id="reset-button" type="button"
+              title="新建会话" aria-label="新建会话">+</button>
+    </header>
+
+    <div class="transcript" id="transcript" aria-live="polite">
+      <div class="empty-state" id="empty-state">
+        <span class="empty-index">01</span>
+        <p>READY</p>
+      </div>
+    </div>
+
+    <form class="composer" id="composer">
+      <label class="sr-only" for="prompt">输入内容</label>
+      <textarea id="prompt" rows="1" placeholder="输入消息" required></textarea>
+      <div class="composer-meta">
+        <span id="composer-status">LOCAL · READY</span>
+        <button class="send-button" id="send-button" type="submit"
+                title="发送" aria-label="发送">↑</button>
+      </div>
+    </form>
+  </section>
+</main>
+
+<template id="message-template">
+  <article class="message">
+    <div class="message-meta">
+      <span class="message-role"></span>
+      <span class="message-usage"></span>
+    </div>
+    <pre class="message-content"></pre>
+    <button class="copy-button" type="button" title="复制" aria-label="复制">⧉</button>
+  </article>
+</template>
+
+<script src="/app.js" defer></script>
+</body>
+</html>

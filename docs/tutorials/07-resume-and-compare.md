@@ -1,6 +1,7 @@
 # 07 让实验可以恢复和比较
 
 [系列目录](./README.md) | [上一篇：判断模型到底学到了什么](./06-evaluating-a-model.md)
+| [下一篇：让 Base 模型学习回答](./08-supervised-fine-tuning.md)
 
 训练运行到一半，进程中断了。重新加载模型权重，再设一次相同 seed，
 是不是就能接着原来的实验继续？
@@ -346,7 +347,7 @@ python scripts/verify_reference.py \
 
 </details>
 
-## 8. 七篇主线之后
+## 8. 预训练主线之后
 
 现在，我们已经把一条可验证的学习路线接起来：
 
@@ -363,3 +364,4 @@ python scripts/verify_reference.py \
 新增功能时延续同一标准：**实现、最小验证和解释对应起来，结论不超过证据。**
 
 [返回系列目录](./README.md) | [上一篇：判断模型到底学到了什么](./06-evaluating-a-model.md)
+| [下一篇：让 Base 模型学习回答](./08-supervised-fine-tuning.md)
