@@ -1,0 +1,44 @@
+schema_version: "1.0"
+model_route: native
+run_profile: learn
+stage: grpo
+seed: 42
+output_dir: runs
+model:
+  provider: native
+  model_id: tiny-60m
+  init_checkpoint: runs/native-sft-60m-001/checkpoints/step-00000626
+  tokenizer: data/tokenizers/bilingual-60m-v1
+data:
+  # Only prompts whose empirical success rate under the SFT policy is strictly
+  # between 0 and 1. The first GPU round was dominated by all-zero groups, so
+  # the group advantage was exactly zero and no gradient signal survived.
+  manifest: data/prepared/grpo-solvable-v1/data_manifest.json
+  evaluation_suite: configs/evaluation/lifecycle-v2.yaml
+training:
+  device: cuda
+  dtype: bfloat16
+  sequence_length: 512
+  micro_batch_size: 8
+  gradient_accumulation_steps: 2
+  num_epochs: 3.0
+  learning_rate: 0.000002
+  beta1: 0.9
+  beta2: 0.95
+  warmup_steps: 10
+  min_lr_ratio: 0.1
+  gradient_clipping: 1.0
+  # Wider groups raise the chance that a solvable prompt yields both rewarded
+  # and unrewarded rollouts, which is the only way to get a non-zero advantage.
+  group_size: 8
+  max_new_tokens: 16
+  temperature: 1.0
+  top_p: 1.0
+  clip_epsilon: 0.2
+  kl_beta: 0.04
+  advantage_epsilon: 0.0001
+  weight_decay: 0.1
+  checkpoint_interval: 25
+  eval_interval: 25
+  eval_batches: 32
+  log_interval: 5

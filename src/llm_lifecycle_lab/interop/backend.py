@@ -93,9 +93,12 @@ class HFTokenizer:
 class HFModelAdapter:
     """Keep Transformers/PEFT details outside the shared training engine."""
 
-    def __init__(self, model, *, binding: dict[str, Any]) -> None:
+    def __init__(
+        self, model, *, binding: dict[str, Any], quantized: bool = False
+    ) -> None:
         self.raw = model
         self.binding = binding
+        self.quantized = quantized
         self.config = SimpleNamespace(
             max_sequence_length=model.config.max_position_embeddings,
             vocab_size=model.config.vocab_size,
@@ -179,6 +182,17 @@ class HFModelAdapter:
         )
 
     def to_device(self, device) -> None:
+        if self.quantized:
+            # 4-bit weights are placed by device_map at load time. Calling .to()
+            # on a quantized model is unsupported and would silently change the
+            # arithmetic, so only accept the device it already occupies.
+            current = next(self.raw.parameters()).device
+            if torch.device(device).type != current.type:
+                raise ContractError(
+                    "QLoRA model is pinned to "
+                    f"{current.type} at load time; cannot move it to {device}"
+                )
+            return
         self.raw.to(device)
 
     def set_training(self, training: bool) -> None:
@@ -196,7 +210,7 @@ class HFModelAdapter:
     def load(self, path: Path) -> None:
         if read_json(path / "model_binding.json") != self.binding:
             raise ArtifactError("HF checkpoint base/adapter binding mismatch")
-        if self.binding["training_method"] == "lora":
+        if self.binding["training_method"] in {"lora", "qlora"}:
             require_hf(peft=True)
             from peft import load_peft_weights, set_peft_model_state_dict
 

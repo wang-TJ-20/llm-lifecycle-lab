@@ -156,6 +156,9 @@ def run_native_dpo(
         raise ConfigError("DPO model/tokenizer does not match its SFT checkpoint")
     training = dict(config.training)
     beta = float(training.pop("beta", 0.1))
+    nll_coefficient = float(training.pop("nll_coefficient", 0.0))
+    if not math.isfinite(nll_coefficient) or nll_coefficient < 0:
+        raise ConfigError("training.nll_coefficient must be finite and non-negative")
     engine_config = EngineConfig.from_dict(training)
     if engine_config.sequence_length > model_config.max_sequence_length:
         raise ConfigError("DPO sequence_length exceeds model context")
@@ -194,6 +197,7 @@ def run_native_dpo(
         "data_manifest_sha256": sha256_file(manifest_path),
         "evaluation_suite_sha256": summary["suite_sha256"],
         "beta": beta,
+        "nll_coefficient": nll_coefficient,
         "optimizer_inherited": False,
     }
     attach_reference_scores(splits, frozen_scores)
@@ -279,7 +283,7 @@ def run_native_dpo(
         )
     result = engine.train(
         bundle=bundle,
-        objective=DPOObjective(beta),
+        objective=DPOObjective(beta, nll_coefficient),
         train_stream=stream,
         evaluation_batches=evaluation,
         resume_from=checkpoint,

@@ -164,12 +164,56 @@ python scripts/evaluate_capabilities.py run \
 Transformers/PEFT 版本和 HF 实现代码。Native 与 Qwen 的 Tokenizer 不同，
 BPB 可以并列查看，但不会计算成同一模型阶段的直接 delta。
 
+## 7. QLoRA
+
+配置中把 `training_method` 设为 `qlora`，并给出 4-bit 量化设置：
+
+```yaml
+model:
+  training_method: qlora
+  lora:
+    rank: 8
+    alpha: 16
+    dropout: 0.0
+    target_modules: [q_proj, v_proj]
+  quantization:
+    load_in_4bit: true
+    bnb_4bit_quant_type: nf4
+    bnb_4bit_use_double_quant: true
+    bnb_4bit_compute_dtype: bfloat16
+```
+
+运行方式与 LoRA 相同：
+
+```bash
+python scripts/train_transfer.py \
+  --config configs/pipelines/qwen3-qlora-60m.yaml \
+  --run-id qwen3-qlora-60m-001
+```
+
+门禁独立于 LoRA：
+
+- 需要 CUDA 与 `bitsandbytes`；`load_in_4bit` 目前只接受 `true`。
+- `bnb_4bit_quant_type` 只允许 `nf4` / `fp4`，
+  `bnb_4bit_compute_dtype` 只允许 `bfloat16` / `float16` / `float32`，
+  选 `bfloat16` 时会检查设备是否真的支持 BF16。
+- 量化设置与 `bitsandbytes` 版本一并写入 run binding，
+  加载 checkpoint 时逐项比对，防止用不同量化配置复用同一个 adapter。
+- 4-bit 权重在加载时由 `device_map` 固定，禁止再用 `.to()` 搬移；
+  评测 QLoRA checkpoint 必须显式 `--device cuda`。
+
+`bitsandbytes` 与硬件强相关，未加入 `requirements-hf.txt`；
+缺失时报错并给出安装提示，不静默回退到非量化路径。
+
 ## 当前边界
 
 - Native 60M HF 导出与 CPU 一致性：已验证。
 - 随机微型 Qwen3 LoRA 训练和精确恢复：已验证。
-- 真实 Qwen 快照下载、LoRA Smoke、GPU Reference：未执行。
-- QLoRA：未实现；其 bitsandbytes、量化硬件和版本门禁需独立设计。
-- Native Full SFT 与 Qwen LoRA 的正式效果/成本对照：待 GPU。
+- 真实 Qwen 快照下载、LoRA/QLoRA GPU 训练：已执行，见
+  [GPU 后训练报告](./experiments/native-60m-lifecycle-gpu-v1.md)。
+- QLoRA 已在 CUDA 上验证（峰值显存 7.267 → 5.572 GiB）。
+- Qwen 侧指令探针为 0：Tokenizer 与 `native-chat-v1` 控制串不匹配，
+  且 LoRA 未泛化到未见模板；与 Native 并列查看，不相减。
+- Qwen LoRA DPO、Qwen full 与 LoRA 同底座对照：未开始。
 
 [返回项目路线](./test.md)

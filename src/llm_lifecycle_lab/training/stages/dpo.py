@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 import torch
@@ -39,10 +40,13 @@ def response_logps(
 class DPOObjective:
     name = "dpo"
 
-    def __init__(self, beta: float = 0.1) -> None:
+    def __init__(self, beta: float = 0.1, nll_coefficient: float = 0.0) -> None:
         if not 0 < beta <= 1:
             raise ContractError("DPO beta must be in (0, 1]")
+        if not nll_coefficient >= 0 or not math.isfinite(nll_coefficient):
+            raise ContractError("DPO nll_coefficient must be finite and non-negative")
         self.beta = beta
+        self.nll_coefficient = nll_coefficient
 
     def __call__(self, model: ModelProtocol, batch: dict[str, Any]) -> ObjectiveOutput:
         required = {"reference_chosen_logps", "reference_rejected_logps"}
@@ -67,13 +71,20 @@ class DPOObjective:
         policy_margin = chosen - rejected
         reference_margin = reference_chosen - reference_rejected
         reward_margin = self.beta * (policy_margin - reference_margin)
-        loss = -F.logsigmoid(reward_margin).mean()
+        preference_loss = -F.logsigmoid(reward_margin).mean()
+        # RPO / DPO+NLL: keep a supervised term on the chosen response. Pure DPO
+        # can raise the margin by pushing down absolute likelihoods, which is the
+        # usual mechanism behind exact-match regressions after preference tuning.
+        nll = -(chosen / chosen_tokens.clamp(min=1)).mean()
+        loss = preference_loss + self.nll_coefficient * nll
         pairs = chosen.shape[0]
         return ObjectiveOutput(
             loss=loss,
             metrics={
                 "supervised_tokens": float(chosen_tokens.sum() + rejected_tokens.sum()),
                 "normalization_count": float(pairs),
+                "report_preference_loss": float(preference_loss.detach()),
+                "report_chosen_nll": float(nll.detach()),
                 "report_pair_accuracy": float(
                     (policy_margin.detach() > 0).float().mean()
                 ),

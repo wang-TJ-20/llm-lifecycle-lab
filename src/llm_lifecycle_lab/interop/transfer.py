@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import importlib.metadata
 import json
 import re
 import shutil
 import tempfile
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -27,6 +29,61 @@ from llm_lifecycle_lab.model.bundle import ModelBundle
 from llm_lifecycle_lab.tokenizer.native import NATIVE_CHAT_TEMPLATE_VERSION
 
 QWEN_ID = "Qwen/Qwen3-0.6B-Base"
+
+_QUANTIZATION_KEYS = {
+    "load_in_4bit",
+    "bnb_4bit_quant_type",
+    "bnb_4bit_use_double_quant",
+    "bnb_4bit_compute_dtype",
+}
+
+
+def _bitsandbytes_version() -> str:
+    try:
+        return importlib.metadata.version("bitsandbytes")
+    except importlib.metadata.PackageNotFoundError as exc:
+        raise ArtifactError(
+            "QLoRA requires bitsandbytes: python -m pip install bitsandbytes"
+        ) from exc
+
+
+def resolve_quantization(settings: Mapping[str, Any]) -> dict[str, Any]:
+    """Validate QLoRA 4-bit settings against the hardware and dependency gates.
+
+    QLoRA is only meaningful on a GPU with the 4-bit kernels, so this refuses to
+    build a config that would silently fall back to a different arithmetic. The
+    resolved values are recorded in the run binding so a later resume or
+    comparison can detect drift instead of reusing a mismatched adapter.
+    """
+
+    raw = dict(settings.get("quantization", {}))
+    unknown = set(raw) - _QUANTIZATION_KEYS
+    if unknown:
+        raise ContractError(
+            "unknown quantization setting: " + ", ".join(sorted(unknown))
+        )
+    if not torch.cuda.is_available():
+        raise ContractError(
+            "QLoRA requires a CUDA device; 4-bit kernels are unavailable here"
+        )
+    if raw.get("load_in_4bit", True) is not True:
+        raise ContractError("QLoRA currently only supports load_in_4bit=true")
+    quant_type = str(raw.get("bnb_4bit_quant_type", "nf4"))
+    if quant_type not in {"nf4", "fp4"}:
+        raise ContractError("bnb_4bit_quant_type must be nf4 or fp4")
+    compute = str(raw.get("bnb_4bit_compute_dtype", "bfloat16"))
+    if compute not in {"bfloat16", "float16", "float32"}:
+        raise ContractError(
+            "bnb_4bit_compute_dtype must be bfloat16, float16 or float32"
+        )
+    if compute == "bfloat16" and not torch.cuda.is_bf16_supported():
+        raise ContractError("bnb_4bit_compute_dtype bfloat16 requires BF16 support")
+    return {
+        "load_in_4bit": True,
+        "bnb_4bit_quant_type": quant_type,
+        "bnb_4bit_use_double_quant": bool(raw.get("bnb_4bit_use_double_quant", True)),
+        "bnb_4bit_compute_dtype": compute,
+    }
 
 
 def prepare_qwen_snapshot(
@@ -135,11 +192,12 @@ def load_transfer_bundle(
     snapshot: str | Path, settings: dict[str, Any]
 ) -> tuple[ModelBundle, dict[str, Any]]:
     method = settings.get("training_method", "lora")
-    if method not in {"lora", "full"}:
-        raise ContractError(
-            "training_method must be lora or full; QLoRA is not enabled"
-        )
-    hf = require_hf(peft=method == "lora")
+    if method not in {"lora", "full", "qlora"}:
+        raise ContractError("training_method must be lora, full or qlora")
+    hf = require_hf(peft=method in {"lora", "qlora"})
+    quantization = resolve_quantization(settings) if method == "qlora" else None
+    if quantization is not None:
+        _bitsandbytes_version()
     directory = Path(snapshot)
     manifest = verify_hf_assets(directory)
     expected = {
@@ -158,13 +216,32 @@ def load_transfer_bundle(
         or settings.get("transformers_version") != TRANSFORMERS_VERSION
     ):
         raise ContractError("Qwen model, tokenizer and Transformers revisions disagree")
-    model = hf.AutoModelForCausalLM.from_pretrained(
-        directory,
-        local_files_only=True,
-        trust_remote_code=False,
-        torch_dtype=torch.float32,
-        attn_implementation="sdpa",
-    )
+    if quantization is None:
+        model = hf.AutoModelForCausalLM.from_pretrained(
+            directory,
+            local_files_only=True,
+            trust_remote_code=False,
+            torch_dtype=torch.float32,
+            attn_implementation="sdpa",
+        )
+    else:
+        from transformers import BitsAndBytesConfig
+
+        model = hf.AutoModelForCausalLM.from_pretrained(
+            directory,
+            local_files_only=True,
+            trust_remote_code=False,
+            attn_implementation="sdpa",
+            quantization_config=BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_quant_type=quantization["bnb_4bit_quant_type"],
+                bnb_4bit_use_double_quant=quantization["bnb_4bit_use_double_quant"],
+                bnb_4bit_compute_dtype=getattr(
+                    torch, quantization["bnb_4bit_compute_dtype"]
+                ),
+            ),
+            device_map={"": 0},
+        )
     if model.config.model_type != "qwen3":
         raise ContractError("Transfer route only supports Qwen3")
     tokenizer = HFTokenizer(
@@ -184,11 +261,24 @@ def load_transfer_bundle(
         "revision": manifest["revision"],
         "transformers_version": TRANSFORMERS_VERSION,
         "training_method": method,
-        "lora": lora if method == "lora" else {},
+        "lora": lora if method in {"lora", "qlora"} else {},
     }
-    if method == "lora":
+    if quantization is not None:
+        # Only present for QLoRA, so LoRA/full bindings stay byte-identical to
+        # the artifacts produced before quantization support existed.
+        binding["quantization"] = quantization
+        binding["bitsandbytes_version"] = _bitsandbytes_version()
+    if method in {"lora", "qlora"}:
+        if quantization is not None:
+            # Casts layernorms to fp32 and enables input gradients so the fp16/bf16
+            # 4-bit base can actually backprop into the fp32 LoRA adapters.
+            from peft import prepare_model_for_kbit_training
+
+            model = prepare_model_for_kbit_training(
+                model, use_gradient_checkpointing=False
+            )
         model = apply_lora(model, lora)
-    adapter = HFModelAdapter(model, binding=binding)
+    adapter = HFModelAdapter(model, binding=binding, quantized=quantization is not None)
     metadata = ModelMetadata(
         model_route=ModelRoute.QWEN3_TRANSFER,
         provider="huggingface",

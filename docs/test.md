@@ -23,10 +23,16 @@
 | 下载、续写与基础评测命令 | 已实现 | `run_published_model.py`；公开下载待组织审核 |
 | 统一 `report.md/json` | 已实现 | 发布报告及 [Base 能力成绩单](./experiments/native-60m-capabilities-v1.md) |
 | 公开 ModelScope 仓库 | 待平台 | 组织 `llmlifecyclelab` 审核中 |
-| clean provenance 新版权重 | 待 GPU | v1 保留并披露 dirty-Git 一次性例外 |
+| clean provenance 新版权重 | 已实现 | `runs/native-60m-v11-001`；新规范 11 pass / 0 fail |
 
 当前 checkpoint 是可复现的历史基线，但不是 clean rerun。不得修改旧 manifest
-伪装成 clean；未来有 GPU 时可新建 v1.1。
+伪装成 clean。
+
+clean 重跑已完成：新增
+[`native-60m-baseline-v1.1`](../../configs/reference/native-60m-baseline-v1.1.yaml)
+规范冻结干净源码快照，**v1 规范与 dirty-Git 例外原样保留**。
+`runs/native-60m-v11-001` 在该规范下验收 **11 pass / 0 fail**，
+包括此前唯一失败的 `runtime-provenance`。
 
 ## 2. 统一能力评测
 
@@ -38,6 +44,7 @@
 | Alignment：chosen/rejected 排序、可验证奖励、能力保持 | 已实现 |
 | 随机、规则及阶段前基线 | 已实现 |
 | 同协议纵向成绩单 | 已实现 |
+| 大样本探针套件 lifecycle-v3（140 案例，每类 30+） | 已实现 | `build_evaluation_suite.py`；构建时泄漏检查为 0 |
 
 详细口径见[统一能力评测](./CAPABILITY_EVALUATION_GUIDE.md)。
 这些是小型诊断探针，不是通用排行榜；不命中记忆探针也不证明没有泄漏。
@@ -51,12 +58,17 @@
 | Base 权重初始化与 SFT 完整恢复 | 已实现 |
 | CPU 微型 Base → SFT → 同协议评测 | 已实现 |
 | CLI 续写/多轮对话 | 已实现 |
-| 正式双语 SFT 数据治理与数据卡 | 未开始 |
-| Native-60M-Instruct 训练、报告与发布 | 待 GPU |
+| 正式双语 SFT 数据治理与数据卡 | 已实现 | `build_posttraining_data.py` + `data/posttraining_data_card.json` |
+| Native-60M-Instruct 训练与报告 | 已实现 | `runs/native-sft-60m-001`；见 [GPU 后训练报告](./experiments/native-60m-lifecycle-gpu-v1.md) |
+| Instruct 权重公开发布 | 待平台 | 训练产物已就绪，未建发布包 |
 | 教材第 08–10 章（SFT、DPO、GRPO） | 已实现 |
 
 操作见 [Native SFT 最小闭环](./NATIVE_SFT_GUIDE.md)。
 微型三步实验只证明机制和恢复正确，不证明 60M 模型已经会遵循指令。
+
+正式 60M SFT 已在单张 RTX 4090 上完成 3 个 epoch（626 步，94.6 s），
+同协议指令成功率 0.000 → 0.500，语料 BPB 上升 0.072。
+这只是**在未见模板探针上的改善**，不等于获得可用的通用 Instruct 模型。
 
 ## 4. Native 与 Transfer 双路线
 
@@ -68,9 +80,9 @@
 | Qwen 与 Native 共用 SFT 数据、训练引擎及能力探针 | 已实现 |
 | PEFT LoRA、adapter-only checkpoint 与精确恢复 | 已实现 |
 | 随机微型 Qwen3 CPU 机制实验 | 已实现 |
-| 下载真实 Qwen 权重并运行 LoRA Smoke | 未执行 |
-| QLoRA | 待 GPU |
-| Native Full SFT 与 Qwen LoRA 正式对照 | 待 GPU |
+| 下载真实 Qwen 权重并运行 LoRA Smoke | 已实现 | revision `da87bfb6…`；`runs/qwen3-lora-60m-001` |
+| QLoRA | 已实现 | `training_method: qlora`；`runs/qwen3-qlora-60m-001` |
+| Native Full SFT 与 Qwen LoRA 正式对照 | 已实现 | [报告第 5 节](./experiments/native-60m-lifecycle-gpu-v1.md#5-qwen-迁移与-qlora) |
 
 详细命令见 [HF 导出与 Qwen 迁移](./TRANSFER_GUIDE.md)。
 两条路线共享题目，但报告记录 `model_route`、Tokenizer 和后端；
@@ -85,10 +97,12 @@ Tokenizer 不同的结果分开统计，不能伪装为完全同口径的 delta�
 | DPO 数据、response-only log-prob 与 pair loss | 已实现 |
 | 冻结 SFT reference 分数、恢复门禁、按偏好对计权 | 已实现 |
 | Native DPO CPU 微型训练与精确恢复 | 已实现 |
-| 正式 DPO 数据、训练和能力保持报告 | 待 GPU |
+| 正式 DPO 数据、训练和能力保持报告 | 已实现 | `runs/native-dpo-60m-001`；QA 回退已记录 |
+| DPO on-policy rejected 与 NLL 正则（RPO） | 已实现 | `runs/native-dpo-onpolicy-001`；QA 0.000 → 0.250 |
 | Qwen LoRA DPO | 未开始 |
 | 可验证奖励 GRPO/RLVR 数据、目标与 CPU 精确恢复 | 已实现 |
-| 正式 GRPO/RLVR 数据、GPU 训练和能力保持报告 | 待 GPU |
+| 正式 GRPO/RLVR 数据、GPU 训练和能力保持报告 | 已实现 | `runs/native-grpo-60m-001`；dev 奖励零结果 |
+| GRPO 可解性预筛 | 已实现 | `runs/native-grpo-solvable-001`；零方差 0.59~0.82 → 0.06~0.44 |
 | HF FP32/dynamic INT8 状态、吞吐、RSS 与稳定性基准 | 已实现 |
 | Native/HF 非流式 OpenAI-compatible API | 已实现 |
 | 同源本地 Chat/Completion 界面 | 已实现 |
@@ -99,7 +113,18 @@ GRPO 只接受可程序验证的 exact、integer 或 JSON 奖励，不引入 LLM
 
 ## 受控实验
 
-这些实验需要正式 GPU 训练，因此目前不输出结论：
+结构消融（深窄/浅宽、QK-Norm）的四个 pipeline 配置已就绪，但**尚未在 GPU 上
+成组运行**，因此仍不输出结论。其余四项需要先补数据或实现：
+
+- 中英文数据比例：需要新的数据配方与 Packing，当前双语音料比例固定。
+- Tokenizer 词表大小：需要重训 Tokenizer 并重新 Packing。
+- Full SFT 与 LoRA：Qwen 侧已有 LoRA / QLoRA，缺少同底座的 full 对照。
+- SFT 数据质量与数量的分离对照：需要按同一模板集构造多档规模的数据。
+
+每个实验必须固定非实验变量，先声明资格门槛、随机种子、训练 token 预算和
+评测协议。未通过数据、恢复及 provenance 门禁的 run 不进入横向比较。
+
+以下实验需要正式 GPU 训练，因此目前不输出结论：
 
 1. 固定参数量的深窄与浅宽。
 2. QK-Norm 开关。
@@ -113,8 +138,32 @@ GRPO 只接受可程序验证的 exact、integer 或 JSON 奖励，不引入 LLM
 
 ## 下一步
 
-当前路线中明确规划的 CPU 功能已实现。后续不等待 GPU 时，优先补正式
-SFT/DPO/GRPO 数据治理、数据卡和更多 verifier 测试；这些工作完成前不产生
-新的 60M 能力结论。
+SFT、DPO、GRPO、Qwen LoRA 与 QLoRA 的 GPU 训练已完成，
+成绩单见 [GPU 后训练与迁移报告](./experiments/native-60m-lifecycle-gpu-v1.md)。
 
-正式 SFT、LoRA、DPO、结构消融和权重发布在 GPU 或平台条件具备后补齐。
+针对其中两个负面结果的第二轮修复已完成，记录在
+[负面结果修复](./experiments/native-60m-negative-result-fixes-v1.md)：
+
+1. **GRPO**：诊断更正为"题太难"——87.4% 的 prompt 模型 4 次采样全错。
+   可解性预筛后零方差比例 0.59~0.82 → **0.06~0.44**，训练奖励 0.25~0.37 → 0.48~0.78。
+2. **DPO**：改用 on-policy rejected 消除风格混淆，并加入 NLL 正则（RPO）。
+   `qa.success` 0.000 → **0.250**，能力崩塌机制已缓解。
+3. **探针**：`lifecycle-v2` 把偏好探针换成近似错误对，
+   Base 上 0.833（v1 为饱和的 1.000），不再无法区分。
+
+**但两者都还没有转化为能力探针上的提升。** 原因是探针样本量太小：
+`instruction` 与 `qa` 各只有 4 个 case，0.25 的差异等于 1 个 case 翻转，
+落在噪声内；所有后训练阶段的 v2 偏好准确率都是 0.667，未见收益。
+
+其余待办按优先级：
+
+- ~~扩大探针样本量~~ 已完成：`lifecycle-v3`（140 案例，每类 30+）。
+  重测后确认：SFT 仍是唯一大跃迁；原 DPO 使 format 崩到 0.000；
+  on-policy + NLL 的 DPO 取得最高 preference.accuracy 0.6250。
+- GRPO 扫描 `kl_beta`（第二轮 KL 0.198 偏高）。
+- DPO 扫描 `nll_coefficient`（当前只试了 1.0，NLL 仍缓慢上升）。
+- 结构消融（深窄/浅宽 × QK-Norm）成组 GPU 运行与横向比较。
+- Qwen LoRA DPO；Qwen full 与 LoRA 同底座对照。
+- Instruct 权重发布包与公开仓库（依赖平台审核）。
+
+在探针样本量扩大前，不产生新的后训练能力结论。

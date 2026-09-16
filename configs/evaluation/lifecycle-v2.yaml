@@ -1,0 +1,285 @@
+schema_version: '1.0'
+suite_id: lifecycle-v2
+license: Apache-2.0
+description: 'Project-authored bilingual diagnostic probes, version 2. Identical to
+  lifecycle-v1 except for the preference cases: v1 pairs were separable by the random-init
+  and Base models (accuracy 1.000), so they could not show any alignment gain. v2
+  adds near-miss preference pairs where chosen and rejected share the same format
+  and differ only in correctness. Do not train on these.'
+cases:
+- id: corpus-en-1
+  group: reading-window
+  language: en
+  kind: corpus
+  text: The child opened a book beside the window. Outside, rain fell on the quiet
+    street.
+- id: corpus-zh-1
+  group: reading-window
+  language: zh
+  kind: corpus
+  text: 孩子坐在窗边打开一本书。窗外下着小雨，街道十分安静。
+- id: corpus-en-2
+  group: library-hours
+  language: en
+  kind: corpus
+  text: The public library opens every morning. Readers can borrow books and return
+    them next week.
+- id: corpus-zh-2
+  group: library-hours
+  language: zh
+  kind: corpus
+  text: 公共图书馆每天上午开放。读者可以借阅书籍，并在下周归还。
+- id: continue-en-1
+  group: continue-story
+  language: en
+  kind: continuation
+  prompt: Once upon a time
+- id: continue-zh-1
+  group: continue-story
+  language: zh
+  kind: continuation
+  prompt: 从前
+- id: continue-en-2
+  group: continue-girl
+  language: en
+  kind: continuation
+  prompt: The little girl
+- id: continue-zh-2
+  group: continue-china
+  language: zh
+  kind: continuation
+  prompt: 在中国
+- id: continue-en-3
+  group: continue-boy
+  language: en
+  kind: continuation
+  prompt: One day, a boy
+- id: continue-zh-3
+  group: continue-this-story
+  language: zh
+  kind: continuation
+  prompt: 这个故事
+- id: continue-en-4
+  group: continue-dragon
+  language: en
+  kind: continuation
+  prompt: There was a dragon
+- id: continue-zh-4
+  group: continue-beijing
+  language: zh
+  kind: continuation
+  prompt: 北京是
+- id: extract-en
+  group: bracket-extraction
+  language: en
+  kind: instruction
+  prompt: 'Return only the text inside brackets: [silver].'
+  rule:
+    type: exact
+    answer: silver
+- id: extract-zh
+  group: bracket-extraction
+  language: zh
+  kind: instruction
+  prompt: 只输出方括号里的内容：[星光]。
+  rule:
+    type: exact
+    answer: 星光
+- id: classify-en
+  group: sentiment-choice
+  language: en
+  kind: instruction
+  prompt: Classify 'I love this gift.' Reply only positive or negative.
+  rule:
+    type: exact
+    answer: positive
+    choices:
+    - positive
+    - negative
+- id: classify-zh
+  group: sentiment-choice
+  language: zh
+  kind: instruction
+  prompt: 判断“我讨厌这场演出”的情感。只回答：正面 或 负面。
+  rule:
+    type: exact
+    answer: 负面
+    choices:
+    - 正面
+    - 负面
+- id: count-en
+  group: contextual-count
+  language: en
+  kind: qa
+  prompt: There are two cups on the table. One more cup is added. How many cups? Reply
+    with a digit only.
+  rule:
+    type: exact
+    answer: '3'
+- id: count-zh
+  group: contextual-count
+  language: zh
+  kind: qa
+  prompt: 桌上有两只杯子，又放上一只。现在有几只？只回答阿拉伯数字。
+  rule:
+    type: exact
+    answer: '3'
+- id: fact-en
+  group: contextual-location
+  language: en
+  kind: qa
+  prompt: Mira lives in Rome. Where does Mira live? Reply only Rome or Lima.
+  rule:
+    type: exact
+    answer: Rome
+    choices:
+    - Rome
+    - Lima
+- id: fact-zh
+  group: contextual-location
+  language: zh
+  kind: qa
+  prompt: 小岚住在苏州。小岚住在哪里？只回答：苏州 或 杭州。
+  rule:
+    type: exact
+    answer: 苏州
+    choices:
+    - 苏州
+    - 杭州
+- id: json-en
+  group: json-count
+  language: en
+  kind: format
+  prompt: Return a JSON object with only the key "count" and the integer value 4.
+    No explanation.
+  rule:
+    type: json
+    answer:
+      count: 4
+- id: json-zh
+  group: json-count
+  language: zh
+  kind: format
+  prompt: 只输出 JSON 对象，唯一的键是 "count"，值是整数 4。不要解释。
+  rule:
+    type: json
+    answer:
+      count: 4
+- id: memory-dialogue-en
+  group: dialogue-secret
+  language: en
+  kind: multiturn
+  turns:
+  - prompt: Remember the code word lantern. Reply only OK.
+    rule:
+      type: exact
+      answer: OK
+  - prompt: What was the code word? Reply with that word only.
+    rule:
+      type: exact
+      answer: lantern
+  - prompt: Repeat the same code word once more, with no explanation.
+    rule:
+      type: exact
+      answer: lantern
+- id: memory-dialogue-zh
+  group: dialogue-secret
+  language: zh
+  kind: multiturn
+  turns:
+  - prompt: 请记住暗号：灯塔。只回答：好的
+    rule:
+      type: exact
+      answer: 好的
+  - prompt: 刚才的暗号是什么？只输出暗号。
+    rule:
+      type: exact
+      answer: 灯塔
+  - prompt: 再重复一次同一个暗号，不要解释。
+    rule:
+      type: exact
+      answer: 灯塔
+- id: preference-en-1
+  group: pair-copy
+  language: en
+  kind: preference
+  prompt: 'Copy exactly: moon'
+  chosen: moon
+  rejected: noon
+- id: preference-zh-1
+  group: pair-copy
+  language: zh
+  kind: preference
+  prompt: 原样输出：月光
+  chosen: 月光
+  rejected: 日光
+- id: preference-en-2
+  group: pair-arithmetic
+  language: en
+  kind: preference
+  prompt: What is 2 + 3? Reply with a digit.
+  chosen: '5'
+  rejected: '9'
+- id: preference-zh-2
+  group: pair-arithmetic
+  language: zh
+  kind: preference
+  prompt: 2 加 3 等于多少？只回答数字。
+  chosen: '5'
+  rejected: '9'
+- id: pref-near-arith-en
+  group: pair-arith-near
+  language: en
+  kind: preference
+  prompt: Compute 47 * 6. Reply with the integer only.
+  chosen: '282'
+  rejected: '276'
+- id: pref-near-arith-zh
+  group: pair-arith-near
+  language: zh
+  kind: preference
+  prompt: 计算 47 乘 6。只回答整数。
+  chosen: '282'
+  rejected: '276'
+- id: pref-near-digit-en
+  group: pair-digit-near
+  language: en
+  kind: preference
+  prompt: 'Copy the number below exactly: 401510'
+  chosen: '401510'
+  rejected: '401610'
+- id: pref-near-digit-zh
+  group: pair-digit-near
+  language: zh
+  kind: preference
+  prompt: 请准确复制下面的数字：401510
+  chosen: '401510'
+  rejected: '401610'
+- id: pref-near-json-en
+  group: pair-json-value
+  language: en
+  kind: preference
+  prompt: 'Return JSON only: {"count": 4}'
+  chosen: '{"count":4}'
+  rejected: '{"count":5}'
+- id: pref-near-json-zh
+  group: pair-json-value
+  language: zh
+  kind: preference
+  prompt: '只输出 JSON：{"count": 4}'
+  chosen: '{"count":4}'
+  rejected: '{"count":5}'
+- id: pref-near-unit-en
+  group: pair-unit-near
+  language: en
+  kind: preference
+  prompt: Please convert 3 meters into centimeters. Integer only.
+  chosen: '300'
+  rejected: '30'
+- id: pref-near-unit-zh
+  group: pair-unit-near
+  language: zh
+  kind: preference
+  prompt: 请把 3 米换算成厘米，只回答整数。
+  chosen: '300'
+  rejected: '30'
