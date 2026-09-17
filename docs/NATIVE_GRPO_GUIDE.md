@@ -3,6 +3,10 @@
 这一阶段只处理**可程序验证奖励**（RLVR）。不接入 LLM Judge，也不把格式启发式
 包装成人类偏好。目标是先验证 on-policy rollout、组内优势、KL 和恢复链路。
 
+推荐的 60M 配方使用与 SFT warmup 零 source-group 交集的 800 组公开 MSVAMP
+题目，完整数据与训练流程见
+[公开数据 SFT、DPO 与 GRPO 路线](./PUBLIC_POSTTRAINING_GUIDE.md)。
+
 ## 1. CPU 机制实验
 
 ```bash
@@ -68,46 +72,46 @@ python scripts/data.py prepare \
 advantage_i = (reward_i - group_mean) / (group_std + epsilon)
 ```
 
-随后记录生成时的 old-policy token log-prob，并计算当前 policy/reference
-token log-prob：
+每批 rollout 都由尚未更新的当前 policy 新鲜生成，然后只进行一次优化。
+对 rollout token 计算当前 policy 与冻结 reference 的 log-prob：
 
 ```text
-ratio = exp(logp_policy - logp_old)
-surrogate = min(ratio * advantage, clip(ratio) * advantage)
 KL = exp(logp_ref - logp_policy) - (logp_ref - logp_policy) - 1
-loss = -mean_per_sequence(surrogate - kl_beta * KL)
+objective = logp_policy * advantage - kl_beta * KL
+loss = -mean_per_sequence(objective)
 ```
 
 prompt 和 padding 不参与 loss。先在每个回答内部按有效 token 求平均，再在
 回答之间平均，因此长回答不会仅因 token 更多获得更大权重；
 `tokens_seen` 仍记录实际 rollout token。
 
-当前每批 fresh rollout 只进行一次优化，没有多 epoch 复用 rollout。
-因此第一次前向时 ratio 为 1，clipping 主要作为数值边界；
-它不等价于带 rollout buffer 的大规模 PPO/GRPO 系统。
+由于没有 rollout reuse 或同一 rollout 上的多轮 policy 更新，显式计算
+`old == current` 的 ratio 只能恒为 1，clipping 也不会产生有效约束。
+当前实现因此使用单次 on-policy policy-gradient + reference KL，不伪造
+PPO-style clipping；它不等价于带 rollout buffer 的大规模 PPO/GRPO 系统。
 
 ## 4. 训练与恢复
 
-示例配置默认从 Native SFT checkpoint 开始，也允许从 Native DPO checkpoint
-继续；reference 始终是该父 checkpoint 的冻结副本：
+公开配置从 Native DPO step 21 开始；实现也允许从 Native SFT checkpoint
+开始。reference 始终是该父 checkpoint 的冻结副本：
 
 ```bash
 python scripts/train_grpo.py \
-  --config configs/pipelines/native-grpo-smoke.yaml \
-  --run-id native-grpo-smoke-001
+  --config configs/pipelines/native-grpo-public-60m.yaml \
+  --run-id native-grpo-public-60m-001
 ```
 
 恢复：
 
 ```bash
 python scripts/train_grpo.py \
-  --config configs/pipelines/native-grpo-smoke.yaml \
-  --resume-run native-grpo-smoke-001
+  --config configs/pipelines/native-grpo-public-60m.yaml \
+  --resume-run native-grpo-public-60m-001
 ```
 
 初始化记录绑定父权重、Tokenizer、数据、评测集、采样参数、group size、
-clip、KL 和 advantage epsilon。attention dropout 必须为 0，避免 old/current
-ratio 被 dropout 噪声污染。修改任一项必须创建新实验。
+KL 和 advantage epsilon。attention dropout 必须为 0，保证 policy/reference
+打分不混入 dropout 噪声。修改任一项必须创建新实验。
 
 由于 rollout 长度取决于 EOS，训练预算中的 token/epoch 是
 `prompts × group_size × max_new_tokens` 上界估算；实际
@@ -120,7 +124,6 @@ ratio 被 dropout 噪声污染。修改任一项必须创建新实验。
 - `report_reward_mean` 与 `report_success_rate`；
 - `report_zero_variance_groups`；
 - `report_approx_kl`；
-- `report_clip_fraction`；
 - 实际 rollout token、吞吐和梯度范数。
 
 奖励上升不是充分证据。正式运行还必须用训练外的统一能力评测比较：
@@ -133,7 +136,8 @@ ratio 被 dropout 噪声污染。修改任一项必须创建新实验。
 ## 当前边界
 
 - Native CPU 微型 on-policy GRPO/RLVR 与精确恢复：已验证。
-- 正式数学/格式数据集、GPU 训练和阶段前后报告：未执行。
+- 公开 MSVAMP 数据物化、SFT/GRPO 零组交集、seq512 加载与泄漏门禁：已验证。
+- 公开数据 GPU 训练和阶段前后报告：未执行。
 - Qwen/LoRA GRPO：未实现。
 - 多 epoch rollout reuse、分布式 rollout、独立 vLLM worker：未实现。
 - 当前 verifier 只衡量答案/格式正确性，不代表帮助性、安全性或人类偏好。

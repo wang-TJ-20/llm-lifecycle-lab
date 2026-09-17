@@ -16,7 +16,7 @@
 
 | 实践步骤 | 先读的脚本 | 核心实现 |
 | --- | --- | --- |
-| 准备数据 | `data.py` | `src/llm_lifecycle_lab/data/` |
+| 准备公开预训练与后训练数据 | `data.py` | `src/llm_lifecycle_lab/data/` |
 | 训练 Tokenizer | `train_tokenizer.py` | `src/llm_lifecycle_lab/tokenizer/native.py` |
 | 检查 Tokenizer | `inspect_tokenizer.py` | `NativeTokenizer.encode/decode` |
 | 理解模型规模 | `inspect_model.py` | `src/llm_lifecycle_lab/model/native/` |
@@ -106,6 +106,13 @@ python scripts/build_model_release.py \
 生成带显式基线、语言分层和逐题结果的 `report.json/md`。
 `compare` 仅接受同一协议和分母的成绩单，不把缺失检查当成零分。
 完整命令见[统一能力评测](../docs/CAPABILITY_EVALUATION_GUIDE.md)。
+
+`data.py posttrain-recipes` 查看固定公开后训练配方，
+`fetch-posttrain` 一次物化 SFT、DPO、GRPO 三份规范化 source。命令必须显式接受
+Apache-2.0 与 CC-BY-4.0，随后每个阶段独立执行 `prepare --group-by source_id`。
+`check-posttrain` 在 CPU 上加载全部 split，并检查评测泄漏与跨阶段 source_id 交集。
+完整 hash、规模和 CUDA 顺序见
+[公开数据后训练](../docs/PUBLIC_POSTTRAINING_GUIDE.md)。
 
 `train_sft.py` 继承 Base 权重与 Tokenizer，但重置新阶段的训练状态；
 `--resume-run` 才恢复同一次 SFT 的完整状态。

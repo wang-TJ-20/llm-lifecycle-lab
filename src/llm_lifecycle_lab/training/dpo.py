@@ -6,7 +6,6 @@ import math
 from collections.abc import Callable, Mapping
 from dataclasses import asdict, dataclass
 from functools import partial
-from itertools import zip_longest
 from pathlib import Path
 from typing import Any
 
@@ -29,7 +28,10 @@ from llm_lifecycle_lab.model.bundle import ModelBundle
 from llm_lifecycle_lab.model.native import NativeTransformer, load_native_model_config
 from llm_lifecycle_lab.provenance import capture_runtime_provenance
 from llm_lifecycle_lab.tokenizer import NativeTokenizer
-from llm_lifecycle_lab.training.batching import DeterministicBatchStream
+from llm_lifecycle_lab.training.batching import (
+    DeterministicBatchStream,
+    stable_stratified_subset,
+)
 from llm_lifecycle_lab.training.checkpoint import CheckpointManager
 from llm_lifecycle_lab.training.engine import (
     EngineConfig,
@@ -248,13 +250,13 @@ def run_native_dpo(
         seed=config.seed,
         collate_fn=collate,
     )
-    buckets = [
-        [example for example in splits["dev"] if example["language"] == language]
-        for language in ("en", "zh")
-    ]
-    ordered = [
-        item for pair in zip_longest(*buckets) for item in pair if item is not None
-    ][: engine_config.eval_batches * engine_config.micro_batch_size]
+    ordered = stable_stratified_subset(
+        splits["dev"],
+        limit=engine_config.eval_batches * engine_config.micro_batch_size,
+        strata=("en", "zh"),
+        stratum_field="language",
+        identity_field="pair_id_sha256",
+    )
     evaluation = [
         collate(ordered[start : start + engine_config.micro_batch_size])
         for start in range(0, len(ordered), engine_config.micro_batch_size)

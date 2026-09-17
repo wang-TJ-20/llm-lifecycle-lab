@@ -1,4 +1,7 @@
-"""生成可复现的双语后训练数据（SFT、DPO 与 GRPO）。
+"""生成旧实验复现用的合成双语后训练数据（SFT、DPO 与 GRPO）。
+
+推荐的新训练路线使用 ``scripts/data.py fetch-posttrain`` 下载固定版本的公开数据；
+本脚本仅保留用于复现仓库已有的 synthetic GPU 实验，不是默认数据入口。
 
 数据由本仓库自有的模板与词表确定性生成：不下载外部语料，不使用模型生成，
 也不包含 ``configs/evaluation/lifecycle-v1.yaml`` 中的任何提示、分组或语段。
@@ -8,7 +11,11 @@
 中英文使用同一实例参数的并行表述，因此同一 ``source_id`` 下的两种语言
 天然互为翻译，会被切分逻辑放在同一个 split。
 
-Generate reproducible bilingual post-training data (SFT, DPO and GRPO).
+Generate legacy synthetic bilingual post-training data (SFT, DPO and GRPO).
+
+Use ``scripts/data.py fetch-posttrain`` for the recommended pinned public-data
+route. This script remains only to reproduce the repository's earlier
+synthetic GPU experiments.
 
 The corpus is produced deterministically from project-owned templates and word
 lists: no external download, no model-generated text, and no prompt, group or

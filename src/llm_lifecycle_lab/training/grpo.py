@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from dataclasses import asdict, dataclass
-from itertools import zip_longest
 from pathlib import Path
 from typing import Any
 
@@ -25,7 +24,10 @@ from llm_lifecycle_lab.model.bundle import ModelBundle
 from llm_lifecycle_lab.model.native import NativeTransformer, load_native_model_config
 from llm_lifecycle_lab.provenance import capture_runtime_provenance
 from llm_lifecycle_lab.tokenizer import NativeTokenizer
-from llm_lifecycle_lab.training.batching import DeterministicBatchStream
+from llm_lifecycle_lab.training.batching import (
+    DeterministicBatchStream,
+    stable_stratified_subset,
+)
 from llm_lifecycle_lab.training.checkpoint import CheckpointManager
 from llm_lifecycle_lab.training.engine import (
     EngineConfig,
@@ -91,16 +93,13 @@ def run_native_grpo(
     ):
         raise ConfigError("GRPO model/tokenizer does not match its parent checkpoint")
     if model_config.attention_dropout != 0:
-        raise ConfigError(
-            "GRPO requires attention_dropout=0 for stable old-policy ratios"
-        )
+        raise ConfigError("GRPO requires attention_dropout=0 for deterministic scoring")
     training = dict(config.training)
     settings = GRPOSettings(
         group_size=int(training.pop("group_size", 4)),
         max_new_tokens=int(training.pop("max_new_tokens", 16)),
         temperature=float(training.pop("temperature", 1.0)),
         top_p=float(training.pop("top_p", 1.0)),
-        clip_epsilon=float(training.pop("clip_epsilon", 0.2)),
         kl_beta=float(training.pop("kl_beta", 0.04)),
         advantage_epsilon=float(training.pop("advantage_epsilon", 1e-4)),
     )
@@ -117,7 +116,7 @@ def run_native_grpo(
         evaluation_suite=suite_path,
     )
     initialization = {
-        "mode": "on-policy-new-stage",
+        "mode": "on-policy-group-relative-policy-gradient",
         "parent_checkpoint": metadata.to_dict(),
         "parent_weights_sha256": sha256_file(parent / "model/model.pt"),
         "parent_model_config_sha256": sha256_file(parent / "model/config.json"),
@@ -164,13 +163,13 @@ def run_native_grpo(
         seed=config.seed,
         collate_fn=collate_grpo,
     )
-    buckets = [
-        [example for example in splits["dev"] if example["language"] == language]
-        for language in ("en", "zh")
-    ]
-    ordered = [
-        item for pair in zip_longest(*buckets) for item in pair if item is not None
-    ][: engine_config.eval_batches * engine_config.micro_batch_size]
+    ordered = stable_stratified_subset(
+        splits["dev"],
+        limit=engine_config.eval_batches * engine_config.micro_batch_size,
+        strata=("en", "zh"),
+        stratum_field="language",
+        identity_field="example_id",
+    )
     evaluation = [
         collate_grpo(ordered[start : start + engine_config.micro_batch_size])
         for start in range(0, len(ordered), engine_config.micro_batch_size)

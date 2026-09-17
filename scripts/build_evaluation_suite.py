@@ -40,7 +40,7 @@ from _project_path import add_project_src_to_path
 add_project_src_to_path()
 
 from llm_lifecycle_lab.evaluation.corpus import normalize
-from llm_lifecycle_lab.exceptions import LLMLabError
+from llm_lifecycle_lab.exceptions import DataValidationError, LLMLabError
 
 SUITE_LICENSE = "Apache-2.0"
 DEFAULT_SEED = 31337
@@ -499,25 +499,25 @@ def collect_prompts(cases: list[dict[str, Any]]) -> set[str]:
     return prompts
 
 
-def check_leakage(cases: list[dict[str, Any]], sources: list[Path]) -> dict[str, Any]:
+def check_leakage(cases: list[dict[str, Any]], sources: list[Path]) -> dict[str, int]:
     prompts = collect_prompts(cases)
     groups = {case["group"] for case in cases}
-    report = {}
+    missing = [str(source) for source in sources if not source.is_file()]
+    if missing:
+        raise DataValidationError(
+            "cannot verify evaluation leakage; missing source(s): " + ", ".join(missing)
+        )
+    report: dict[str, int] = {}
     for source in sources:
-        if not source.is_file():
-            report[source.name] = "missing"
-            continue
         hits = 0
         for line in source.read_text(encoding="utf-8").splitlines():
             record = json.loads(line)
             text = record.get("prompt")
             if text is None and record.get("messages"):
                 text = " ".join(m["content"] for m in record["messages"])
-            if (
-                text
-                and normalize(text) in prompts
-                or record.get("template_id") in groups
-            ):
+            if (text and normalize(text) in prompts) or record.get(
+                "template_id"
+            ) in groups:
                 hits += 1
         report[source.name] = hits
     return report
@@ -564,7 +564,7 @@ def main(argv: list[str] | None = None) -> int:
             preference=args.preference,
         )
         leakage = check_leakage(cases, list(args.source))
-        total = sum(value for value in leakage.values() if isinstance(value, int))
+        total = sum(leakage.values())
         if total:
             print(f"error: probe leakage detected: {leakage}", file=sys.stderr)
             return 1

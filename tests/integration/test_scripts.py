@@ -4,6 +4,7 @@ import json
 import os
 import subprocess
 import sys
+from importlib import import_module
 from pathlib import Path
 
 import pytest
@@ -206,6 +207,37 @@ def test_script_error_codes_and_nested_help(tmp_path: Path) -> None:
         expected_code=2,
     )
     assert "config file does not exist" in result.stderr
+
+
+def test_evaluation_suite_builder_fails_when_training_source_is_missing(
+    tmp_path: Path,
+) -> None:
+    result = run_script(
+        "build_evaluation_suite",
+        "--output",
+        "suite.yaml",
+        "--source",
+        "missing-source.jsonl",
+        cwd=tmp_path,
+        expected_code=2,
+    )
+    assert "cannot verify evaluation leakage" in result.stderr
+    assert not (tmp_path / "suite.yaml").exists()
+
+
+def test_onpolicy_builder_appends_assistant_generation_prompt(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.syspath_prepend(str(PROJECT_ROOT / "scripts"))
+    module = import_module("build_onpolicy_preference")
+
+    class RecordingTokenizer:
+        def encode_chat(self, messages, *, add_generation_prompt=False):
+            assert messages == [{"role": "user", "content": "question"}]
+            assert add_generation_prompt is True
+            return [1, 2, 3]
+
+    assert module._encode_prompt(RecordingTokenizer(), "question") == [1, 2, 3]
 
 
 def test_plot_training_curves_writes_available_series(tmp_path: Path) -> None:

@@ -52,7 +52,7 @@
 
 **第十篇 · [用可验证奖励改进采样](./tutorials/10-verifiable-reward-grpo.md)**
 
-用严格程序奖励连接 rollout、组内 advantage、clipping 和 reference KL。
+用严格程序奖励连接 rollout、组内 advantage、单次 policy-gradient 和 reference KL。
 
 ```mermaid
 flowchart TD
@@ -68,6 +68,8 @@ flowchart TD
 
 十篇主线已完整。当前代码已经实现 Native 模型、BPE Tokenizer、磁盘 Packing、
 Pretrain、SFT、DPO、GRPO、恢复和评测，可以先沿操作指南进行实践。
+新的正式后训练默认使用固定 revision 的 OASST1、HelpSteer3 和 MSVAMP，
+见[公开数据 SFT、DPO 与 GRPO 路线](./PUBLIC_POSTTRAINING_GUIDE.md)。
 此外已接入[统一能力评测](./CAPABILITY_EVALUATION_GUIDE.md)和
 [SFT 最小闭环](./NATIVE_SFT_GUIDE.md)，后者完成 CPU 微型训练、阶段前后对照与恢复验证。
 Native → HF 导出、Qwen3 LoRA、Native DPO、可验证奖励 GRPO 和
@@ -92,6 +94,7 @@ Native-60M FP32/INT8 基准也已完成 CPU 验证；本地 Native/HF 模型可�
 | 当前问题 | 对应指南 |
 | --- | --- |
 | 数据从哪里来，怎样下载、切分和打包？ | [数据介绍与准备](./DATA_GUIDE.md) |
+| 怎样用公开数据顺序训练 SFT、DPO、GRPO？ | [公开数据后训练](./PUBLIC_POSTTRAINING_GUIDE.md) |
 | 模型各层怎样连接，张量形状是什么？ | [自有模型介绍](./NATIVE_MODEL_GUIDE.md) |
 | 怎样训练、恢复、评测与排错？ | [Pretrain 训练文档](./NATIVE_PRETRAIN_GUIDE.md) |
 | 如何比较 Base、SFT 和对齐后的能力？ | [统一能力评测](./CAPABILITY_EVALUATION_GUIDE.md) |

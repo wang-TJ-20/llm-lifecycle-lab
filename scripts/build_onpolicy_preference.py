@@ -60,7 +60,7 @@ def _load_records(path: Path) -> list[dict[str, Any]]:
 
 def _encode_prompt(tokenizer: NativeTokenizer, prompt: str) -> list[int]:
     messages = [{"role": "user", "content": prompt}]
-    return list(tokenizer.encode_chat(messages))
+    return list(tokenizer.encode_chat(messages, add_generation_prompt=True))
 
 
 def _sample_policy(

@@ -7,6 +7,11 @@ Pretrain → SFT → DPO / GRPO 后训练，以及 Qwen3-0.6B-Base 真实权重�
 LoRA 与 QLoRA 迁移。所有后训练阶段使用同一份 `lifecycle-v1` 探针和
 `native-chat-v1` 提示协议，因此报告之间可以直接相减。
 
+> 这是旧合成后训练数据与旧 GRPO 目标的历史实验记录。结果保持原样用于复现，
+> 不代表新的 OASST1/HelpSteer3/MSVAMP 公开数据路线；推荐路线见
+> [公开数据后训练](../PUBLIC_POSTTRAINING_GUIDE.md)。
+> 当前 GRPO 实现已移除在单次 fresh rollout 上恒为 1 的伪 ratio/clipping。
+
 > 设备为共享 GPU，同一张卡上还有其它进程；吞吐和显存只描述本次环境，
 > 不代表硬件极限。
 

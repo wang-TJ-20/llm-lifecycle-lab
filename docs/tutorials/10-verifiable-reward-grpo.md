@@ -89,65 +89,50 @@ advantages ≈ [1.732, -0.577, -0.577, -0.577]
 零方差组多可能表示任务过难、过易、采样缺乏多样性，或 verifier/答案有问题。
 这些原因要分别排查，不能只调大学习率。
 
-## 4. old policy、current policy 与 reference
+## 4. current policy 与 reference
 
-每批 fresh rollout 来自更新前的当前 policy。生成后记录 old-policy 的 token
-log-prob，再用当前可训练 policy 计算：
-
-```math
-\rho_t =
-\exp\left(
-\log\pi_\theta(y_t)-\log\pi_{\mathrm{old}}(y_t)
-\right)
-```
-
-裁剪 surrogate：
+每批 fresh rollout 来自更新前的当前 policy，并且只用来做一次优化。
+对已采样回答重新计算当前 policy 的 token log-prob，policy-gradient 项为：
 
 ```math
-\min\left(
-\rho_t A,\;
-\mathrm{clip}(\rho_t,1-\varepsilon,1+\varepsilon)A
-\right)
+\log\pi_\theta(y_t)A
 ```
 
 冻结父 checkpoint 提供 reference。当前实现使用：
 
 ```math
-\mathrm{KL}_t =
-\exp(\log\pi_{\mathrm{ref}}-\log\pi_\theta)
--(\log\pi_{\mathrm{ref}}-\log\pi_\theta)-1
+\begin{aligned}
+\Delta_t &= \log\pi_{\mathrm{ref}}-\log\pi_\theta \\
+\mathrm{KL}_t &= \exp(\Delta_t)-\Delta_t-1
+\end{aligned}
 ```
 
-最终 token 目标是 clipped surrogate 减去 `kl_beta * KL`。
+最终 token 目标是 policy-gradient 项减去 `kl_beta * KL`。
 prompt 与 padding 不参与 loss；先在每条回答内部按有效 token 平均，
 再在 rollout sequence 之间平均。
 
 ```math
-L_{\mathrm{GRPO}}=
--\frac{1}{N}\sum_i
-\frac{1}{|A_i|}
-\sum_{t\in A_i}
-\left[
-\min(\rho_{i,t}A_i,\mathrm{clip}(\rho_{i,t})A_i)
--\beta_{\mathrm{KL}}\mathrm{KL}_{i,t}
-\right]
+\begin{aligned}
+o_{i,t} &= A_i\log\pi_\theta(y_{i,t})
+           -\beta_{\mathrm{KL}}\mathrm{KL}_{i,t} \\
+\ell_i &= -\frac{1}{|T_i|}\sum_{t\in T_i}o_{i,t} \\
+L_{\mathrm{GRPO}} &= \frac{1}{N}\sum_i\ell_i
+\end{aligned}
 ```
 
 这样长回答不会仅因 token 更多获得更大的 sequence 权重，
 但 `tokens_seen` 仍记录实际 rollout token 作为计算量证据。
 
-当前每批 rollout 只更新一次，不进行多 epoch reuse。
-第一次 current log-prob 与 old log-prob 来自同一参数，因此 ratio 起点为 1，
-clipping 主要是明确数值边界。这不是大规模 PPO 服务，也没有独立 rollout worker。
+若在这里额外计算 old-policy log-prob，它与 current 来自同一组未更新参数，
+ratio 必然恒为 1；没有 rollout reuse 时，PPO-style clipping 不会产生有效约束。
+当前实现不记录这个伪 ratio，也不报告 clip fraction。这不是大规模 PPO 服务，
+没有独立 rollout worker 或同一 rollout 上的多轮更新。
 
 ## 5. 为什么 attention dropout 必须为 0
 
-若同一参数、同一输入的 old/current 前向因 dropout mask 不同而产生随机差异，
-ratio 会混入与参数更新无关的噪声。
-
 当前 GRPO 路线要求 attention dropout 为 0，并在 rollout 时临时切到 eval，
-随后恢复 policy 的训练状态。reference 始终冻结并处于 eval。
-这是一项确定性门禁，不依赖模型“自己学会忽略”随机扰动。
+随后恢复 policy 的训练状态。reference 始终冻结并处于 eval，因此 policy/reference
+打分不会混入 dropout 随机噪声。这是一项确定性门禁。
 
 采样仍然需要随机性，但它被显式放在 generation seed 中；
 前向 log-prob 的比较不再额外混入 dropout 随机源。
@@ -190,7 +175,7 @@ fixture 的答案来自模型自己的初始采样，刻意让机制测试产生
 - 父 SFT 或 DPO checkpoint 及其权重；
 - Tokenizer、Data Manifest 和评测 suite；
 - group size、生成 token 上限、temperature、top-p；
-- clip、KL 系数和 advantage epsilon。
+- KL 系数和 advantage epsilon。
 
 恢复还需要完整权重、optimizer、scheduler、RNG、数据位置和计数。
 修改任何绑定项都可能产生另一组 rollout 或另一种目标函数，因此必须新建实验。
@@ -201,7 +186,7 @@ fixture 的答案来自模型自己的初始采样，刻意让机制测试产生
 
 ## 8. 奖励上升之后还要检查什么
 
-训练日志包含 reward mean、success rate、零方差组比例、近似 KL、clip fraction、
+训练日志包含 reward mean、success rate、零方差组比例、近似 KL、
 token 吞吐和梯度范数。它们能诊断训练过程，但不能单独证明能力提升。
 
 正式报告至少还要比较：
@@ -227,7 +212,8 @@ token 吞吐和梯度范数。它们能诊断训练过程，但不能单独证�
 ```
 
 CPU 实验已经覆盖每一阶段的契约、目标函数和精确恢复。
-它们证明机制可运行，不证明 Native-60M 已完成正式 SFT、DPO 或 GRPO。
+固定公开数据的 SFT、DPO、GRPO 准备和 CPU 加载门禁也已完成，但尚未执行
+这条公开路线的 Native-60M CUDA 训练。
 
 后续正式实验应继续沿用同一原则：先固定资格门槛与阶段前基线，
 再训练，最后用同协议报告定向改善和能力保持。没有 GPU 结果时，

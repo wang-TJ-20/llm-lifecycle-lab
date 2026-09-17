@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any
@@ -69,3 +70,52 @@ class DeterministicBatchStream:
         generator = torch.Generator()
         generator.manual_seed(self.seed + epoch)
         return torch.randperm(len(self.dataset), generator=generator).tolist()
+
+
+def stable_stratified_subset(
+    dataset: Sequence[dict[str, Any]],
+    *,
+    limit: int,
+    strata: Sequence[Any],
+    stratum_field: str,
+    identity_field: str,
+) -> list[dict[str, Any]]:
+    """Select a bounded, interleaved subset independently of source order."""
+
+    if limit < len(strata):
+        raise ContractError("subset limit must cover every requested stratum")
+    buckets: dict[Any, list[dict[str, Any]]] = {value: [] for value in strata}
+    for example in dataset:
+        value = example.get(stratum_field)
+        if value not in buckets:
+            raise ContractError(
+                f"evaluation example has unsupported {stratum_field}: {value!r}"
+            )
+        identity = example.get(identity_field)
+        if not isinstance(identity, str) or not identity:
+            raise ContractError(f"evaluation example has no usable {identity_field}")
+        buckets[value].append(example)
+    if any(not bucket for bucket in buckets.values()):
+        raise ContractError("evaluation subset must contain every requested stratum")
+    for bucket in buckets.values():
+        bucket.sort(
+            key=lambda example: hashlib.sha256(
+                example[identity_field].encode("utf-8")
+            ).digest()
+        )
+
+    selected = []
+    offset = 0
+    while len(selected) < limit:
+        added = False
+        for value in strata:
+            bucket = buckets[value]
+            if offset < len(bucket):
+                selected.append(bucket[offset])
+                added = True
+                if len(selected) == limit:
+                    break
+        if not added:
+            break
+        offset += 1
+    return selected

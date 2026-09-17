@@ -6,6 +6,10 @@ SFT 并没有把“预测下一个 token”换成另一种学习问题。关键�
 先有[统一能力评测](./CAPABILITY_EVALUATION_GUIDE.md)，再运行 SFT：
 训练前后使用同一组探针，才能区分 loss 下降、格式变化和实际任务改善。
 
+推荐的 60M 正式路线使用固定公开数据，完整命令见
+[公开数据 SFT、DPO 与 GRPO 路线](./PUBLIC_POSTTRAINING_GUIDE.md)。
+本页的自定义 JSONL 和微型实验用于解释通用契约。
+
 ## 1. 不下载数据，先验证机制
 
 ```bash
@@ -54,6 +58,10 @@ user、system、角色名称、起始标记、回合之间的换行、padding �
 SFT dev loss 同样只度量回答部分，单列中英文，不输出混合整段对话的 BPB。
 
 ## 3. 准备自己的双语对话数据
+
+新公开路线已经从 OASST1 选择 700 条双语人工对话，并加入与 GRPO 严格隔离的
+400 条 MSVAMP integer warmup。若不需要接入自有数据，直接使用
+`data/raw/public-60m-v1/sft/source.jsonl`，不要运行旧的合成数据生成器。
 
 每行一个 JSON 对象，例如：
 
@@ -138,6 +146,7 @@ python scripts/train_sft.py \
 
 重点观察：格式与指令是否改善，中文与英文是否一致，基础 BPB 与续写是否退化。
 不要用训练集回答 loss 下降替代这些证据。当前已验证 CPU 微型链路与精确恢复；
-正式 60M 长跑、GPU 数值对照及 Instruct 权重发布仍需后续数据与算力验证。
+公开数据的 seq512 加载与泄漏门禁也已验证。公开数据 60M CUDA 长跑、阶段前后
+数值对照及 Instruct 权重发布仍待执行；历史合成数据 GPU 报告不替代该验证。
 
 [返回项目首页](../README.md)

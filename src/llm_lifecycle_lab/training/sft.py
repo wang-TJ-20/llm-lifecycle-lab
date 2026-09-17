@@ -5,7 +5,6 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from dataclasses import asdict, dataclass
 from functools import partial
-from itertools import zip_longest
 from pathlib import Path
 from typing import Any
 
@@ -26,7 +25,10 @@ from llm_lifecycle_lab.model.bundle import ModelBundle
 from llm_lifecycle_lab.model.native import NativeTransformer, load_native_model_config
 from llm_lifecycle_lab.provenance import capture_runtime_provenance
 from llm_lifecycle_lab.tokenizer import NativeTokenizer
-from llm_lifecycle_lab.training.batching import DeterministicBatchStream
+from llm_lifecycle_lab.training.batching import (
+    DeterministicBatchStream,
+    stable_stratified_subset,
+)
 from llm_lifecycle_lab.training.checkpoint import CheckpointManager
 from llm_lifecycle_lab.training.engine import (
     EngineConfig,
@@ -152,18 +154,13 @@ def run_native_sft(
         seed=config.seed,
         collate_fn=collate,
     )
-    # Alternate languages in the bounded dev subset, rather than accepting a
-    # first-N subset that accidentally omits one language.
-    buckets = [
-        [x for x in splits["dev"] if int(x["language_ids"][0]) == language]
-        for language in (0, 1)
-    ]
-    indices = [
-        item for pair in zip_longest(*buckets) for item in pair if item is not None
-    ]
-    if engine_config.eval_batches * engine_config.micro_batch_size < 2:
-        raise ConfigError("SFT dev evaluation budget must cover both languages")
-    indices = indices[: engine_config.eval_batches * engine_config.micro_batch_size]
+    indices = stable_stratified_subset(
+        splits["dev"],
+        limit=engine_config.eval_batches * engine_config.micro_batch_size,
+        strata=("en", "zh"),
+        stratum_field="language",
+        identity_field="example_id_sha256",
+    )
     evaluation = [
         collate(indices[start : start + engine_config.micro_batch_size])
         for start in range(0, len(indices), engine_config.micro_batch_size)

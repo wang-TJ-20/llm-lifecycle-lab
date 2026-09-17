@@ -1,5 +1,9 @@
 ## 4. 扩大探针后的重测（lifecycle-v3）
 
+> 本文是旧合成/on-policy 数据路线的历史结果，保留用于复现，不是新的
+> OASST1/HelpSteer3/MSVAMP 公开训练结果。推荐路线见
+> [公开数据后训练](../PUBLIC_POSTTRAINING_GUIDE.md)。
+
 v1/v2 的 instruction 与 qa 各只有 4 个 case，0.25 的差异就是 1 个 case 翻转，
 落在噪声内，因此第二轮无法判断任何后训练阶段的真实效果。
 

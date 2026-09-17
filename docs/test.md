@@ -58,17 +58,20 @@ clean 重跑已完成：新增
 | Base 权重初始化与 SFT 完整恢复 | 已实现 |
 | CPU 微型 Base → SFT → 同协议评测 | 已实现 |
 | CLI 续写/多轮对话 | 已实现 |
-| 正式双语 SFT 数据治理与数据卡 | 已实现 | `build_posttraining_data.py` + `data/posttraining_data_card.json` |
-| Native-60M-Instruct 训练与报告 | 已实现 | `runs/native-sft-60m-001`；见 [GPU 后训练报告](./experiments/native-60m-lifecycle-gpu-v1.md) |
+| 旧合成双语 SFT 数据与数据卡 | 历史复现 | `build_posttraining_data.py` + `data/posttraining_data_card.json` |
+| 旧合成 Native-60M-Instruct 训练与报告 | 历史结果 | `runs/native-sft-60m-001`；见 [GPU 后训练报告](./experiments/native-60m-lifecycle-gpu-v1.md) |
+| OASST1 + MSVAMP 公开 SFT 配方、切分与 CPU 加载 | 已实现 | [`public-60m-v1`](./PUBLIC_POSTTRAINING_GUIDE.md) |
+| 公开数据 Native-60M-Instruct CUDA 训练 | 待 GPU | `native-sft-public-60m.yaml` |
 | Instruct 权重公开发布 | 待平台 | 训练产物已就绪，未建发布包 |
 | 教材第 08–10 章（SFT、DPO、GRPO） | 已实现 |
 
 操作见 [Native SFT 最小闭环](./NATIVE_SFT_GUIDE.md)。
 微型三步实验只证明机制和恢复正确，不证明 60M 模型已经会遵循指令。
 
-正式 60M SFT 已在单张 RTX 4090 上完成 3 个 epoch（626 步，94.6 s），
+旧合成数据 60M SFT 已在单张 RTX 4090 上完成 3 个 epoch（626 步，94.6 s），
 同协议指令成功率 0.000 → 0.500，语料 BPB 上升 0.072。
-这只是**在未见模板探针上的改善**，不等于获得可用的通用 Instruct 模型。
+这只是**在未见模板探针上的历史结果**，不等于公开数据路线已经完成，
+也不等于获得可用的通用 Instruct 模型。
 
 ## 4. Native 与 Transfer 双路线
 
@@ -97,12 +100,16 @@ Tokenizer 不同的结果分开统计，不能伪装为完全同口径的 delta�
 | DPO 数据、response-only log-prob 与 pair loss | 已实现 |
 | 冻结 SFT reference 分数、恢复门禁、按偏好对计权 | 已实现 |
 | Native DPO CPU 微型训练与精确恢复 | 已实现 |
-| 正式 DPO 数据、训练和能力保持报告 | 已实现 | `runs/native-dpo-60m-001`；QA 回退已记录 |
-| DPO on-policy rejected 与 NLL 正则（RPO） | 已实现 | `runs/native-dpo-onpolicy-001`；QA 0.000 → 0.250 |
+| 旧合成 DPO 数据、训练和能力保持报告 | 历史结果 | `runs/native-dpo-60m-001`；QA 回退已记录 |
+| 旧 on-policy rejected 与 NLL 正则（RPO） | 历史结果 | `runs/native-dpo-onpolicy-001`；QA 0.000 → 0.250 |
+| HelpSteer3 公开 DPO 配方、切分与 CPU 加载 | 已实现 | `native-dpo-public-60m.yaml` |
+| 公开数据 DPO CUDA 训练 | 待 GPU | 依赖公开 SFT step 112 |
 | Qwen LoRA DPO | 未开始 |
 | 可验证奖励 GRPO/RLVR 数据、目标与 CPU 精确恢复 | 已实现 |
-| 正式 GRPO/RLVR 数据、GPU 训练和能力保持报告 | 已实现 | `runs/native-grpo-60m-001`；dev 奖励零结果 |
-| GRPO 可解性预筛 | 已实现 | `runs/native-grpo-solvable-001`；零方差 0.59~0.82 → 0.06~0.44 |
+| 旧合成 GRPO/RLVR 数据、GPU 训练和能力保持报告 | 历史结果 | `runs/native-grpo-60m-001`；dev 奖励零结果 |
+| 旧 GRPO 可解性预筛 | 历史结果 | `runs/native-grpo-solvable-001`；零方差 0.59~0.82 → 0.06~0.44 |
+| MSVAMP 公开 GRPO 配方、SFT 零组交集与 CPU 加载 | 已实现 | `native-grpo-public-60m.yaml` |
+| 公开数据 GRPO CUDA 训练 | 待 GPU | 依赖公开 DPO step 21 |
 | HF FP32/dynamic INT8 状态、吞吐、RSS 与稳定性基准 | 已实现 |
 | Native/HF 非流式 OpenAI-compatible API | 已实现 |
 | 同源本地 Chat/Completion 界面 | 已实现 |
@@ -138,8 +145,11 @@ GRPO 只接受可程序验证的 exact、integer 或 JSON 奖励，不引入 LLM
 
 ## 下一步
 
-SFT、DPO、GRPO、Qwen LoRA 与 QLoRA 的 GPU 训练已完成，
+旧合成 SFT、DPO、GRPO 以及 Qwen LoRA 与 QLoRA 的 GPU 训练已完成，
 成绩单见 [GPU 后训练与迁移报告](./experiments/native-60m-lifecycle-gpu-v1.md)。
+推荐的新路线已经完成公开数据准备、配置和 CPU 验证，CUDA 训练尚未执行；
+执行顺序与 fail-fast 门槛见
+[公开数据 SFT、DPO 与 GRPO 路线](./PUBLIC_POSTTRAINING_GUIDE.md)。
 
 针对其中两个负面结果的第二轮修复已完成，记录在
 [负面结果修复](./experiments/native-60m-negative-result-fixes-v1.md)：

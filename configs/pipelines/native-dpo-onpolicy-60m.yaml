@@ -1,3 +1,5 @@
+# Legacy synthetic/on-policy result reproduction only.
+# Use native-dpo-public-60m.yaml for the recommended public-data route.
 schema_version: "1.0"
 model_route: native
 run_profile: learn

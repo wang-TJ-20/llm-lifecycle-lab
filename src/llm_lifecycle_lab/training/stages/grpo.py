@@ -43,7 +43,6 @@ class GRPOSettings:
     max_new_tokens: int = 16
     temperature: float = 1.0
     top_p: float = 1.0
-    clip_epsilon: float = 0.2
     kl_beta: float = 0.04
     advantage_epsilon: float = 1e-4
 
@@ -54,8 +53,6 @@ class GRPOSettings:
             raise ContractError("GRPO max_new_tokens must be positive")
         if self.temperature <= 0 or not 0 < self.top_p <= 1:
             raise ContractError("invalid GRPO sampling settings")
-        if not 0 < self.clip_epsilon < 1:
-            raise ContractError("GRPO clip_epsilon must be in (0, 1)")
         if self.kl_beta < 0 or self.advantage_epsilon <= 0:
             raise ContractError("invalid GRPO KL/advantage settings")
 
@@ -172,21 +169,13 @@ class GRPOObjective:
                 (grouped - means) / (deviations + self.settings.advantage_epsilon)
             ).reshape(-1)
             with torch.no_grad():
-                old_logps, mask = masked_token_logps(
-                    model,
-                    input_ids=input_ids,
-                    labels=labels,
-                    attention_mask=attention_mask,
-                )
                 self.reference.to_device(input_ids.device)
-                reference_logps, reference_mask = masked_token_logps(
+                reference_logps, mask = masked_token_logps(
                     self.reference,
                     input_ids=input_ids,
                     labels=labels,
                     attention_mask=attention_mask,
                 )
-                if not torch.equal(mask, reference_mask):
-                    raise ContractError("policy and reference GRPO masks differ")
         finally:
             model.set_training(was_training)
         current_logps, current_mask = masked_token_logps(
@@ -196,17 +185,11 @@ class GRPOObjective:
             attention_mask=attention_mask,
         )
         if not torch.equal(mask, current_mask):
-            raise ContractError("old and current policy GRPO masks differ")
-        ratio = torch.exp((current_logps - old_logps).clamp(-20, 20))
+            raise ContractError("policy and reference GRPO masks differ")
         advantage = advantages[:, None]
-        unclipped = ratio * advantage
-        clipped = (
-            ratio.clamp(1 - self.settings.clip_epsilon, 1 + self.settings.clip_epsilon)
-            * advantage
-        )
         reference_delta = (reference_logps - current_logps).clamp(-20, 20)
         kl = torch.exp(reference_delta) - reference_delta - 1
-        objective = torch.minimum(unclipped, clipped) - self.settings.kl_beta * kl
+        objective = current_logps * advantage - self.settings.kl_beta * kl
         counts = current_mask.sum(dim=-1)
         per_sequence = (objective * current_mask).sum(dim=-1) / counts
         loss = -per_sequence.mean()
@@ -226,13 +209,6 @@ class GRPOObjective:
                 "report_zero_variance_groups": zero_variance,
                 "report_approx_kl": float(
                     (kl.detach() * current_mask).sum() / current_mask.sum()
-                ),
-                "report_clip_fraction": float(
-                    (
-                        ((ratio.detach() - 1).abs() > self.settings.clip_epsilon)
-                        * current_mask
-                    ).sum()
-                    / current_mask.sum()
                 ),
             },
         )

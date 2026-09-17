@@ -4,6 +4,11 @@ DPO 使用成对偏好数据，让策略相对于冻结 reference 更偏向 chos
 当前实现面向 Native 路线，重点是把数据、数学、reference 与恢复契约做正确；
 正式偏好能力仍需 GPU 训练和统一成绩单验证。
 
+推荐的 60M 配方从固定 revision 的 HelpSteer3 选择 560 个公开偏好对，
+命令与许可见
+[公开数据 SFT、DPO 与 GRPO 路线](./PUBLIC_POSTTRAINING_GUIDE.md)。
+旧的模板偏好对和 on-policy 数据只用于复现历史结果。
+
 ## 1. 先验证机制
 
 不下载数据、不修改已有 run：
@@ -97,24 +102,24 @@ prompt、角色头和 padding 不参与 log-prob。`beta` 必须位于 `(0, 1]`�
 
 ## 5. 运行
 
-先把示例配置中的 SFT checkpoint 和数据路径改为真实路径：
+公开路线完成 SFT step 112 后直接使用已绑定父 checkpoint 的配置：
 
 ```bash
 python scripts/train_dpo.py \
-  --config configs/pipelines/native-dpo-smoke.yaml \
-  --run-id native-dpo-smoke-001
+  --config configs/pipelines/native-dpo-public-60m.yaml \
+  --run-id native-dpo-public-60m-001
 ```
 
 恢复未完成的同一次 run：
 
 ```bash
 python scripts/train_dpo.py \
-  --config configs/pipelines/native-dpo-smoke.yaml \
-  --resume-run native-dpo-smoke-001
+  --config configs/pipelines/native-dpo-public-60m.yaml \
+  --resume-run native-dpo-public-60m-001
 ```
 
 已完成预算的 run 不能追加训练。修改 `beta`、学习率、数据或父 checkpoint
-属于新实验。
+属于新实验。`native-dpo-smoke.yaml` 仍可用于 CPU 机制检查，不用于正式效果结论。
 
 训练日志记录 DPO loss、policy 偏好准确率、reference 偏好准确率及 reward margin。
 这些训练指标只描述当前偏好对；最终结论必须运行统一能力评测，比较：
@@ -126,7 +131,8 @@ python scripts/train_dpo.py \
 ## 当前边界
 
 - Native DPO 数据、目标、冻结 reference、checkpoint 与 CPU 精确恢复：已验证。
-- 正式偏好数据、60M GPU 训练和能力保持报告：未执行。
+- HelpSteer3 公开数据物化、切分、seq512 加载与泄漏门禁：已验证。
+- 公开数据 60M GPU 训练和能力保持报告：未执行。
 - Qwen LoRA DPO：未实现。
 - DPO 不等于安全对齐；四个固定偏好探针不足以说明整体偏好质量。
 - GRPO/RLVR 是下一阶段，只接受程序可验证奖励，不复用 DPO 偏好对冒充奖励。

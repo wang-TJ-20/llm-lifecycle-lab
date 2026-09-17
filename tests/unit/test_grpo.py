@@ -87,6 +87,7 @@ def test_grpo_zero_variance_group_is_finite_and_reference_is_frozen() -> None:
     assert output.metrics["supervised_tokens"] == 12
     assert output.metrics["report_reward_mean"] == 0
     assert output.metrics["report_zero_variance_groups"] == 1
+    assert "report_clip_fraction" not in output.metrics
     assert all(not parameter.requires_grad for parameter in reference.parameters())
 
 
@@ -97,7 +98,6 @@ def test_grpo_zero_variance_group_is_finite_and_reference_is_frozen() -> None:
         {"max_new_tokens": 0},
         {"temperature": 0},
         {"top_p": 2},
-        {"clip_epsilon": 1},
         {"kl_beta": -1},
     ],
 )

@@ -1,28 +1,25 @@
-# Legacy synthetic-data result reproduction only.
-# Use native-dpo-public-60m.yaml for the recommended public-data route.
 schema_version: "1.0"
 model_route: native
 run_profile: learn
-stage: dpo
+stage: sft
 seed: 42
 output_dir: runs
 model:
   provider: native
   model_id: tiny-60m
-  init_checkpoint: runs/native-sft-60m-001/checkpoints/step-00000626
+  init_checkpoint: build/modelscope/native-60m-base-v1
   tokenizer: data/tokenizers/bilingual-60m-v1
 data:
-  manifest: data/prepared/dpo-bilingual-v1/data_manifest.json
-  evaluation_suite: configs/evaluation/lifecycle-v1.yaml
+  manifest: data/prepared/sft-public-60m-v1/data_manifest.json
+  evaluation_suite: configs/evaluation/lifecycle-v3.yaml
 training:
   device: cuda
   dtype: bfloat16
   sequence_length: 512
   micro_batch_size: 16
   gradient_accumulation_steps: 4
-  num_epochs: 1.0
-  learning_rate: 0.000002
-  beta: 0.1
+  num_epochs: 8.0
+  learning_rate: 0.00002
   weight_decay: 0.1
   beta1: 0.9
   beta2: 0.95
@@ -31,5 +28,5 @@ training:
   gradient_clipping: 1.0
   checkpoint_interval: 25
   eval_interval: 25
-  eval_batches: 64
-  log_interval: 10
+  eval_batches: 8
+  log_interval: 5

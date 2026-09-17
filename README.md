@@ -212,7 +212,8 @@ flowchart TD
 | 已实现 | Native/HF 本地非流式 OpenAI-compatible API 与同源聊天界面 |
 | 已完成 | 60M 单卡 RTX 4090 Reference、1 epoch；dev loss 9.8523 → 3.1032 |
 | 已记录例外 | 自动检查 10 pass / 1 provenance fail；项目接受该固定 run，不要求重跑 |
-| 后续方向 | 正式后训练数据治理，以及 SFT/LoRA/DPO/GRPO GPU 验证 |
+| 已实现 | 固定公开数据的 SFT/DPO/GRPO 配方、许可门禁、跨阶段隔离与 CPU 加载验证 |
+| 后续方向 | 公开数据路线的 SFT/DPO/GRPO CUDA 训练与同协议验收 |
 
 第一份冻结基线为
 [`native-60m-baseline-v1`](./configs/reference/native-60m-baseline-v1.yaml)：
@@ -238,11 +239,17 @@ python scripts/sft_experiment.py --mode resume
 操作边界见 [Native SFT 最小闭环](./docs/NATIVE_SFT_GUIDE.md)。
 微型实验只验证机制，不代表已获得可用的 60M Instruct 模型。
 
+新的正式后训练默认使用 OASST1、HelpSteer3 和 MSVAMP 公开数据，不再使用旧的
+模板合成数据。固定 revision、许可、输出 hash、准备命令和三阶段 CUDA 顺序见
+[公开数据 SFT、DPO 与 GRPO 路线](./docs/PUBLIC_POSTTRAINING_GUIDE.md)。
+不带 `public` 的 60M 后训练配置只保留用于复现历史实验。
+
 ## 文档与代码
 
 | 入口 | 用途 |
 | --- | --- |
 | [数据介绍与准备](./docs/DATA_GUIDE.md) | 来源、许可、公开/自有数据、切分、Tokenizer、Packing 与迁移 |
+| [公开数据后训练](./docs/PUBLIC_POSTTRAINING_GUIDE.md) | OASST1/HelpSteer3/MSVAMP 固定配方、隔离、CUDA 顺序与验收 |
 | [自有模型介绍](./docs/NATIVE_MODEL_GUIDE.md) | 模型结构、参数预算、前向、生成与结构消融 |
 | [Pretrain 训练文档](./docs/NATIVE_PRETRAIN_GUIDE.md) | 环境、训练、评测、恢复、Reference 验收与排错 |
 | [统一能力评测](./docs/CAPABILITY_EVALUATION_GUIDE.md) | 固定探针、显式基线、语料重合检查与纵向比较 |

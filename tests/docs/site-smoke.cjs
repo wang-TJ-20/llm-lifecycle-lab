@@ -14,7 +14,7 @@ const finalChapters = [
   { route: "/tutorials/07-resume-and-compare", title: "07 让实验", diagrams: 2, formulas: 0, search: "数据顺序也必须恢复", command: "pretrain_experiment.py --mode" },
   { route: "/tutorials/08-supervised-fine-tuning", title: "08 让 Base", diagrams: 2, formulas: 1, search: "assistant-only 到底屏蔽", command: "sft_experiment.py --mode" },
   { route: "/tutorials/09-direct-preference-optimization", title: "09 用偏好", diagrams: 1, formulas: 5, search: "policy 与 reference 各自", command: "dpo_experiment.py --mode" },
-  { route: "/tutorials/10-verifiable-reward-grpo", title: "10 用可验证", diagrams: 1, formulas: 5, search: "组内 advantage 在比较", command: "grpo_experiment.py --mode" },
+  { route: "/tutorials/10-verifiable-reward-grpo", title: "10 用可验证", diagrams: 1, formulas: 4, search: "组内 advantage 在比较", command: "grpo_experiment.py --mode" },
 ];
 const expectedFigures = new Map([
   ["/tutorials/01-first-parameter-update", 4],

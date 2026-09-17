@@ -173,6 +173,8 @@ def load_sft_splits(
                 sequence_length=sequence_length,
                 language=row.get("language", ""),
             )
+            example["example_id_sha256"] = digest({"id": row["id"]})
+            example["language"] = row["language"]
             examples.append(example)
             language_counts[row["language"]] += 1
         if not examples or not all(language_counts.values()):

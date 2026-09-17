@@ -25,9 +25,24 @@
 `prepare` 不会自动训练 Tokenizer，`pack` 也不会自动下载原始数据。
 必须按这个顺序完成前置产物。上述 `data/` 全部为本地产物，不进入 Git。
 
+后训练使用另一条公开数据流：
+
+```text
+OASST1 + HelpSteer3 + MSVAMP
+  -> fetch-posttrain -> SFT/DPO/GRPO source.jsonl
+  -> prepare --group-by source_id -> 三份 Data Manifest
+```
+
+后训练不执行 packing，也不重训 Base Tokenizer。固定公开来源、许可、跨阶段隔离、
+本地准备和远程 CUDA 命令见
+[公开数据 SFT、DPO 与 GRPO 路线](./PUBLIC_POSTTRAINING_GUIDE.md)。
+
 ## 2. 默认用什么数据
 
 ### 2.1 来源与边界
+
+本节的 SimpleStories/Wikipedia 配方是 **Pretrain 默认数据**；SFT、DPO、GRPO
+默认公开配方不使用它们。
 
 | 语言 | 数据集 | 内容 | 许可 |
 | --- | --- | --- | --- |

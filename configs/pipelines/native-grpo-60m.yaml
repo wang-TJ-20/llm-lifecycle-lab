@@ -1,3 +1,5 @@
+# Legacy synthetic-data result reproduction only.
+# Use native-grpo-public-60m.yaml for the recommended public-data route.
 schema_version: "1.0"
 model_route: native
 run_profile: learn
@@ -29,7 +31,6 @@ training:
   max_new_tokens: 16
   temperature: 1.0
   top_p: 1.0
-  clip_epsilon: 0.2
   kl_beta: 0.04
   advantage_epsilon: 0.0001
   weight_decay: 0.1

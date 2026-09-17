@@ -165,7 +165,6 @@ def run_experiment(root: Path, *, mode: str) -> dict:
             "max_new_tokens": 4,
             "temperature": 1.0,
             "top_p": 1.0,
-            "clip_epsilon": 0.2,
             "kl_beta": 0.04,
             "advantage_epsilon": 1e-4,
         },

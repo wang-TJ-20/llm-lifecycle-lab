@@ -21,6 +21,7 @@
 
 - **操作与原理参考**
   - [数据介绍与准备](/DATA_GUIDE)
+  - [公开数据 SFT/DPO/GRPO](/PUBLIC_POSTTRAINING_GUIDE)
   - [自有模型介绍](/NATIVE_MODEL_GUIDE)
   - [Pretrain 训练文档](/NATIVE_PRETRAIN_GUIDE)
   - [统一能力评测](/CAPABILITY_EVALUATION_GUIDE)
