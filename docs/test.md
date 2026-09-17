@@ -61,7 +61,7 @@ clean 重跑已完成：新增
 | 旧合成双语 SFT 数据与数据卡 | 历史复现 | `build_posttraining_data.py` + `data/posttraining_data_card.json` |
 | 旧合成 Native-60M-Instruct 训练与报告 | 历史结果 | `runs/native-sft-60m-001`；见 [GPU 后训练报告](./experiments/native-60m-lifecycle-gpu-v1.md) |
 | OASST1 + MSVAMP 公开 SFT 配方、切分与 CPU 加载 | 已实现 | [`public-60m-v1`](./PUBLIC_POSTTRAINING_GUIDE.md) |
-| 公开数据 Native-60M-Instruct CUDA 训练 | 待 GPU | `native-sft-public-60m.yaml` |
+| 公开数据 Native-60M-Instruct CUDA 训练 | 已完成 | 112 步；dev loss 5.1526 → 4.4969；见[公开数据后训练报告](./experiments/native-60m-public-posttrain-v1.md) |
 | Instruct 权重公开发布 | 待平台 | 训练产物已就绪，未建发布包 |
 | 教材第 08–10 章（SFT、DPO、GRPO） | 已实现 |
 
@@ -72,6 +72,11 @@ clean 重跑已完成：新增
 同协议指令成功率 0.000 → 0.500，语料 BPB 上升 0.072。
 这只是**在未见模板探针上的历史结果**，不等于公开数据路线已经完成，
 也不等于获得可用的通用 Instruct 模型。
+
+公开数据路线的 SFT 已在单张 RTX 4090 上完成 8 个 epoch（112 步，27.7 s）：
+dev loss 5.1526 → 4.4969，语料 BPB 2.035306 → 2.008218，
+但 `lifecycle-v3` 的指令、格式、问答、多轮成功率仍为 0.000。
+**训练目标改善不等于已获得可用的 Instruct 模型。**
 
 ## 4. Native 与 Transfer 双路线
 
@@ -109,7 +114,7 @@ Tokenizer 不同的结果分开统计，不能伪装为完全同口径的 delta�
 | 旧合成 GRPO/RLVR 数据、GPU 训练和能力保持报告 | 历史结果 | `runs/native-grpo-60m-001`；dev 奖励零结果 |
 | 旧 GRPO 可解性预筛 | 历史结果 | `runs/native-grpo-solvable-001`；零方差 0.59~0.82 → 0.06~0.44 |
 | MSVAMP 公开 GRPO 配方、SFT 零组交集与 CPU 加载 | 已实现 | `native-grpo-public-60m.yaml` |
-| 公开数据 GRPO CUDA 训练 | 待 GPU | 依赖公开 DPO step 21 |
+| 公开数据 GRPO CUDA 训练 | 已完成（零结果） | 161 步；未通过第 6 节预注册门槛；见[公开数据后训练报告](./experiments/native-60m-public-posttrain-v1.md) |
 | HF FP32/dynamic INT8 状态、吞吐、RSS 与稳定性基准 | 已实现 |
 | Native/HF 非流式 OpenAI-compatible API | 已实现 |
 | 同源本地 Chat/Completion 界面 | 已实现 |

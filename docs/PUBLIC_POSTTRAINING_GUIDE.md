@@ -242,3 +242,8 @@ DPO 与 GRPO 使用相同命令，分别替换 checkpoint、输出目录和前�
 最终用 `evaluate_capabilities.py compare` 生成纵向成绩单。只有训练目标改善且
 instruction、format、QA、multiturn 和 corpus BPB 的非定向退化在预先声明范围内，
 该阶段才进入后续比较；训练 loss 下降本身不构成通过。
+
+本路线第一次完整训练的结果、资格门槛判定与边界记录在
+[公开数据后训练报告](./experiments/native-60m-public-posttrain-v1.md)：
+SFT dev loss 5.1526 → 4.4969，DPO dev 偏好损失 0.6915 → 0.6825，
+GRPO 未通过第 6 节门槛，记为预注册零结果。

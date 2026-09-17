@@ -9,14 +9,13 @@ __pycache__/
 dist/
 build/
 
-# Pinned upstream snapshots (Qwen weights and tokenizer); re-download, never commit
-/artifacts/
-
 # Local experiment outputs
 /data/
 /runs/
 /checkpoints/
 /wandb/
+# Pinned upstream snapshots (Qwen weights and tokenizer); re-download, never commit
+/artifacts/
 *.pt
 *.pth
 *.safetensors

@@ -18,6 +18,7 @@
   - [60M CUDA Reference v1](/experiments/native-60m-baseline-v1)
   - [60M 能力成绩单 v1](/experiments/native-60m-capabilities-v1)
   - [60M CPU FP32 / INT8 v1](/experiments/native-60m-cpu-inference-v1)
+  - [公开数据 60M 后训练 v1](/experiments/native-60m-public-posttrain-v1)
 
 - **操作与原理参考**
   - [数据介绍与准备](/DATA_GUIDE)

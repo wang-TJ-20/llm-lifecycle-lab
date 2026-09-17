@@ -213,7 +213,8 @@ flowchart TD
 | 已完成 | 60M 单卡 RTX 4090 Reference、1 epoch；dev loss 9.8523 → 3.1032 |
 | 已记录例外 | 自动检查 10 pass / 1 provenance fail；项目接受该固定 run，不要求重跑 |
 | 已实现 | 固定公开数据的 SFT/DPO/GRPO 配方、许可门禁、跨阶段隔离与 CPU 加载验证 |
-| 后续方向 | 公开数据路线的 SFT/DPO/GRPO CUDA 训练与同协议验收 |
+| 已完成 | 公开数据路线的 SFT/DPO CUDA 训练与同协议验收；GRPO 记为预注册零结果 |
+| 后续方向 | GRPO 难度分层或 `kl_beta` 对照，以及 Instruct 权重发布 |
 
 第一份冻结基线为
 [`native-60m-baseline-v1`](./configs/reference/native-60m-baseline-v1.yaml)：
