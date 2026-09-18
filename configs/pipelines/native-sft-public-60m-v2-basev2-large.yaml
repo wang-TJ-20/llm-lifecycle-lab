@@ -1,0 +1,32 @@
+schema_version: "1.0"
+model_route: native
+run_profile: learn
+stage: sft
+seed: 42
+output_dir: runs
+model:
+  provider: native
+  model_id: tiny-60m
+  init_checkpoint: runs/native-60m-base-expanded-v2-s42/checkpoints/from-training-result
+  tokenizer: data/tokenizers/bilingual-60m-v1
+data:
+  manifest: data/prepared/sft-public-60m-v2/data_manifest.json
+  evaluation_suite: configs/evaluation/lifecycle-v3.yaml
+training:
+  device: cuda
+  dtype: bfloat16
+  sequence_length: 512
+  micro_batch_size: 16
+  gradient_accumulation_steps: 4
+  max_train_tokens: 2000000
+  learning_rate: 0.00002
+  weight_decay: 0.1
+  beta1: 0.9
+  beta2: 0.95
+  warmup_steps: 10
+  min_lr_ratio: 0.1
+  gradient_clipping: 1.0
+  checkpoint_interval: 50
+  eval_interval: 50
+  eval_batches: 16
+  log_interval: 5

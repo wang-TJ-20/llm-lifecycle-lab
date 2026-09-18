@@ -35,13 +35,23 @@ _COMMIT_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 _ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]{0,127}$")
 _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 _CONTROL_TOKEN_PATTERN = re.compile(r"<\|(?:pad|bos|eos|unk|chat_start|chat_end)\|>")
-_SOURCE_IDS = ("oasst1", "helpsteer3", "msvamp")
 _STAGES = (RecordKind.SFT, RecordKind.DPO, RecordKind.GRPO)
+_TRANSFORM_STAGES = {
+    "oasst-ranked-conversation-v1": ("sft",),
+    "dolly-single-turn-sft-v1": ("sft",),
+    "hc3-human-single-turn-sft-v1": ("sft",),
+    "helpsteer3-single-turn-preference-v1": ("dpo",),
+    "hh-helpful-single-turn-preference-v1": ("dpo",),
+    "cvalues-helpful-single-turn-preference-v1": ("dpo",),
+    "msvamp-parallel-integer-v1": ("sft", "grpo"),
+}
 
 
 @dataclass(frozen=True, slots=True)
 class PosttrainingSourceRecipe(JsonContract):
     source_id: str
+    transform: str
+    stages: tuple[str, ...]
     repository: str
     revision: str
     upstream_file: str
@@ -53,6 +63,15 @@ class PosttrainingSourceRecipe(JsonContract):
     def __post_init__(self) -> None:
         if not _ID_PATTERN.fullmatch(self.source_id):
             raise ConfigError(f"invalid post-training source_id: {self.source_id}")
+        if self.transform not in _TRANSFORM_STAGES:
+            raise ConfigError(
+                f"unsupported post-training transform: {self.transform}"
+            )
+        if self.stages != _TRANSFORM_STAGES[self.transform]:
+            expected = ", ".join(_TRANSFORM_STAGES[self.transform])
+            raise ConfigError(
+                f"post-training source {self.source_id} stages must be {expected}"
+            )
         for name in (
             "repository",
             "upstream_file",
@@ -67,7 +86,7 @@ class PosttrainingSourceRecipe(JsonContract):
             )
         if not _SHA256_PATTERN.fullmatch(self.upstream_file_sha256):
             raise ConfigError("post-training upstream file SHA-256 is invalid")
-        if self.file_format not in {"parquet", "jsonl", "jsonl.gz"}:
+        if self.file_format not in {"parquet", "json", "jsonl", "jsonl.gz"}:
             raise ConfigError(
                 f"unsupported post-training source format: {self.file_format}"
             )
@@ -79,6 +98,8 @@ class PosttrainingSourceRecipe(JsonContract):
                 raise ConfigError("only provider=huggingface is currently supported")
             return cls(
                 source_id=str(value["source_id"]),
+                transform=str(value["transform"]),
+                stages=tuple(str(item) for item in value["stages"]),
                 repository=str(value["repository"]),
                 revision=str(value["revision"]),
                 upstream_file=str(value["file"]),
@@ -99,6 +120,7 @@ class PublicPosttrainingRecipe(JsonContract):
     description: str
     sources: tuple[PosttrainingSourceRecipe, ...]
     selection: Mapping[str, Any]
+    expected_records: Mapping[str, int]
     expected_source_sha256: Mapping[str, str | None]
     schema_version: str = SCHEMA_VERSION
 
@@ -110,15 +132,29 @@ class PublicPosttrainingRecipe(JsonContract):
         if not self.description.strip():
             raise ConfigError("public post-training description must not be empty")
         source_ids = tuple(source.source_id for source in self.sources)
-        if source_ids != _SOURCE_IDS:
+        if not source_ids or len(source_ids) != len(set(source_ids)):
+            raise ConfigError("post-training source IDs must be non-empty and unique")
+        if set(self.selection) != set(source_ids):
             raise ConfigError(
-                "post-training sources must be ordered as " + ", ".join(_SOURCE_IDS)
+                "post-training selection keys must exactly match source IDs"
             )
-        _validate_selection(self.selection)
+        _validate_selection(self.sources, self.selection)
         expected_keys = {stage.value for stage in _STAGES}
-        if set(self.expected_source_sha256) != expected_keys:
+        if (
+            set(self.expected_records) != expected_keys
+            or set(self.expected_source_sha256) != expected_keys
+        ):
             raise ConfigError(
-                "post-training output hashes must declare sft, dpo, and grpo"
+                "post-training outputs must declare sft, dpo, and grpo"
+            )
+        if any(
+            not isinstance(value, int)
+            or isinstance(value, bool)
+            or value <= 0
+            for value in self.expected_records.values()
+        ):
+            raise ConfigError(
+                "post-training expected record counts must be positive integers"
             )
         for stage, value in self.expected_source_sha256.items():
             if value is not None and not _SHA256_PATTERN.fullmatch(value):
@@ -129,6 +165,11 @@ class PublicPosttrainingRecipe(JsonContract):
             self,
             "selection",
             MappingProxyType(_copy_mapping(self.selection)),
+        )
+        object.__setattr__(
+            self,
+            "expected_records",
+            MappingProxyType(dict(self.expected_records)),
         )
         object.__setattr__(
             self,
@@ -159,6 +200,12 @@ class PublicPosttrainingRecipe(JsonContract):
                     for item in raw_sources
                 ),
                 selection=_require_mapping(value["selection"], "selection"),
+                expected_records={
+                    stage.value: int(
+                        _require_mapping(outputs[stage.value], stage.value)["records"]
+                    )
+                    for stage in _STAGES
+                },
                 expected_source_sha256={
                     stage.value: (
                         str(
@@ -204,6 +251,8 @@ class PublicPosttrainingSourceManifest(JsonContract):
     source_file: str
     source_sha256: str
     loader_versions: Mapping[str, str]
+    source_records: Mapping[str, int] = field(default_factory=dict)
+    task_records: Mapping[str, int] = field(default_factory=dict)
     created_at: str = field(default_factory=utc_now)
     schema_version: str = SCHEMA_VERSION
 
@@ -228,6 +277,17 @@ class PublicPosttrainingSourceManifest(JsonContract):
             raise DataValidationError(
                 "post-training source must contain both en and zh"
             )
+        for name, counts in (
+            ("source_records", self.source_records),
+            ("task_records", self.task_records),
+        ):
+            if counts and (
+                sum(counts.values()) != self.records
+                or any(not key or value <= 0 for key, value in counts.items())
+            ):
+                raise DataValidationError(
+                    f"invalid post-training {name} counts"
+                )
         if self.source_file != "source.jsonl":
             raise DataValidationError("post-training source_file must be source.jsonl")
         if not _SHA256_PATTERN.fullmatch(self.source_sha256):
@@ -251,6 +311,16 @@ class PublicPosttrainingSourceManifest(JsonContract):
             self,
             "loader_versions",
             MappingProxyType(dict(self.loader_versions)),
+        )
+        object.__setattr__(
+            self,
+            "source_records",
+            MappingProxyType(dict(self.source_records)),
+        )
+        object.__setattr__(
+            self,
+            "task_records",
+            MappingProxyType(dict(self.task_records)),
         )
         if self.schema_version != SCHEMA_VERSION:
             raise DataValidationError(
@@ -289,6 +359,20 @@ class PublicPosttrainingSourceManifest(JsonContract):
                 for name, version in _require_mapping(
                     value["loader_versions"],
                     "manifest.loader_versions",
+                ).items()
+            },
+            source_records={
+                str(name): int(count)
+                for name, count in _require_mapping(
+                    value.get("source_records", {}),
+                    "manifest.source_records",
+                ).items()
+            },
+            task_records={
+                str(name): int(count)
+                for name, count in _require_mapping(
+                    value.get("task_records", {}),
+                    "manifest.task_records",
                 ).items()
             },
             created_at=str(value["created_at"]),
@@ -451,6 +535,31 @@ def materialize_public_posttraining(
                 )
                 for language in ("en", "zh")
             }
+            source_records = {
+                source.source_id: sum(
+                    record.get("metadata", {}).get("source")
+                    == _source_uri(source)
+                    for record in records[stage]
+                )
+                for source in used_sources
+            }
+            source_records = {
+                name: count for name, count in source_records.items() if count
+            }
+            task_records: dict[str, int] = {}
+            for record in records[stage]:
+                metadata = record.get("metadata", {})
+                task = str(
+                    metadata.get("task")
+                    or {
+                        "oasst-ranked-conversation-v1": "conversation",
+                        "helpsteer3-single-turn-preference-v1": (
+                            "general-preference"
+                        ),
+                        "msvamp-parallel-integer-v1": "math-verifiable",
+                    }.get(str(metadata.get("transform")), "unspecified")
+                )
+                task_records[task] = task_records.get(task, 0) + 1
             manifest = PublicPosttrainingSourceManifest(
                 manifest_type="public-posttraining-source",
                 recipe_id=recipe.recipe_id,
@@ -465,6 +574,8 @@ def materialize_public_posttraining(
                 source_file=source_path.name,
                 source_sha256=source_sha256,
                 loader_versions=loader_versions,
+                source_records=source_records,
+                task_records=task_records,
             )
             _write_json(stage_path / "source_manifest.json", manifest.to_dict())
             stage_manifests.append(manifest)
@@ -534,18 +645,22 @@ def _load_posttraining_records(
     dict[str, str],
 ]:
     source_paths, loader_versions = _download_sources(recipe)
-    oasst_rows = _read_oasst(source_paths["oasst1"])
-    helpsteer_rows = _read_jsonl_gzip(source_paths["helpsteer3"])
-    msvamp_rows = _read_jsonl(source_paths["msvamp"])
-
-    oasst, _ = _transform_oasst(oasst_rows, recipe)
-    dpo, _ = _transform_helpsteer(helpsteer_rows, recipe)
-    msvamp_sft, grpo = _transform_msvamp(msvamp_rows, recipe)
-    records = {
-        RecordKind.SFT: sorted((*oasst, *msvamp_sft), key=lambda row: row["id"]),
-        RecordKind.DPO: sorted(dpo, key=lambda row: row["id"]),
-        RecordKind.GRPO: sorted(grpo, key=lambda row: row["id"]),
+    records: dict[RecordKind, list[dict[str, Any]]] = {
+        stage: [] for stage in _STAGES
     }
+    for source in recipe.sources:
+        rows = _read_source_rows(source_paths[source.source_id], source)
+        transformed = _transform_source(rows, recipe, source)
+        for stage, stage_records in transformed.items():
+            records[stage].extend(stage_records)
+    for stage in _STAGES:
+        records[stage].sort(key=lambda row: row["id"])
+        expected = recipe.expected_records[stage.value]
+        if len(records[stage]) != expected:
+            raise DataValidationError(
+                f"public post-training {stage.value} produced "
+                f"{len(records[stage])} records; expected {expected}"
+            )
     return records, loader_versions
 
 
@@ -642,6 +757,31 @@ def _read_jsonl(path: Path) -> Iterable[Mapping[str, Any]]:
     return rows()
 
 
+def _read_json(path: Path) -> Iterable[Mapping[str, Any]]:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise DataValidationError(f"cannot read JSON {path}: {exc}") from exc
+    if not isinstance(value, list) or not all(
+        isinstance(item, Mapping) for item in value
+    ):
+        raise DataValidationError(f"JSON source {path} must contain an object list")
+    return value
+
+
+def _read_source_rows(
+    path: Path,
+    source: PosttrainingSourceRecipe,
+) -> Iterable[Mapping[str, Any]]:
+    readers = {
+        "parquet": _read_oasst,
+        "json": _read_json,
+        "jsonl": _read_jsonl,
+        "jsonl.gz": _read_jsonl_gzip,
+    }
+    return readers[source.file_format](path)
+
+
 def _parse_json_lines(lines: Iterable[str], path: Path) -> Iterable[Mapping[str, Any]]:
     for line_number, line in enumerate(lines, start=1):
         if not line.strip():
@@ -662,12 +802,16 @@ def _parse_json_lines(lines: Iterable[str], path: Path) -> Iterable[Mapping[str,
 def _transform_oasst(
     rows: Iterable[Mapping[str, Any]],
     recipe: PublicPosttrainingRecipe,
+    source: PosttrainingSourceRecipe | None = None,
 ) -> tuple[list[dict[str, Any]], int]:
-    config = _require_mapping(recipe.selection["oasst1"], "selection.oasst1")
+    source = source or recipe.source("oasst1")
+    config = _require_mapping(
+        recipe.selection[source.source_id],
+        f"selection.{source.source_id}",
+    )
     per_language = int(config["records_per_language"])
     max_messages = int(config["max_messages"])
     max_characters = int(config["max_characters"])
-    source = recipe.source("oasst1")
     values = [dict(row) for row in rows]
     by_id: dict[str, dict[str, Any]] = {}
     for row in values:
@@ -712,16 +856,18 @@ def _transform_oasst(
         ]
         record = {
             "id": _record_id(source, "sft", message_id, language),
-            "source_id": f"oasst1:{tree_id}",
+            "source_id": f"{source.source_id}:{tree_id}",
             "language": language,
             "messages": messages,
             "metadata": {
                 "source": _source_uri(source),
-                "transform": "oasst-ranked-conversation-v1",
+                "transform": source.transform,
                 "upstream_message_id": message_id,
             },
         }
-        key = _selection_key(recipe.recipe_id, "oasst1", language, message_id)
+        key = _selection_key(
+            recipe.recipe_id, source.source_id, language, message_id
+        )
         candidates[language].append((key, record))
 
     selected = []
@@ -794,14 +940,16 @@ def _valid_oasst_chain(
 def _transform_helpsteer(
     rows: Iterable[Mapping[str, Any]],
     recipe: PublicPosttrainingRecipe,
+    source: PosttrainingSourceRecipe | None = None,
 ) -> tuple[list[dict[str, Any]], int]:
+    source = source or recipe.source("helpsteer3")
     config = _require_mapping(
-        recipe.selection["helpsteer3"],
-        "selection.helpsteer3",
+        recipe.selection[source.source_id],
+        f"selection.{source.source_id}",
     )
     per_language = int(config["records_per_language"])
     max_characters = int(config["max_characters"])
-    source = recipe.source("helpsteer3")
+    context_policy = config["context_messages"]
     language_map = {"english": "en", "chinese": "zh"}
     candidates: dict[str, list[tuple[str, dict[str, Any]]]] = {
         "en": [],
@@ -818,9 +966,10 @@ def _transform_helpsteer(
         if (
             language is None
             or not isinstance(context, list)
-            or len(context) != 1
-            or not isinstance(context[0], Mapping)
-            or context[0].get("role") != "user"
+            or not context
+            or (context_policy == 1 and len(context) != 1)
+            or not isinstance(context[-1], Mapping)
+            or context[-1].get("role") != "user"
             or not isinstance(preference, (int, float))
             or isinstance(preference, bool)
             or preference == 0
@@ -829,7 +978,7 @@ def _transform_helpsteer(
         ):
             skipped += 1
             continue
-        prompt = _clean_text(context[0].get("content"))
+        prompt = _clean_text(context[-1].get("content"))
         if (
             prompt is None
             or _CONTROL_TOKEN_PATTERN.search(prompt)
@@ -854,7 +1003,7 @@ def _transform_helpsteer(
             skipped += 1
             continue
         seen_pairs.add(identity)
-        upstream_id = f"helpsteer3:{identity}"
+        upstream_id = f"{source.source_id}:{identity}"
         record = {
             "id": _record_id(source, "dpo", identity, language),
             "source_id": upstream_id,
@@ -864,12 +1013,14 @@ def _transform_helpsteer(
             "rejected": rejected,
             "metadata": {
                 "source": _source_uri(source),
-                "transform": "helpsteer3-single-turn-preference-v1",
+                "transform": source.transform,
                 "domain": str(row.get("domain", "")),
                 "preference_strength": abs(float(preference)),
             },
         }
-        key = _selection_key(recipe.recipe_id, "helpsteer3", language, identity)
+        key = _selection_key(
+            recipe.recipe_id, source.source_id, language, identity
+        )
         candidates[language].append((key, record))
 
     selected = []
@@ -886,14 +1037,271 @@ def _transform_helpsteer(
     return selected, skipped
 
 
+def _transform_dolly(
+    rows: Iterable[Mapping[str, Any]],
+    recipe: PublicPosttrainingRecipe,
+    source: PosttrainingSourceRecipe,
+) -> tuple[list[dict[str, Any]], int]:
+    config = _require_mapping(
+        recipe.selection[source.source_id],
+        f"selection.{source.source_id}",
+    )
+    required = int(config["records"])
+    max_characters = int(config["max_characters"])
+    candidates: list[tuple[str, dict[str, Any]]] = []
+    seen = set()
+    skipped = 0
+    for row in rows:
+        instruction = _clean_text(row.get("instruction"))
+        context = _clean_text(row.get("context"))
+        response = _clean_text(row.get("response"))
+        if instruction is None or response is None:
+            skipped += 1
+            continue
+        prompt = (
+            f"{instruction}\n\nContext:\n{context}"
+            if context is not None
+            else instruction
+        )
+        if (
+            _has_control_token(prompt, response)
+            or len(prompt) + len(response) > max_characters
+        ):
+            skipped += 1
+            continue
+        identity = canonical_record_sha256(
+            {"prompt": _normalize(prompt), "response": _normalize(response)}
+        )
+        if identity in seen:
+            skipped += 1
+            continue
+        seen.add(identity)
+        record = {
+            "id": _record_id(source, "sft", identity, "en"),
+            "source_id": f"{source.source_id}:{identity}",
+            "language": "en",
+            "messages": [
+                {"role": "user", "content": prompt},
+                {"role": "assistant", "content": response},
+            ],
+            "metadata": {
+                "source": _source_uri(source),
+                "transform": source.transform,
+                "task": str(row.get("category", "instruction")),
+            },
+        }
+        candidates.append(
+            (
+                _selection_key(recipe.recipe_id, source.source_id, identity),
+                record,
+            )
+        )
+    return _select_candidates(candidates, required, source.source_id), skipped
+
+
+def _transform_hc3(
+    rows: Iterable[Mapping[str, Any]],
+    recipe: PublicPosttrainingRecipe,
+    source: PosttrainingSourceRecipe,
+) -> tuple[list[dict[str, Any]], int]:
+    config = _require_mapping(
+        recipe.selection[source.source_id],
+        f"selection.{source.source_id}",
+    )
+    required = int(config["records"])
+    max_characters = int(config["max_characters"])
+    candidates: list[tuple[str, dict[str, Any]]] = []
+    seen = set()
+    skipped = 0
+    for row in rows:
+        prompt = _clean_text(row.get("question"))
+        answers = row.get("human_answers")
+        response = (
+            _clean_text(answers[0])
+            if isinstance(answers, list) and answers
+            else None
+        )
+        if (
+            prompt is None
+            or response is None
+            or _has_control_token(prompt, response)
+            or len(prompt) + len(response) > max_characters
+        ):
+            skipped += 1
+            continue
+        identity = canonical_record_sha256(
+            {"prompt": _normalize(prompt), "response": _normalize(response)}
+        )
+        if identity in seen:
+            skipped += 1
+            continue
+        seen.add(identity)
+        record = {
+            "id": _record_id(source, "sft", identity, "zh"),
+            "source_id": f"{source.source_id}:{identity}",
+            "language": "zh",
+            "messages": [
+                {"role": "user", "content": prompt},
+                {"role": "assistant", "content": response},
+            ],
+            "metadata": {
+                "source": _source_uri(source),
+                "transform": source.transform,
+                "task": str(row.get("source", "open_qa")),
+                "answer_origin": "human",
+            },
+        }
+        candidates.append(
+            (
+                _selection_key(recipe.recipe_id, source.source_id, identity),
+                record,
+            )
+        )
+    return _select_candidates(candidates, required, source.source_id), skipped
+
+
+def _transform_hh_helpful(
+    rows: Iterable[Mapping[str, Any]],
+    recipe: PublicPosttrainingRecipe,
+    source: PosttrainingSourceRecipe,
+) -> tuple[list[dict[str, Any]], int]:
+    config = _require_mapping(
+        recipe.selection[source.source_id],
+        f"selection.{source.source_id}",
+    )
+    required = int(config["records"])
+    max_characters = int(config["max_characters"])
+    candidates: list[tuple[str, dict[str, Any]]] = []
+    seen = set()
+    skipped = 0
+    for row in rows:
+        chosen = _final_hh_turn(row.get("chosen"))
+        rejected = _final_hh_turn(row.get("rejected"))
+        if chosen is None or rejected is None:
+            skipped += 1
+            continue
+        chosen_prompt, chosen_response = chosen
+        rejected_prompt, rejected_response = rejected
+        if (
+            _normalize(chosen_prompt) != _normalize(rejected_prompt)
+            or chosen_response == rejected_response
+            or _has_control_token(
+                chosen_prompt, chosen_response, rejected_response
+            )
+            or len(chosen_prompt)
+            + max(len(chosen_response), len(rejected_response))
+            > max_characters
+        ):
+            skipped += 1
+            continue
+        identity = canonical_record_sha256(
+            {
+                "prompt": _normalize(chosen_prompt),
+                "chosen": _normalize(chosen_response),
+                "rejected": _normalize(rejected_response),
+            }
+        )
+        if identity in seen:
+            skipped += 1
+            continue
+        seen.add(identity)
+        record = {
+            "id": _record_id(source, "dpo", identity, "en"),
+            "source_id": f"{source.source_id}:{identity}",
+            "language": "en",
+            "prompt": chosen_prompt,
+            "chosen": chosen_response,
+            "rejected": rejected_response,
+            "metadata": {
+                "source": _source_uri(source),
+                "transform": source.transform,
+                "task": "helpfulness",
+            },
+        }
+        candidates.append(
+            (
+                _selection_key(recipe.recipe_id, source.source_id, identity),
+                record,
+            )
+        )
+    return _select_candidates(candidates, required, source.source_id), skipped
+
+
+def _transform_cvalues(
+    rows: Iterable[Mapping[str, Any]],
+    recipe: PublicPosttrainingRecipe,
+    source: PosttrainingSourceRecipe,
+) -> tuple[list[dict[str, Any]], int]:
+    config = _require_mapping(
+        recipe.selection[source.source_id],
+        f"selection.{source.source_id}",
+    )
+    required = int(config["records"])
+    max_characters = int(config["max_characters"])
+    candidates: list[tuple[str, dict[str, Any]]] = []
+    seen = set()
+    skipped = 0
+    for row in rows:
+        prompt = _clean_text(row.get("prompt"))
+        chosen = _clean_text(row.get("pos_resp"))
+        rejected = _clean_text(row.get("neg_resp"))
+        if (
+            prompt is None
+            or chosen is None
+            or rejected is None
+            or chosen == rejected
+            or _has_control_token(prompt, chosen, rejected)
+            or len(prompt) + max(len(chosen), len(rejected)) > max_characters
+        ):
+            skipped += 1
+            continue
+        identity = canonical_record_sha256(
+            {
+                "prompt": _normalize(prompt),
+                "chosen": _normalize(chosen),
+                "rejected": _normalize(rejected),
+            }
+        )
+        if identity in seen:
+            skipped += 1
+            continue
+        seen.add(identity)
+        record = {
+            "id": _record_id(source, "dpo", identity, "zh"),
+            "source_id": f"{source.source_id}:{identity}",
+            "language": "zh",
+            "prompt": prompt,
+            "chosen": chosen,
+            "rejected": rejected,
+            "metadata": {
+                "source": _source_uri(source),
+                "transform": source.transform,
+                "task": "values-alignment",
+                "chosen_type": str(row.get("pos_type", "")),
+                "rejected_type": str(row.get("neg_type", "")),
+            },
+        }
+        candidates.append(
+            (
+                _selection_key(recipe.recipe_id, source.source_id, identity),
+                record,
+            )
+        )
+    return _select_candidates(candidates, required, source.source_id), skipped
+
+
 def _transform_msvamp(
     rows: Iterable[Mapping[str, Any]],
     recipe: PublicPosttrainingRecipe,
+    source: PosttrainingSourceRecipe | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    config = _require_mapping(recipe.selection["msvamp"], "selection.msvamp")
+    source = source or recipe.source("msvamp")
+    config = _require_mapping(
+        recipe.selection[source.source_id],
+        f"selection.{source.source_id}",
+    )
     warmup_groups = int(config["sft_warmup_groups"])
     expected_groups = int(config["expected_groups"])
-    source = recipe.source("msvamp")
     groups = []
     seen = set()
     for row in rows:
@@ -923,7 +1331,7 @@ def _transform_msvamp(
         seen.add(identity)
         groups.append(
             (
-                _selection_key(recipe.recipe_id, "msvamp", identity),
+                _selection_key(recipe.recipe_id, source.source_id, identity),
                 identity,
                 query,
                 chinese_query,
@@ -942,7 +1350,7 @@ def _transform_msvamp(
         groups
     ):
         partition = "sft-warmup" if index < warmup_groups else "grpo"
-        source_id = f"msvamp:{identity}"
+        source_id = f"{source.source_id}:{identity}"
         for language, prompt in (("en", query), ("zh", chinese_query)):
             common = {
                 "id": _record_id(source, partition, identity, language),
@@ -955,7 +1363,7 @@ def _transform_msvamp(
                 "intended_use": "training",
                 "partition": partition,
                 "equation": equation,
-                "transform": "msvamp-parallel-integer-v1",
+                "transform": source.transform,
             }
             if partition == "sft-warmup":
                 sft.append(
@@ -980,34 +1388,60 @@ def _transform_msvamp(
     return sft, grpo
 
 
+def _transform_source(
+    rows: Iterable[Mapping[str, Any]],
+    recipe: PublicPosttrainingRecipe,
+    source: PosttrainingSourceRecipe,
+) -> dict[RecordKind, list[dict[str, Any]]]:
+    if source.transform == "oasst-ranked-conversation-v1":
+        records, _ = _transform_oasst(rows, recipe, source)
+        return {RecordKind.SFT: records}
+    if source.transform == "dolly-single-turn-sft-v1":
+        records, _ = _transform_dolly(rows, recipe, source)
+        return {RecordKind.SFT: records}
+    if source.transform == "hc3-human-single-turn-sft-v1":
+        records, _ = _transform_hc3(rows, recipe, source)
+        return {RecordKind.SFT: records}
+    if source.transform == "helpsteer3-single-turn-preference-v1":
+        records, _ = _transform_helpsteer(rows, recipe, source)
+        return {RecordKind.DPO: records}
+    if source.transform == "hh-helpful-single-turn-preference-v1":
+        records, _ = _transform_hh_helpful(rows, recipe, source)
+        return {RecordKind.DPO: records}
+    if source.transform == "cvalues-helpful-single-turn-preference-v1":
+        records, _ = _transform_cvalues(rows, recipe, source)
+        return {RecordKind.DPO: records}
+    if source.transform == "msvamp-parallel-integer-v1":
+        sft, grpo = _transform_msvamp(rows, recipe, source)
+        return {RecordKind.SFT: sft, RecordKind.GRPO: grpo}
+    raise DataValidationError(
+        f"no implementation for post-training transform {source.transform}"
+    )
+
+
 def _sources_for_stage(
     recipe: PublicPosttrainingRecipe,
     stage: RecordKind,
 ) -> tuple[PosttrainingSourceRecipe, ...]:
-    source_ids = {
-        RecordKind.SFT: ("oasst1", "msvamp"),
-        RecordKind.DPO: ("helpsteer3",),
-        RecordKind.GRPO: ("msvamp",),
-    }[stage]
-    return tuple(recipe.source(source_id) for source_id in source_ids)
+    return tuple(source for source in recipe.sources if stage.value in source.stages)
 
 
 def _selection_for_stage(
     recipe: PublicPosttrainingRecipe,
     stage: RecordKind,
 ) -> dict[str, Any]:
-    keys = {
-        RecordKind.SFT: ("oasst1", "msvamp"),
-        RecordKind.DPO: ("helpsteer3",),
-        RecordKind.GRPO: ("msvamp",),
-    }[stage]
-    result = {key: _copy_mapping(recipe.selection[key]) for key in keys}
-    if stage in {RecordKind.SFT, RecordKind.GRPO}:
-        result["msvamp"]["partition"] = (
-            "lowest-stable-hash-rank"
-            if stage is RecordKind.SFT
-            else "remaining-stable-hash-ranks"
-        )
+    sources = _sources_for_stage(recipe, stage)
+    result = {
+        source.source_id: _copy_mapping(recipe.selection[source.source_id])
+        for source in sources
+    }
+    for source in sources:
+        if source.transform == "msvamp-parallel-integer-v1":
+            result[source.source_id]["partition"] = (
+                "lowest-stable-hash-rank"
+                if stage is RecordKind.SFT
+                else "remaining-stable-hash-ranks"
+            )
     return result
 
 
@@ -1023,7 +1457,7 @@ def _verify_source_manifest_recipe(
         ) from exc
     sources = _sources_for_stage(recipe, manifest.record_kind)
     licenses = tuple(dict.fromkeys(source.license for source in sources))
-    expected_records = _expected_records(recipe, manifest.record_kind)
+    expected_records = recipe.expected_records[manifest.record_kind.value]
     expected = {
         "license": " AND ".join(sorted(licenses)),
         "licenses": licenses,
@@ -1054,30 +1488,47 @@ def _verify_source_manifest_recipe(
         )
 
 
-def _expected_records(
-    recipe: PublicPosttrainingRecipe,
-    stage: RecordKind,
-) -> int:
-    oasst = _require_mapping(recipe.selection["oasst1"], "selection.oasst1")
-    helpsteer = _require_mapping(recipe.selection["helpsteer3"], "selection.helpsteer3")
-    msvamp = _require_mapping(recipe.selection["msvamp"], "selection.msvamp")
-    warmup = int(msvamp["sft_warmup_groups"])
-    total = int(msvamp["expected_groups"])
-    return {
-        RecordKind.SFT: 2 * (int(oasst["records_per_language"]) + warmup),
-        RecordKind.DPO: 2 * int(helpsteer["records_per_language"]),
-        RecordKind.GRPO: 2 * (total - warmup),
-    }[stage]
+def _validate_selection(
+    sources: Sequence[PosttrainingSourceRecipe],
+    selection: Mapping[str, Any],
+) -> None:
+    by_transform = {
+        source.transform: (source, _require_mapping(
+            selection[source.source_id],
+            f"selection.{source.source_id}",
+        ))
+        for source in sources
+    }
+    if len(by_transform) != len(sources):
+        raise ConfigError("post-training transforms may appear only once per recipe")
+    for source, config in by_transform.values():
+        if source.transform in {
+            "dolly-single-turn-sft-v1",
+            "hc3-human-single-turn-sft-v1",
+            "hh-helpful-single-turn-preference-v1",
+            "cvalues-helpful-single-turn-preference-v1",
+        }:
+            if set(config) != {"strategy", "records", "max_characters"}:
+                raise ConfigError(
+                    f"invalid {source.source_id} selection fields"
+                )
+            if config["strategy"] != "stable-hash-rank":
+                raise ConfigError(
+                    f"unsupported {source.source_id} selection strategy"
+                )
+            _require_positive_integers(
+                config, ("records", "max_characters"), source.source_id
+            )
+            continue
+        if source.transform == "oasst-ranked-conversation-v1":
+            _validate_oasst_selection(config)
+        elif source.transform == "helpsteer3-single-turn-preference-v1":
+            _validate_helpsteer_selection(config)
+        elif source.transform == "msvamp-parallel-integer-v1":
+            _validate_msvamp_selection(config)
 
 
-def _validate_selection(selection: Mapping[str, Any]) -> None:
-    if set(selection) != set(_SOURCE_IDS):
-        raise ConfigError(
-            "post-training selection must declare oasst1, helpsteer3, and msvamp"
-        )
-    oasst = _require_mapping(selection["oasst1"], "selection.oasst1")
-    helpsteer = _require_mapping(selection["helpsteer3"], "selection.helpsteer3")
-    msvamp = _require_mapping(selection["msvamp"], "selection.msvamp")
+def _validate_oasst_selection(oasst: Mapping[str, Any]) -> None:
     if set(oasst) != {
         "strategy",
         "records_per_language",
@@ -1090,6 +1541,17 @@ def _validate_selection(selection: Mapping[str, Any]) -> None:
         raise ConfigError("unsupported OASST selection strategy")
     if oasst["require_all_assistant_rank_zero"] is not True:
         raise ConfigError("OASST selection must require all assistant rank zero")
+
+    _require_positive_integers(
+        oasst,
+        ("records_per_language", "max_messages", "max_characters"),
+        "OASST",
+    )
+    if int(oasst["max_messages"]) % 2 != 0:
+        raise ConfigError("OASST max_messages must be even")
+
+
+def _validate_helpsteer_selection(helpsteer: Mapping[str, Any]) -> None:
     if set(helpsteer) != {
         "strategy",
         "records_per_language",
@@ -1100,10 +1562,19 @@ def _validate_selection(selection: Mapping[str, Any]) -> None:
         raise ConfigError("invalid HelpSteer3 selection fields")
     if (
         helpsteer["strategy"] != "stable-hash-rank"
-        or helpsteer["context_messages"] != 1
+        or helpsteer["context_messages"] not in {1, "last-user"}
         or helpsteer["nonzero_preference"] is not True
     ):
         raise ConfigError("invalid HelpSteer3 selection policy")
+
+    _require_positive_integers(
+        helpsteer,
+        ("records_per_language", "max_characters"),
+        "HelpSteer3",
+    )
+
+
+def _validate_msvamp_selection(msvamp: Mapping[str, Any]) -> None:
     if set(msvamp) != {
         "strategy",
         "expected_groups",
@@ -1112,26 +1583,30 @@ def _validate_selection(selection: Mapping[str, Any]) -> None:
         raise ConfigError("invalid MSVAMP selection fields")
     if msvamp["strategy"] != "stable-hash-partition":
         raise ConfigError("unsupported MSVAMP selection strategy")
-    integer_fields = (
-        (oasst, "records_per_language"),
-        (oasst, "max_messages"),
-        (oasst, "max_characters"),
-        (helpsteer, "records_per_language"),
-        (helpsteer, "max_characters"),
-        (msvamp, "expected_groups"),
-        (msvamp, "sft_warmup_groups"),
+
+    _require_positive_integers(
+        msvamp,
+        ("expected_groups", "sft_warmup_groups"),
+        "MSVAMP",
     )
+    if int(msvamp["sft_warmup_groups"]) >= int(msvamp["expected_groups"]):
+        raise ConfigError("MSVAMP warmup must leave at least one GRPO group")
+
+
+def _require_positive_integers(
+    mapping: Mapping[str, Any],
+    names: Sequence[str],
+    source_name: str,
+) -> None:
     if any(
         not isinstance(mapping[name], int)
         or isinstance(mapping[name], bool)
         or mapping[name] <= 0
-        for mapping, name in integer_fields
+        for name in names
     ):
-        raise ConfigError("post-training selection counts must be positive integers")
-    if int(oasst["max_messages"]) % 2 != 0:
-        raise ConfigError("OASST max_messages must be even")
-    if int(msvamp["sft_warmup_groups"]) >= int(msvamp["expected_groups"]):
-        raise ConfigError("MSVAMP warmup must leave at least one GRPO group")
+        raise ConfigError(
+            f"{source_name} selection counts must be positive integers"
+        )
 
 
 def _load_recipe_resource(resource: Any) -> PublicPosttrainingRecipe:
@@ -1181,6 +1656,45 @@ def _record_id(
 def _selection_key(recipe_id: str, *parts: str) -> str:
     value = "\0".join((recipe_id, *parts))
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def _select_candidates(
+    candidates: Sequence[tuple[str, dict[str, Any]]],
+    required: int,
+    source_id: str,
+) -> list[dict[str, Any]]:
+    ordered = sorted(candidates, key=lambda item: (item[0], item[1]["id"]))
+    if len(ordered) < required:
+        raise DataValidationError(
+            f"{source_id} has only {len(ordered)} eligible records; "
+            f"recipe requires {required}"
+        )
+    return [record for _, record in ordered[:required]]
+
+
+def _final_hh_turn(value: Any) -> tuple[str, str] | None:
+    text = _clean_text(value)
+    if text is None:
+        return None
+    _, marker, tail = text.rpartition("\n\nHuman:")
+    if not marker or "\n\nAssistant:" not in tail:
+        return None
+    prompt, separator, response = tail.partition("\n\nAssistant:")
+    clean_prompt = _clean_text(prompt)
+    clean_response = _clean_text(response)
+    if (
+        not separator
+        or clean_prompt is None
+        or clean_response is None
+        or "\n\nHuman:" in clean_response
+        or "\n\nAssistant:" in clean_response
+    ):
+        return None
+    return clean_prompt, clean_response
+
+
+def _has_control_token(*values: str) -> bool:
+    return any(_CONTROL_TOKEN_PATTERN.search(value) is not None for value in values)
 
 
 def _integer_answer(value: Any) -> str | None:

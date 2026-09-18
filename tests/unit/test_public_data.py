@@ -55,8 +55,10 @@ class PublicDatasetTests(unittest.TestCase):
         learn = recipes["simplestories-60m-v1"]
         chinese_smoke = recipes["wikipedia-zh-smoke-v1"]
         chinese_learn = recipes["wikipedia-zh-60m-v1"]
+        english_v2 = recipes["wikipedia-en-primary-60m-v2"]
+        chinese_v2 = recipes["wikipedia-zh-60m-v2"]
 
-        self.assertEqual(len(recipes), 4)
+        self.assertEqual(len(recipes), 7)
         self.assertEqual(smoke.repository, "SimpleStories/SimpleStories")
         self.assertEqual(smoke.revision, learn.revision)
         self.assertEqual(smoke.upstream_file, learn.upstream_file)
@@ -90,6 +92,11 @@ class PublicDatasetTests(unittest.TestCase):
             chinese_learn.expected_source_sha256,
             "fdf06f43db54c564945725e175d5196f93824a1b411558763ff30d318128a9a0",
         )
+        self.assertEqual(english_v2.revision, chinese_v2.revision)
+        self.assertEqual(english_v2.max_records, 150_000)
+        self.assertEqual(chinese_v2.max_records, 220_000)
+        self.assertFalse(english_v2.synthetic)
+        self.assertFalse(chinese_v2.synthetic)
 
     def test_materialize_requires_exact_license_acceptance(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

@@ -16,7 +16,7 @@ from _project_path import add_project_src_to_path
 
 add_project_src_to_path()
 
-from llm_lifecycle_lab.config import load_run_config
+from llm_lifecycle_lab.config import load_run_config, with_init_checkpoint
 from llm_lifecycle_lab.exceptions import LLMLabError
 from llm_lifecycle_lab.training.dpo import run_native_dpo
 
@@ -26,6 +26,7 @@ def build_parser() -> argparse.ArgumentParser:
         prog="python scripts/train_dpo.py", description=__doc__
     )
     parser.add_argument("--config", type=Path, required=True)
+    parser.add_argument("--init-checkpoint", type=Path)
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--run-id")
     group.add_argument("--resume-run")
@@ -36,8 +37,12 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
-        run = run_native_dpo(
+        config = with_init_checkpoint(
             load_run_config(args.config),
+            args.init_checkpoint,
+        )
+        run = run_native_dpo(
+            config,
             run_id=args.run_id,
             resume_run=args.resume_run,
             resume_checkpoint=args.resume_checkpoint,

@@ -603,6 +603,7 @@ def evaluate_objective(
         "eval_loss": loss,
         "eval_perplexity": math.exp(min(loss, 20.0)),
         "eval_tokens": float(supervised_tokens),
+        "eval_normalization_count": float(normalization_count),
     }
     metrics.update(
         {

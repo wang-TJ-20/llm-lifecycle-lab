@@ -75,7 +75,7 @@ class GRPOObjective:
             parameter.requires_grad_(False)
         self.reference.set_training(False)
 
-    def _rollouts(
+    def rollouts(
         self, model: ModelProtocol, batch: dict[str, Any]
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, list[dict[str, Any]]]:
         trainable = tuple(model.trainable_parameters())
@@ -156,7 +156,7 @@ class GRPOObjective:
         was_training = model.is_training()
         model.set_training(False)
         try:
-            input_ids, labels, attention_mask, records = self._rollouts(model, batch)
+            input_ids, labels, attention_mask, records = self.rollouts(model, batch)
             rewards = torch.tensor(
                 [record["reward"] for record in records],
                 dtype=torch.float32,

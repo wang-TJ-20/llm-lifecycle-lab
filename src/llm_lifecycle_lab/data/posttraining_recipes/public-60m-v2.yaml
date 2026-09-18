@@ -1,0 +1,124 @@
+schema_version: "1.0"
+recipe_id: public-60m-v2
+description: Pinned 13.6K SFT, 8.4K preference, and isolated bilingual GRPO records for Native 60M.
+sources:
+  - source_id: oasst1
+    transform: oasst-ranked-conversation-v1
+    stages: [sft]
+    provider: huggingface
+    repository: OpenAssistant/oasst1
+    revision: fdf72ae0827c1cda404aff25b6603abec9e3399b
+    file: data/train-00000-of-00001-b42a775f407cee45.parquet
+    file_sha256: bbfadf5ed1278ba2208c837fdcad865adf65f5df55d80abadab2745db13fcb5e
+    format: parquet
+    license: Apache-2.0
+    split: train
+  - source_id: dolly
+    transform: dolly-single-turn-sft-v1
+    stages: [sft]
+    provider: huggingface
+    repository: databricks/databricks-dolly-15k
+    revision: bdd27f4d94b9c1f951818a7da7fd7aeea5dbff1a
+    file: databricks-dolly-15k.jsonl
+    file_sha256: 2df9083338b4abd6bceb5635764dab5d833b393b55759dffb0959b6fcbf794ec
+    format: jsonl
+    license: CC-BY-SA-3.0
+    split: train
+  - source_id: hc3-chinese
+    transform: hc3-human-single-turn-sft-v1
+    stages: [sft]
+    provider: huggingface
+    repository: Hello-SimpleAI/HC3-Chinese
+    revision: 09a687b8dc164b89e7df95abf15df3b216bc31c2
+    file: all.jsonl
+    file_sha256: 425e7071bbd5dd88efd85d51e28a5adec9c72e04d96c52d194bdfb95fef00b0d
+    format: jsonl
+    license: CC-BY-SA-4.0
+    split: train
+  - source_id: helpsteer3
+    transform: helpsteer3-single-turn-preference-v1
+    stages: [dpo]
+    provider: huggingface
+    repository: nvidia/HelpSteer3
+    revision: f6d145777bcbde96137596340fab89793acd1031
+    file: preference/train.jsonl.gz
+    file_sha256: 32b52e1d378f8dab1e4c9ae549da49a5d6fc0875aeafe3f9139e6053beb906bb
+    format: jsonl.gz
+    license: CC-BY-4.0
+    split: preference/train
+  - source_id: hh-helpful
+    transform: hh-helpful-single-turn-preference-v1
+    stages: [dpo]
+    provider: huggingface
+    repository: Anthropic/hh-rlhf
+    revision: 09be8c5bbc57cb3887f3a9732ad6aa7ec602a1fa
+    file: helpful-base/train.jsonl.gz
+    file_sha256: 518a5bf288456fc9f3b7c980c54116fba0c52f274d3f4d344675d83e4058f6f4
+    format: jsonl.gz
+    license: MIT
+    split: helpful-base/train
+  - source_id: cvalues-helpful
+    transform: cvalues-helpful-single-turn-preference-v1
+    stages: [dpo]
+    provider: huggingface
+    repository: Skepsun/cvalues_rlhf
+    revision: 130d6cc61440b02aaa6d649b983826b09403440a
+    file: helpful_train.json
+    file_sha256: d00826859bca48506bf36f3f9d8c7a9daf77611045dc4d41ffacd9f77592350f
+    format: json
+    license: Apache-2.0
+    split: helpful_train
+  - source_id: msvamp
+    transform: msvamp-parallel-integer-v1
+    stages: [sft, grpo]
+    provider: huggingface
+    repository: Mathoctopus/MSVAMP
+    revision: 301e2b3b168be70058c89c21c2fbdc9262102add
+    file: test_Chinese.json
+    file_sha256: 31e136303b56ed1734d3e9fbcdcff4499f974a0857298816c41e1c5c0be6b4bd
+    format: jsonl
+    license: Apache-2.0
+    split: test_Chinese
+selection:
+  oasst1:
+    strategy: stable-hash-rank
+    records_per_language: 350
+    max_messages: 8
+    max_characters: 500
+    require_all_assistant_rank_zero: true
+  dolly:
+    strategy: stable-hash-rank
+    records: 6250
+    max_characters: 500
+  hc3-chinese:
+    strategy: stable-hash-rank
+    records: 6250
+    max_characters: 500
+  helpsteer3:
+    strategy: stable-hash-rank
+    records_per_language: 300
+    max_characters: 500
+    context_messages: last-user
+    nonzero_preference: true
+  hh-helpful:
+    strategy: stable-hash-rank
+    records: 3900
+    max_characters: 500
+  cvalues-helpful:
+    strategy: stable-hash-rank
+    records: 3900
+    max_characters: 500
+  msvamp:
+    strategy: stable-hash-partition
+    expected_groups: 1000
+    sft_warmup_groups: 200
+outputs:
+  sft:
+    records: 13600
+    output_sha256: e71bc675698cf72346c2669c9f5cb1003e27414d818ce2dc4ab25a2b1a766063
+  dpo:
+    records: 8400
+    output_sha256: 07333995bd3df1b38cb5d4bdfd5377ec4920162813bffd344db56caac35a30cb
+  grpo:
+    records: 1600
+    output_sha256: 505f8bdf2d4a3ac008174382e8e134d61c0d2bd29d3c7cedc443c45dd5dbfa9e

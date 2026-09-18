@@ -212,7 +212,6 @@ def verify_reference_inputs(
     provenance_ok = (
         not failures
         and sha256_file(data_path) == spec.expected_data_manifest_sha256
-        and tokenizer.manifest.source_data_sha256 == spec.expected_data_manifest_sha256
         and tokenizer.manifest.content_sha256 == spec.expected_tokenizer_sha256
         and packed.data_manifest_sha256 == spec.expected_data_manifest_sha256
         and packed.tokenizer_sha256 == spec.expected_tokenizer_sha256
@@ -315,6 +314,7 @@ def verify_reference_run(
         "run_manifest.json",
         "resolved_config.yaml",
         "data_snapshot.json",
+        "data_provenance.json",
         "packed_data_snapshot.json",
         "tokenizer_manifest.json",
         "tokenizer/tokenizer.json",
@@ -376,6 +376,10 @@ def verify_reference_run(
     )
 
     data_snapshot = _load_json(run / "data_snapshot.json", "data snapshot")
+    data_provenance = _load_json(
+        run / "data_provenance.json",
+        "data provenance",
+    )
     packed_snapshot = _load_json(
         run / "packed_data_snapshot.json",
         "packed data snapshot",
@@ -396,8 +400,11 @@ def verify_reference_run(
     provenance_ok = (
         packed_snapshot.get("data_manifest_sha256") == data_sha256
         and packed_snapshot.get("tokenizer_sha256") == tokenizer_sha256
-        and tokenizer_manifest.get("source_data_sha256") == data_sha256
         and tokenizer_manifest.get("content_sha256") == tokenizer_sha256
+        and data_provenance.get("training_data_manifest_sha256") == data_sha256
+        and data_provenance.get("tokenizer_source_data_manifest_sha256")
+        == tokenizer_manifest.get("source_data_sha256")
+        and data_provenance.get("tokenizer_sha256") == tokenizer_sha256
         and data_snapshot.get("dataset_id") == packed_snapshot.get("dataset_id")
         and data_sha256 == spec.expected_data_manifest_sha256
         and tokenizer_sha256 == spec.expected_tokenizer_sha256

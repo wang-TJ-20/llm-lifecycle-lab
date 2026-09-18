@@ -1,0 +1,38 @@
+schema_version: "1.0"
+model_route: native
+run_profile: learn
+stage: grpo
+seed: 42
+output_dir: runs
+model:
+  provider: native
+  model_id: tiny-60m
+  init_checkpoint: runs/selected-parent/checkpoints/from-training-result
+  tokenizer: data/tokenizers/bilingual-60m-v1
+data:
+  manifest: data/prepared/grpo-public-60m-v2/data_manifest.json
+  evaluation_suite: configs/evaluation/lifecycle-v3.yaml
+training:
+  device: cuda
+  dtype: bfloat16
+  sequence_length: 512
+  micro_batch_size: 4
+  gradient_accumulation_steps: 4
+  num_epochs: 1.0
+  learning_rate: 0.000002
+  beta1: 0.9
+  beta2: 0.95
+  warmup_steps: 5
+  min_lr_ratio: 0.1
+  gradient_clipping: 1.0
+  group_size: 8
+  max_new_tokens: 16
+  temperature: 1.0
+  top_p: 1.0
+  kl_beta: 0.12
+  advantage_epsilon: 0.0001
+  weight_decay: 0.1
+  checkpoint_interval: 25
+  eval_interval: 25
+  eval_batches: 8
+  log_interval: 5

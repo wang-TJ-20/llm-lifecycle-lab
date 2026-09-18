@@ -239,4 +239,21 @@ def run_native_grpo(
         resume_from=checkpoint,
         metric_callback=record,
     )
+    prompts_seen = stream.epoch * len(splits["train"]) + stream.offset
+    artifacts.write_json(
+        "grpo_budget_summary.json",
+        {
+            "schema_version": "1.0",
+            "train_prompts": len(splits["train"]),
+            "prompts_seen": prompts_seen,
+            "prompt_passes": prompts_seen / len(splits["train"]),
+            "rollout_tokens_seen": result.tokens_seen,
+            "rollout_token_budget": result.target_train_tokens,
+            "rollout_token_coverage": result.target_token_coverage,
+            "group_size": settings.group_size,
+            "maximum_rollout_tokens_per_prompt": (
+                settings.group_size * settings.max_new_tokens
+            ),
+        },
+    )
     return GRPORun(artifacts, result, policy.parameter_count, budget)

@@ -16,7 +16,7 @@ from _project_path import add_project_src_to_path
 
 add_project_src_to_path()
 
-from llm_lifecycle_lab.config import load_run_config
+from llm_lifecycle_lab.config import load_run_config, with_init_checkpoint
 from llm_lifecycle_lab.doctor.preflight import available_profiles, run_doctor
 from llm_lifecycle_lab.doctor.result import CheckStatus, DoctorReport
 from llm_lifecycle_lab.exceptions import LLMLabError
@@ -29,6 +29,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--profile", choices=available_profiles())
     parser.add_argument("--config", type=Path)
+    parser.add_argument("--init-checkpoint", type=Path)
     parser.add_argument("--json", action="store_true", dest="as_json")
     return parser
 
@@ -53,6 +54,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         config = load_run_config(args.config) if args.config else None
+        if args.init_checkpoint is not None:
+            if config is None:
+                raise ValueError("--init-checkpoint requires --config")
+            config = with_init_checkpoint(config, args.init_checkpoint)
         report = run_doctor(
             profile=args.profile,
             config=config,

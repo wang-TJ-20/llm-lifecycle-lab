@@ -512,14 +512,14 @@ def check_leakage(cases: list[dict[str, Any]], sources: list[Path]) -> dict[str,
         hits = 0
         for line in source.read_text(encoding="utf-8").splitlines():
             record = json.loads(line)
-            text = record.get("prompt")
+            text = record.get("text") or record.get("prompt")
             if text is None and record.get("messages"):
                 text = " ".join(m["content"] for m in record["messages"])
             if (text and normalize(text) in prompts) or record.get(
                 "template_id"
             ) in groups:
                 hits += 1
-        report[source.name] = hits
+        report[str(source)] = hits
     return report
 
 

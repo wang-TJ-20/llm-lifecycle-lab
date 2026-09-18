@@ -242,10 +242,10 @@ def test_corpus_audit_and_memory_probes(native_fixture, tmp_path: Path) -> None:
     assert report["metrics"]["memory.test.suffix_exact"]["count"] == 4
     assert report["corpus_audit"]["status"] == "checked"
     changed_manifest = json.loads(manifest.read_text())
-    changed_manifest["dataset_id"] = "mismatch"
+    changed_manifest["splits"][0]["sha256"] = "0" * 64
     wrong = manifest.parent / "wrong.json"
     wrong.write_text(json.dumps(changed_manifest))
-    with pytest.raises(ContractError, match="not bound"):
+    with pytest.raises(ContractError, match="hash mismatch"):
         scan_corpus(wrong, suite=suite, tokenizer=tokenizer)
 
 

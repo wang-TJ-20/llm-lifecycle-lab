@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
@@ -40,29 +41,46 @@ def _parse_json(text: str) -> Any:
     )
 
 
-def reward_response(text: str, answer: str, verifier: str) -> float:
+def evaluate_verifier_response(
+    text: str,
+    answer: str,
+    verifier: str,
+) -> tuple[float, bool]:
+    """Return deterministic reward and whether the candidate parsed."""
+
     if verifier == "exact":
-        return float(text.strip() == answer)
+        return float(text.strip() == answer), True
     if verifier == "integer":
         pattern = re.compile(r"[+-]?\d+")
         candidate = text.strip()
-        if not pattern.fullmatch(candidate) or not pattern.fullmatch(answer):
-            return 0.0
-        return float(int(candidate) == int(answer))
+        parsed = pattern.fullmatch(candidate) is not None
+        if not parsed or not pattern.fullmatch(answer):
+            return 0.0, parsed
+        return float(int(candidate) == int(answer)), True
     if verifier == "json":
         try:
             actual = _parse_json(text)
+        except (json.JSONDecodeError, TypeError, ValueError, RecursionError):
+            return 0.0, False
+        try:
             expected = _parse_json(answer)
             actual_json = canonical_json(actual)
             expected_json = canonical_json(expected)
         except (json.JSONDecodeError, TypeError, ValueError, RecursionError):
-            return 0.0
-        return float(
-            isinstance(actual, (dict, list))
-            and type(actual) is type(expected)
-            and actual_json == expected_json
+            return 0.0, True
+        return (
+            float(
+                isinstance(actual, (dict, list))
+                and type(actual) is type(expected)
+                and actual_json == expected_json
+            ),
+            True,
         )
     raise ContractError(f"unsupported GRPO verifier: {verifier}")
+
+
+def reward_response(text: str, answer: str, verifier: str) -> float:
+    return evaluate_verifier_response(text, answer, verifier)[0]
 
 
 def rollout_seed(example_id: str, group_index: int) -> int:
@@ -94,6 +112,7 @@ def load_grpo_splits(
     sequence_length: int,
     max_new_tokens: int,
     evaluation_suite: str | Path,
+    split_names: Sequence[str] | None = None,
 ) -> tuple[dict[str, list[dict[str, Any]]], dict[str, Any]]:
     path = Path(manifest_path)
     manifest = load_data_manifest(path)
@@ -114,7 +133,17 @@ def load_grpo_splits(
     prompts: set[str] = set()
     splits = {}
     summary = {"suite_sha256": digest(suite), "splits": {}, "verifiers": {}}
+    selected_names = (
+        {split.name for split in manifest.splits}
+        if split_names is None
+        else set(split_names)
+    )
+    available_names = {split.name for split in manifest.splits}
+    if not selected_names or not selected_names <= available_names:
+        raise ContractError("GRPO split_names must select available splits")
     for split in manifest.splits:
+        if split.name not in selected_names:
+            continue
         validated = validate_jsonl(path.parent / split.path, RecordKind.GRPO)
         if not validated.report.ok:
             raise DataValidationError(format_validation_failure(validated.report))
@@ -174,6 +203,7 @@ def load_grpo_splits(
                     "answer": row["answer"],
                     "verifier": verifier,
                     "language": language,
+                    "source_id": str(group),
                 }
             )
             language_counts[language] += 1

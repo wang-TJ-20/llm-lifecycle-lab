@@ -51,8 +51,6 @@ def scan_corpus(
     manifest = load_data_manifest(path)
     if manifest.record_kind is not RecordKind.PRETRAIN:
         raise ContractError("memory corpus must be a pretrain Data Manifest")
-    if sha256_file(path) != tokenizer.manifest.source_data_sha256:
-        raise ContractError("memory corpus is not bound to this Base tokenizer")
     failures = verify_data_manifest(path)
     if failures:
         raise ContractError("; ".join(failures))
@@ -131,7 +129,7 @@ def scan_corpus(
         "limitations": (
             "Normalized full-text and query-substring checks only; no semantic or "
             "fuzzy detection. Short queries are excluded, not counted as clean. "
-            "Membership refers to the supplied tokenizer-bound corpus, not proof "
+            "Membership refers to the supplied verified corpus, not proof "
             "that any particular optimizer step observed the selected document."
         ),
     }

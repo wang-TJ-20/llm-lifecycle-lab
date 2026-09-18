@@ -365,10 +365,6 @@ def materialize_packed_pretraining_dataset(
         raise DataValidationError("token packing requires pretrain data")
     tokenizer = NativeTokenizer.from_directory(tokenizer_path)
     data_sha256 = sha256_file(data_path)
-    if tokenizer.manifest.source_data_sha256 != data_sha256:
-        raise DataValidationError(
-            "tokenizer was trained from a different Data Manifest"
-        )
 
     target = Path(output_dir)
     if target.exists():

@@ -89,8 +89,6 @@ def evaluate_native_pretraining(
     tokenizer = NativeTokenizer.from_directory(tokenizer_path)
     if tokenizer.vocab_size != model_config.vocab_size:
         raise ConfigError("tokenizer and model vocabulary sizes do not match")
-    if tokenizer.manifest.source_data_sha256 != sha256_file(data_manifest_path):
-        raise ConfigError("tokenizer was trained from a different Data Manifest")
 
     metadata = _checkpoint_metadata(checkpoint_path)
     expected = {
@@ -206,8 +204,6 @@ def run_native_pretraining(
             f"model vocab_size {model_config.vocab_size}"
         )
     data_manifest_sha256 = sha256_file(data_manifest_path)
-    if tokenizer.manifest.source_data_sha256 != data_manifest_sha256:
-        raise ConfigError("tokenizer was trained from a different Data Manifest")
 
     torch.manual_seed(config.seed)
     model = NativeTransformer(model_config)
@@ -278,6 +274,17 @@ def run_native_pretraining(
         artifacts.write_json(
             "data_snapshot.json",
             load_data_manifest(data_manifest_path),
+        )
+        artifacts.write_json(
+            "data_provenance.json",
+            {
+                "training_data_manifest": str(data_manifest_path),
+                "training_data_manifest_sha256": data_manifest_sha256,
+                "tokenizer_source_data_manifest_sha256": (
+                    tokenizer.manifest.source_data_sha256
+                ),
+                "tokenizer_sha256": tokenizer.manifest.content_sha256,
+            },
         )
         artifacts.write_json(
             "packed_data_snapshot.json",

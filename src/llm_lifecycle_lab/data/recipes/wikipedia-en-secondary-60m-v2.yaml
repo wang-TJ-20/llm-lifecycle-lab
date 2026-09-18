@@ -1,0 +1,20 @@
+schema_version: "1.0"
+recipe_id: wikipedia-en-secondary-60m-v2
+description: Pinned second 150K-article English Wikipedia shard for Native 60M Base-v2.
+dataset:
+  provider: huggingface
+  repository: wikimedia/wikipedia
+  revision: b04c8d1ceb2f5cd4588862100d08de323dccfbaa
+  config: 20231101.en
+  split: train
+  text_field: text
+  source_id_field: id
+  license: CC-BY-SA-3.0
+  language: en
+  synthetic: false
+  file: 20231101.en/train-00019-of-00041.parquet
+  file_sha256: 99c23125b0dd115d68f4a921376880e307bdfcbf3bfd66ae4ed90e853e1dadac
+selection:
+  strategy: source-prefix
+  max_records: 150000
+  min_characters: 64

@@ -3,6 +3,8 @@ recipe_id: public-60m-v1
 description: Pinned bilingual public SFT, preference, and verifiable-reward data for Native 60M.
 sources:
   - source_id: oasst1
+    transform: oasst-ranked-conversation-v1
+    stages: [sft]
     provider: huggingface
     repository: OpenAssistant/oasst1
     revision: fdf72ae0827c1cda404aff25b6603abec9e3399b
@@ -12,6 +14,8 @@ sources:
     license: Apache-2.0
     split: train
   - source_id: helpsteer3
+    transform: helpsteer3-single-turn-preference-v1
+    stages: [dpo]
     provider: huggingface
     repository: nvidia/HelpSteer3
     revision: f6d145777bcbde96137596340fab89793acd1031
@@ -21,6 +25,8 @@ sources:
     license: CC-BY-4.0
     split: preference/train
   - source_id: msvamp
+    transform: msvamp-parallel-integer-v1
+    stages: [sft, grpo]
     provider: huggingface
     repository: Mathoctopus/MSVAMP
     revision: 301e2b3b168be70058c89c21c2fbdc9262102add
@@ -48,8 +54,11 @@ selection:
     sft_warmup_groups: 200
 outputs:
   sft:
+    records: 1100
     output_sha256: 4286e08a52910b027c2c3d0b7ab1b0333faec11792d918d6a3cc7c483be8110f
   dpo:
+    records: 560
     output_sha256: d6a284296bb5b1bfaab2173a28b2d52ffb5669522e8987751a0afd33175f2b0e
   grpo:
+    records: 1600
     output_sha256: 3cc66aa262967b18dee023cbe97336dd875c9db3b995015dedb629fc45abb22b

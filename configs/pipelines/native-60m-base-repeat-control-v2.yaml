@@ -1,0 +1,33 @@
+schema_version: "1.0"
+model_route: native
+run_profile: reproduce
+stage: pretrain
+seed: 42
+output_dir: runs
+model:
+  provider: native
+  model_id: tiny-60m
+  architecture: dense-decoder
+  config: configs/models/tiny-60m.yaml
+  tokenizer: data/tokenizers/bilingual-60m-v1
+data:
+  manifest: data/prepared/bilingual-60m-v1/data_manifest.json
+  packed_manifest: data/packed/bilingual-60m-v1-seq512/packed_manifest.json
+training:
+  device: cuda
+  dtype: bfloat16
+  sequence_length: 512
+  micro_batch_size: 1
+  gradient_accumulation_steps: 16
+  num_epochs: 8.0
+  learning_rate: 0.0003
+  weight_decay: 0.1
+  beta1: 0.9
+  beta2: 0.95
+  warmup_steps: 50
+  min_lr_ratio: 0.1
+  gradient_clipping: 1.0
+  checkpoint_interval: 500
+  eval_interval: 500
+  eval_batches: 64
+  log_interval: 10

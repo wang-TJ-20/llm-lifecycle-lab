@@ -42,6 +42,7 @@ def _small_recipe() -> PublicPosttrainingRecipe:
         base,
         recipe_id="fixture-public-v1",
         selection=selection,
+        expected_records={"sft": 4, "dpo": 2, "grpo": 2},
         expected_source_sha256={"sft": None, "dpo": None, "grpo": None},
     )
 
@@ -124,8 +125,13 @@ def _msvamp_rows() -> list[dict]:
 class PublicPosttrainingTests(unittest.TestCase):
     def test_builtin_recipe_is_fully_pinned(self) -> None:
         recipes = available_public_posttraining_recipes()
-        self.assertEqual(len(recipes), 1)
-        recipe = recipes[0]
+        self.assertEqual(
+            tuple(recipe.recipe_id for recipe in recipes),
+            ("public-60m-v1", "public-60m-v2"),
+        )
+        recipe = next(
+            item for item in recipes if item.recipe_id == "public-60m-v1"
+        )
         self.assertEqual(recipe.recipe_id, "public-60m-v1")
         self.assertEqual(
             tuple(source.source_id for source in recipe.sources),

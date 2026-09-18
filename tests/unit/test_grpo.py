@@ -3,7 +3,11 @@ from __future__ import annotations
 import pytest
 import torch
 
-from llm_lifecycle_lab.data.grpo import reward_response, rollout_seed
+from llm_lifecycle_lab.data.grpo import (
+    evaluate_verifier_response,
+    reward_response,
+    rollout_seed,
+)
 from llm_lifecycle_lab.exceptions import ContractError
 from llm_lifecycle_lab.model.native import NativeModelConfig, NativeTransformer
 from llm_lifecycle_lab.training.stages import GRPOObjective, GRPOSettings
@@ -60,6 +64,12 @@ def test_rollout_seed_is_stable_and_group_specific() -> None:
     assert rollout_seed("example", 0) != rollout_seed("example", 1)
     with pytest.raises(ContractError, match="non-negative"):
         rollout_seed("example", -1)
+
+
+def test_verifier_reports_parse_failures_separately_from_wrong_answers() -> None:
+    assert evaluate_verifier_response("3 things", "3", "integer") == (0.0, False)
+    assert evaluate_verifier_response("4", "3", "integer") == (0.0, True)
+    assert evaluate_verifier_response('{"a":2}', '{"a":1}', "json") == (0.0, True)
 
 
 def test_grpo_zero_variance_group_is_finite_and_reference_is_frozen() -> None:
