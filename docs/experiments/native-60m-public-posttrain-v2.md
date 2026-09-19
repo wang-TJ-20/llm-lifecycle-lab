@@ -2,8 +2,9 @@
 
 本文记录按旧版
 [PUBLIC_POSTTRAINING_GUIDE](../PUBLIC_POSTTRAINING_GUIDE.md) 执行的 v2 轮次结果。
-执行状态：**Phase 1 完成，旧 Base 硬门禁失败，原 Phase 2/3/4 未执行**。
-链接中的现行手册已更新为本轮结果之后的 R0/R1 续跑计划。
+**Phase 1 已完成；现行手册的 R0/R1 续跑亦已执行完毕，两个 large-SFT arm 均未通过
+预注册硬门禁，因此 DPO/GRPO 未运行**（见第 9–13 节）。
+链接中的现行手册为本次 R0/R1 的执行依据。
 
 ## 1. 结论摘要
 
@@ -12,8 +13,12 @@
 | 数据物化 | 完成（1 项门禁失败后经确认继续） | Base-v2 语料 510,611,451 train token；SFT/DPO/GRPO 切分与文档表格一致 |
 | Base-repeat 计算量对照 | 完成 | dev/test 相对冻结 Base-v1 大幅下降，确认旧 Base 主要缺计算量 |
 | Base-v2 唯一语料扩容 | 完成，但门禁失败 | v2 held-out 的数值与 v1 基线一升一降；因评测语料不同，尚不能归因为能力改善或退化 |
-| SFT 四臂 | 未执行 | Base 门禁失败，按 §11 停止 |
+| SFT 四臂 | 未执行 | Base 门禁失败，按旧 §11 停止 |
 | DPO / GRPO | 未执行 | 同上 |
+| R0 交叉评测（现行手册） | 完成 | 3 权重 × 2 held-out，6 份 JSON 齐全；见第 9 节 |
+| R1 父模型 baseline（现行手册） | 完成 | 同协议 hash；见第 10 节 |
+| R1 large-SFT 两臂（现行手册） | 完成，**两臂门禁均未通过** | dev objective 与 BPB 通过，能力项未达标；见第 11 节 |
+| R1 DPO / GRPO（现行手册） | **未执行** | 两个 SFT arm 都失败，按现行 §6.3 / §11 硬性停止 |
 
 ## 2. 实验契约与三项已确认偏差
 
@@ -344,3 +349,200 @@ Base-v2 最终 checkpoint：
 对照臂最终 checkpoint：
 `/root/zitong/llm-lifecycle-lab/runs/native-60m-base-repeat-control-v2-s42/checkpoints/step-00045191`。
 中间 checkpoint 已滚动清理，历史 run 位于 `/data/legacy-runs-llm-lab/`。
+
+---
+
+## 9. R0：三个 Base 的 dev 交叉评测（现行手册 §4）
+
+按现行手册从 **R0** 续跑。R0 是诊断，不改权重、不读 test、不产生新门禁。
+6 份报告全部为有限数值，`eval_batches = 1024`、`external_data = true`、
+`sample_count = 1024`，Manifest 与 v2 §6.2 表格一致（`ok = true`，三对
+`stage_source_id_overlap` 全为 0，SFT 10,935 / 894,771、DPO 6,712 / 1,514,923、
+GRPO 1,288）。
+
+`--config` 始终使用 checkpoint 所属 run 的 `resolved_config.yaml`，
+外部 manifest 只改变评测数据。两套 held-out 的 `data_manifest_sha256`：
+v1 = `11a0c0ab…d577b8`，v2 = `ae80609b…6121c5`。
+
+| 权重 | held-out | eval loss | en loss | zh loss | BPB |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Base-v1 | v1 | 3.199809 | 2.203963 | 4.114944 | 1.189372 |
+| Base-v1 | v2 | 5.076120 | 5.054696 | 5.097978 | 2.284374 |
+| Base-repeat | v1 | **2.756106** | 1.952536 | 3.494549 | 1.024447 |
+| Base-repeat | v2 | 4.746067 | 4.958934 | 4.528888 | 2.135842 |
+| Base-v2 | v1 | 3.023885 | 2.446250 | 3.554704 | 1.123981 |
+| Base-v2 | v2 | **3.120518** | **2.540050** | **3.712744** | **1.404307** |
+
+按现行手册的解释规则：**Base-v2 在 v2 dev 胜、在 v1 dev 败**，属于
+「存在领域 tradeoff，不能称为整体改善或退化」。
+
+- v1 held-out 上 Base-repeat 最好，但它把 v1 语料看过 8 epoch（369.48M token），
+  该项优势主要来自重复暴露，不能在 v2 上复现（4.746 vs Base-v2 的 3.121）。
+- 同一个 Base-v1 权重在两套 held-out 上的 loss 相差 1.876（3.200 / 5.076），
+  远大于旧门禁 ±1% 的判定粒度：**旧 Base 门禁确实在跨语料比较绝对 loss**，
+  这一点由 R0 直接证实，v2 §6.2 的归因成立。
+- 因此 R0 不给出「哪个 Base 更优」的结论，也不据此停止 SFT。
+
+产物：`runs/evaluations/base-cross-r0/{6 × *.json, summary.tsv}`。
+
+## 10. R1：两个父模型的统一 capability baseline（现行手册 §5）
+
+两个 parent 使用同一 `lifecycle-v3` suite、同一 v2 pretrain manifest、
+同一 `native-chat-v1`、greedy、`max_new_tokens=32`、单线程。
+两份报告的 `protocol_sha256` 相同：
+`b99400ff7074086539d835f689265f466b30f2f5124ff26fba622322ac8bd1fa`（去重计数 = 1）。
+
+| 指标 | Base-repeat | Base-v2 |
+| --- | ---: | ---: |
+| instruction.success | 0 / 32 | 0 / 32 |
+| format.success | 0 / 24 | 0 / 24 |
+| qa.success | 0 / 32 | 0 / 32 |
+| multiturn.success | 0 / 24 | 0 / 24 |
+| verifiable.reward | 0 / 112 | 0 / 112 |
+| preference.accuracy | 0.718750 | 0.656250 |
+| corpus.bpb.all | 1.986153 | **1.693502** |
+| corpus.bpb.en | 1.527985 | **1.340105** |
+| corpus.bpb.zh | 2.487817 | **2.080450** |
+| continuation.repeated_trigram | 0.062500 | 0.108333 |
+
+两个 parent 在四类生成任务上都是全 0：和 v1 冻结结论
+（`public-posttrain-v3` 的 Base/SFT/DPO/GRPO 四项同为 0）一致。
+Base-v2 的 BPB 明显更好（1.6935 vs 1.9862），但这来自它在 v2 语料上训练，
+而 `corpus.bpb.*` 读的正是 v2 语料——因此 BPB 在本轮只能做**父子同分布对照**
+（用于不超过父模型 1.02 倍的回归检查），不能作为跨父模型的能力比较。
+
+## 11. R1：两个 large-SFT arm（现行手册 §6）
+
+### 11.1 预算与执行
+
+两臂配置除 `model.init_checkpoint` 外逐字段一致（脚本断言通过：
+`max_train_tokens = 2,000,000`、`learning_rate = 2e-5`、`seed = 42`）。
+两臂实际 batch/预算完全相同：
+
+| run_id | parent | steps | 监督 token | 覆盖 | dev loss（step 0 → 最终） | 最终 train loss | 耗时 |
+| --- | --- | ---: | ---: | ---: | --- | ---: | ---: |
+| `native-sft-public-60m-r1-repeat-large-s42` | Base-repeat | 383 | 2,002,968 | 1.001484 | 5.082605 → **4.185979** | 3.938592 | 73.1 s |
+| `native-sft-public-60m-r1-basev2-large-s42` | Base-v2 | 383 | 2,002,968 | 1.001484 | 3.989625 → **3.507844** | 3.290331 | 74.5 s |
+
+两臂 clean Git（`code.dirty = false`）、`run_manifest.status = completed`，
+`repository_commit = 6cf411ff77e3234dd35b863df6d352ea90093342`。
+
+### 11.2 门禁结果：两臂均失败
+
+| 检查 | 阈值 | repeat arm | basev2 arm |
+| --- | --- | --- | --- |
+| dev objective 相对 step 0 ↓ ≥5% | ≤ 4.8285 / ≤ 3.7901 | 4.1860 通过 | 3.5078 通过 |
+| instruction.success ≥4 | 32 | **0 失败** | **1 失败** |
+| format.success ≥3 | 24 | **0 失败** | **0 失败** |
+| qa.success ≥4 | 32 | **0 失败** | **0 失败** |
+| verifiable.reward ≥12 | 112 | **0 失败** | **1 失败** |
+| instruction/format/qa en 各 ≥1 | 16/12/16 | **0/0/0 失败** | **0/0/0 失败** |
+| instruction/format/qa zh 各 ≥1 | 16/12/16 | **0/0/0 失败** | **1/0/0 部分失败** |
+| corpus.bpb.all ≤ 1.02× parent | ≤ 2.0259 / ≤ 1.7274 | 1.908904 通过 | 1.713292 通过 |
+| 跨阶段 source group 交集 = 0 | 全 0 | 通过 | 通过 |
+| **合计** | | **ok = false** | **ok = false** |
+
+产物：`runs/gates/native-sft-public-60m-r1-{repeat,basev2}-large-s42.json`。
+
+### 11.3 归因：objective 达标、能力未达标，且两臂同源
+
+两臂都完成了这类低成本筛选臂应该完成的部分——dev objective 下降 12.1%–17.6%，
+BPB 相对父模型没有退化，跨阶段数据隔离为 0——但四类任务的成功数几乎全部为 0。这个「只改善自身 objective」
+的形态完全落在现行手册 §11 的最后一行：**不视为能力收益**。
+
+失败不是偶发算子错误，而是**数据分布分离不足**：
+
+1. `public-60m-v2` 的 SFT 训练集 10,935 条里，`open_qa` 3,260 + `baike` 1,768
+   + `brainstorming` 837 + `general_qa` 683 占 60% 以上，来源以
+   `databricks-dolly-15k`（5,031）与 `HC3-Chinese`（5,019）为主；回答中位数
+   **124 字符**、p90 318 字符。
+2. `lifecycle-v3` 的 instruction/format/qa/verifiable 全部要求
+   **精确串或整数匹配**（如 “Reply only Lima or Bern.”、JSON 键整数值、
+   “Write back the number 115838 using digits only.”）。
+3. 实测输出形态已学会 assistant 轮次（如 `Lima is Lima.`、
+   `1. The key "count" with the integer value 3.`），但不会收敛到被要求的
+   最小答案串；长答案先验直接违背精确匹配规则。
+4. 同一现象在历史资料里可复现：v1 冻结成绩单 `public-posttrain-v3` 的
+   SFT/DPO/GRPO 四项同为 0；仓库内唯一拿到非零值的是合成/模板数据的
+   `sft-v3`（0.25 / 0.21 / 0.34 / 0.27），仍远低于 4/3/4/12 的门禁。
+
+因此本轮 SFT 失败应归因于「**公开长答案数据与 lifecycle-v3 精确匹配探针的分布
+不匹配 + 2M assistant token 预算下 62.93M 模型不足以学会压缩到最小答案串**」，
+而不是某一臂的优化缺陷（两臂 dev/bpb 行为一致），也不是评测链路故障
+（同一份报告里 `corpus.bpb.*`、`continuation.*`、`preference.*` 全部产出有效读数）。
+
+## 12. 停止决策
+
+按现行手册 §6.3 的显式检查执行，返回 STOP：
+
+```text
+STOP: both R1 SFT arms failed; do not run DPO or GRPO   (exit=1)
+```
+
+依据同一节与 §11 矩阵：
+
+- 两个 SFT arm 都失败 → **停止 DPO/GRPO**，不生成 `runs/gates/sft-r1-winner.json`，
+  因此也不存在 SFT winner、DPO winner、GRPO winner 与最终成绩单
+  `runs/evaluations/public-posttrain-r1`。
+- 不现场降低门槛、不改写 `check_stage_gate.py` 的预注册定义、不为拉高成功数
+  改动 `max_new_tokens` 或 suite 规则。
+- 也不因为「SFT 已经跑完」而把它当成通过：「阶段训练完成」不能替代
+  「阶段门禁通过」。
+
+DPO、GRPO qualification 与三个 KL arm 未运行，这是**协议要求的正确终端状态**，
+不是遗漏。
+
+## 13. 承接：Base-v3 设计（现行手册 §10）
+
+现行手册 §10 明确是下一轮的**设计约束**，当前仓库没有对应 recipe/config，
+不得把该节改写成临时命令开跑。本轮结果给出了必须遵守此约束的证据：
+
+- Base 侧：Base-v2 与 Base-repeat 存在已观测的领域 tradeoff（第 9 节），
+  且两者 token 数不同（510.61M vs 369.48M），**不能**宣称 compute-matched；
+  §10.5 的「约 460M seen token Base-v3 vs 10-epoch v1 repeat」仍是唯一能把
+  数据效应与计算量效应分开的设计。
+- 后训练侧：要让 §6.2 的能力门禁有机会通过，光换 Base 不够，必须有办法处理
+  「长答案先验 vs 精确匹配探针」的分布不匹配（例如为指代/提取/计数类任务
+  引入公开非合成的短答案语料，并作为新 recipe ID 下的独立实验臂）。这属于新的
+  后训练数据配方，不在本轮契约内。
+- 在此之前，§10.10 的 sealed test anchor 必须先冻结：本轮与 v1/v2 的 test 都已
+  被使用或历史消费，不能再用作阈值来源。
+
+## 14. 本轮产物
+
+```text
+runs/qualifications/public-60m-v2-data-check-r1.json
+runs/evaluations/base-cross-r0/{6 × *.json, summary.tsv}
+runs/evaluations/r1-parent-repeat/{report.json,report.md}
+runs/evaluations/r1-parent-basev2/{report.json,report.md}
+runs/native-sft-public-60m-r1-repeat-large-s42/    （含 metrics.jsonl 等全套）
+runs/native-sft-public-60m-r1-basev2-large-s42/    （含 metrics.jsonl 等全套）
+runs/evaluations/native-sft-public-60m-r1-repeat-large-s42/{report.json,report.md}
+runs/evaluations/native-sft-public-60m-r1-basev2-large-s42/{report.json,report.md}
+runs/gates/native-sft-public-60m-r1-repeat-large-s42.json
+runs/gates/native-sft-public-60m-r1-basev2-large-s42.json
+```
+
+未生成（按 §12 要求逐一核对）：`runs/gates/sft-r1-winner.json`、
+`runs/gates/dpo-r1-winner.json`、`runs/gates/grpo-r1-winner.json`、
+`runs/qualifications/native-grpo-public-60m-r1-parent-s42/qualification.json`、
+`runs/evaluations/public-posttrain-r1/`。
+
+最终 checkpoint 绝对位置与 SHA-256（中间 step-00000050 … step-00000350 保留未删）：
+
+| run_id | 绝对路径（`model/model.pt`） | SHA-256 |
+| --- | --- | --- |
+| `native-sft-public-60m-r1-repeat-large-s42` | `/root/zitong/llm-lifecycle-lab/runs/native-sft-public-60m-r1-repeat-large-s42/checkpoints/step-00000383` | `8a490087a291e275469c0802bdb36cca881c4a5c0dc4b38686799b4e61d00f45` |
+| `native-sft-public-60m-r1-basev2-large-s42` | `/root/zitong/llm-lifecycle-lab/runs/native-sft-public-60m-r1-basev2-large-s42/checkpoints/step-00000383` | `60ae22a57c2d7b21d3b5378c1e612efecbfc45d7502f03de7551a250b44c8c64` |
+
+### 14.1 执行环境偏差（两项，已登记）
+
+1. **手册 §4 的 shell 片段有一处变量名冲突，已修正后执行。**
+   原文 `eval_model()` 用 `$name-on-v1` 与 `$name-on-v2` 调用 `eval_cross_dev()`，
+   而 `eval_cross_dev()` 内部第一条语句就是 `name=$1`。bash 函数不隔离辅助变量，
+   第二次调用实际展开成 `<model>-on-v1-on-v2`，summary 循环会在缺失的
+   `basev1-on-v2.json` 上失败。本次把两层的形参分别改名为 `target` / `model_name`
+   并加 `local`，输出文件名与手册 §12 要求的命名一致；评测本身的内容未被改动。
+2. **共享 GPU。** 同一张 RTX 4090 上还有其它进程，训练中出现过
+   `CUDACachingAllocator` 的分配重试日志，训练仍正常完成。
+   耗时与显存只描述本次环境，不用于跨设备比较（与 v1 记录口径一致）。
