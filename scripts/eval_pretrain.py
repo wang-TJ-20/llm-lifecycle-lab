@@ -30,6 +30,21 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--checkpoint", type=Path, required=True)
     parser.add_argument("--split", choices=("dev", "test"), default="dev")
+    parser.add_argument(
+        "--data-manifest",
+        type=Path,
+        help="Override held-out data without changing checkpoint identity checks.",
+    )
+    parser.add_argument(
+        "--packed-manifest",
+        type=Path,
+        help="Packed data paired with --data-manifest.",
+    )
+    parser.add_argument(
+        "--eval-batches",
+        type=int,
+        help="Override the number of deterministic evaluation batches.",
+    )
     parser.add_argument("--json", action="store_true", dest="as_json")
     return parser
 
@@ -43,6 +58,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             checkpoint=args.checkpoint,
             split=args.split,
             workdir=Path.cwd(),
+            data_manifest=args.data_manifest,
+            packed_manifest=args.packed_manifest,
+            eval_batches=args.eval_batches,
         )
     except (LLMLabError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)

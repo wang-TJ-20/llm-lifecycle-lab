@@ -205,6 +205,34 @@ class PretrainingIntegrationTests(unittest.TestCase):
             )
             self.assertTrue(Path(evaluation["report_path"]).is_file())
 
+            external_root = root / "external"
+            external_root.mkdir()
+            external_data_manifest = _prepare_data(external_root)
+            external_packed_dir = external_root / "packed"
+            materialize_packed_pretraining_dataset(
+                external_data_manifest,
+                tokenizer_dir,
+                external_packed_dir,
+                sequence_length=16,
+            )
+            external_evaluation = evaluate_native_pretraining(
+                config,
+                checkpoint=run.result.final_checkpoint,
+                split="dev",
+                workdir=root,
+                data_manifest=external_data_manifest,
+                packed_manifest=external_packed_dir / "packed_manifest.json",
+                eval_batches=2,
+            )
+            self.assertTrue(external_evaluation["external_data"])
+            self.assertEqual(external_evaluation["eval_batches"], 2)
+            self.assertEqual(external_evaluation["sample_count"], 4)
+            self.assertEqual(
+                external_evaluation["data_manifest_sha256"],
+                sha256_file(external_data_manifest),
+            )
+            self.assertNotIn("report_path", external_evaluation)
+
             reference_spec = root / "reference.yaml"
             reference_spec.write_text(
                 yaml.safe_dump(

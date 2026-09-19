@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable, Mapping
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from itertools import chain
 from pathlib import Path
 from typing import Any
@@ -64,6 +64,9 @@ def evaluate_native_pretraining(
     checkpoint: str | Path,
     split: str = "dev",
     workdir: str | Path = ".",
+    data_manifest: str | Path | None = None,
+    packed_manifest: str | Path | None = None,
+    eval_batches: int | None = None,
 ) -> dict[str, Any]:
     if (
         config.stage is not Stage.PRETRAIN
@@ -74,10 +77,29 @@ def evaluate_native_pretraining(
     root = Path(workdir).resolve()
     model_config_path = _required_path(config.model, "config", root=root)
     tokenizer_path = _required_path(config.model, "tokenizer", root=root)
-    data_manifest_path = _required_path(config.data, "manifest", root=root)
-    packed_manifest_path = _required_path(
+    configured_data_manifest_path = _required_path(
+        config.data,
+        "manifest",
+        root=root,
+    )
+    configured_packed_manifest_path = _required_path(
         config.data,
         "packed_manifest",
+        root=root,
+    )
+    if (data_manifest is None) != (packed_manifest is None):
+        raise ConfigError(
+            "external evaluation requires both data_manifest and packed_manifest"
+        )
+    external_data = data_manifest is not None
+    data_manifest_path = _evaluation_path(
+        data_manifest,
+        default=configured_data_manifest_path,
+        root=root,
+    )
+    packed_manifest_path = _evaluation_path(
+        packed_manifest,
+        default=configured_packed_manifest_path,
         root=root,
     )
     checkpoint_path = Path(checkpoint)
@@ -85,6 +107,10 @@ def evaluate_native_pretraining(
         checkpoint_path = root / checkpoint_path
 
     engine_config = EngineConfig.from_dict(config.training)
+    if eval_batches is not None:
+        if eval_batches <= 0:
+            raise ConfigError("eval_batches must be positive")
+        engine_config = replace(engine_config, eval_batches=eval_batches)
     model_config = load_native_model_config(model_config_path)
     tokenizer = NativeTokenizer.from_directory(tokenizer_path)
     if tokenizer.vocab_size != model_config.vocab_size:
@@ -126,19 +152,32 @@ def evaluate_native_pretraining(
         device=device,
         dtype=engine_config.torch_dtype,
     )
+    sample_count = sum(int(batch["input_ids"].shape[0]) for batch in batches)
     result = {
         "checkpoint": str(checkpoint_path),
         "checkpoint_step": metadata.step,
         "split": split,
+        "sample_count": sample_count,
+        "eval_batches": len(batches),
+        "data_manifest": str(data_manifest_path),
+        "data_manifest_sha256": sha256_file(data_manifest_path),
+        "packed_manifest": str(packed_manifest_path),
+        "packed_manifest_sha256": sha256_file(packed_manifest_path),
+        "external_data": external_data,
         **metrics,
     }
     run_path = checkpoint_path.parent.parent
-    if run_path.name == metadata.run_id and (run_path / "run_manifest.json").is_file():
+    default_protocol = not external_data and eval_batches is None
+    if (
+        default_protocol
+        and run_path.name == metadata.run_id
+        and (run_path / "run_manifest.json").is_file()
+    ):
         evaluation = EvaluationReport(
             run_id=metadata.run_id,
             suite=f"pretrain-{split}",
             metrics=metrics,
-            sample_count=sum(int(batch["input_ids"].shape[0]) for batch in batches),
+            sample_count=sample_count,
         )
         report_path = RunArtifacts(
             run_id=metadata.run_id,
@@ -149,6 +188,18 @@ def evaluate_native_pretraining(
         )
         result["report_path"] = str(report_path)
     return result
+
+
+def _evaluation_path(
+    value: str | Path | None,
+    *,
+    default: Path,
+    root: Path,
+) -> Path:
+    if value is None:
+        return default
+    path = Path(value)
+    return path if path.is_absolute() else root / path
 
 
 def run_native_pretraining(

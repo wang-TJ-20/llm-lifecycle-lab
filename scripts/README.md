@@ -66,6 +66,11 @@ python scripts/pretrain_experiment.py --mode resume
 `resume` 只在临时 run 中注入受控异常，不影响已有训练。
 实验用于机制检查，不代表真实双语模型能力或完整 CUDA 验证。
 
+`eval_pretrain.py` 默认使用训练配置绑定的数据并把报告写回 run。跨语料诊断时，
+同时传入 `--data-manifest`、`--packed-manifest`；可用 `--eval-batches` 扩大
+固定评测窗口。checkpoint 仍校验原训练配置和 Tokenizer，覆盖评测数据不会改写
+run 内的冻结报告。
+
 ## 60M 基线入口
 
 `verify_reference.py` 的三种模式互斥，必须选择其中一种：

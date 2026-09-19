@@ -577,6 +577,25 @@ def test_python_scripts_prepare_train_and_evaluate(tmp_path: Path) -> None:
     assert evaluation["eval_en_tokens"] > 0
     assert evaluation["eval_zh_tokens"] > 0
     assert Path(evaluation["report_path"]).is_file()
+    cross_evaluation = run_script(
+        "eval_pretrain",
+        "--config",
+        "pipeline.yaml",
+        "--checkpoint",
+        "runs/script-run/checkpoints/step-00000001",
+        "--data-manifest",
+        "prepared/data_manifest.json",
+        "--packed-manifest",
+        "packed/packed_manifest.json",
+        "--eval-batches",
+        "2",
+        "--json",
+        cwd=tmp_path,
+    )
+    cross_metrics = json.loads(cross_evaluation.stdout)
+    assert cross_metrics["external_data"] is True
+    assert cross_metrics["eval_batches"] == 2
+    assert "report_path" not in cross_metrics
     saved_config = yaml.safe_load(
         (tmp_path / "runs/script-run/resolved_config.yaml").read_text(encoding="utf-8")
     )
