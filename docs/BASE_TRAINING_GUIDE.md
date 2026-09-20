@@ -13,7 +13,8 @@ held-out 上稳定学到更低的双语语言模型损失。** 在 Base 门禁�
 - Tokenizer：`data/tokenizers/bilingual-60m-v1`。
 - 数据：`data/prepared/bilingual-60m-v1`。
 - Packing：`data/packed/bilingual-60m-v1-seq512`。
-- 本地配置：`configs/pipelines/native-60m-base-local-smoke.yaml`。
+- 本地链路配置：`configs/pipelines/native-60m-base-local-smoke.yaml`。
+- 本地收敛配置：`configs/pipelines/native-60m-base-local-pilot100.yaml`。
 - 远端配置：`configs/pipelines/native-60m-base-v1.yaml`。
 - 本轮只评测同一 manifest 的 dev；通过开发门禁后，test 只运行一次。
 - 不从任何历史 checkpoint 初始化，不复用历史 run ID。
@@ -33,15 +34,16 @@ recipe 和共同评测 anchor，不能把两套 held-out 的绝对 loss 直接�
    数据难度无法分离。
 3. 旧计划同时展开 Base、SFT、DPO、GRPO，Base 结论未稳定时下游复杂度已经进入。
 
-新流程只保留两个阶段：本地 8-step 链路验证，以及远端 8-epoch Base 训练。
-所有收益判断都使用同一 run 的 step-0 baseline。
+新流程只保留三个阶段：本地 8-step 链路验证、本地 100-step 收敛验证，以及远端
+8-epoch Base 训练。所有收益判断都使用同一 run 的 step-0 baseline。
 
 当前状态：
 
 | 阶段 | 状态 | 结果 |
 | --- | --- | --- |
 | 本地 Native-60M MPS smoke | 通过 | 8 steps；dev loss 9.834474 → 8.748201；en/zh 均下降 |
-| 远端 Base-v1 | 未运行 | 等待从干净提交执行 |
+| 本地 Native-60M MPS pilot | 通过 | 100 steps；dev loss 9.855341 → 7.299100；en/zh 均下降 |
+| 远端 Base-v1 | 未运行 | 仅在本地 pilot 通过后启动 |
 
 ## 3. 本地 MPS 门禁
 
@@ -93,7 +95,89 @@ PY
 
 任何断言失败都停止。不要修改阈值，也不要启动远端训练。
 
-## 4. 远端 Base-v1
+## 4. 本地 100-step 收敛门禁
+
+8-step smoke 只证明链路可运行。远端训练前，再从随机权重独立运行 100 steps，
+检查较长优化过程、分语言趋势和 checkpoint 重载。该 run 不继承 smoke 权重：
+
+```bash
+set -euo pipefail
+
+.venv/bin/python scripts/validate_config.py \
+  configs/pipelines/native-60m-base-local-pilot100.yaml
+
+.venv/bin/python scripts/doctor.py \
+  --config configs/pipelines/native-60m-base-local-pilot100.yaml
+
+test ! -e runs/native-60m-base-local-pilot100-s42
+.venv/bin/python scripts/train_pretrain.py \
+  --config configs/pipelines/native-60m-base-local-pilot100.yaml \
+  --run-id native-60m-base-local-pilot100-s42
+
+.venv/bin/python scripts/eval_pretrain.py \
+  --config configs/pipelines/native-60m-base-local-pilot100.yaml \
+  --checkpoint \
+    runs/native-60m-base-local-pilot100-s42/checkpoints/step-00000100 \
+  --split dev \
+  --json > runs/native-60m-base-local-pilot100-s42/final-dev-reload.json
+```
+
+以下门禁在训练前固定，不得根据输出放宽：
+
+```bash
+.venv/bin/python - <<'PY'
+import json
+import math
+from pathlib import Path
+
+run = Path("runs/native-60m-base-local-pilot100-s42")
+manifest = json.loads((run / "run_manifest.json").read_text())
+result = json.loads((run / "training_result.json").read_text())
+reload = json.loads((run / "final-dev-reload.json").read_text())
+rows = [
+    json.loads(line)
+    for line in (run / "metrics.jsonl").read_text().splitlines()
+    if line.strip()
+]
+baseline = next(row for row in rows if row.get("event") == "baseline")
+evaluated = [
+    row
+    for row in rows
+    if "eval_loss" in row and "train_loss" in row
+]
+final = next(row for row in reversed(evaluated) if row.get("step") == 100)
+best = min(float(row["eval_loss"]) for row in evaluated)
+
+assert manifest["status"] == "completed"
+assert result["global_step"] == 100
+assert math.isclose(
+    float(result["target_token_coverage"]),
+    1.0,
+    rel_tol=0.0,
+    abs_tol=1e-12,
+)
+for row in (baseline, final):
+    for key in ("eval_loss", "eval_en_loss", "eval_zh_loss"):
+        assert math.isfinite(float(row[key]))
+for key in ("train_loss", "gradient_norm"):
+    assert math.isfinite(float(final[key]))
+for key in ("eval_loss", "eval_en_loss", "eval_zh_loss"):
+    assert float(final[key]) < float(baseline[key])
+    assert math.isclose(
+        float(reload[key]),
+        float(final[key]),
+        rel_tol=0.0,
+        abs_tol=1e-9,
+    )
+assert float(final["eval_loss"]) <= 1.02 * best
+print("PASS: local Native-60M 100-step pilot")
+PY
+```
+
+任一断言失败都保留 run 和 checkpoint 并停止，不运行远端训练，也不修改门禁。
+本阶段仍只读取 dev，不接触 test。
+
+## 5. 远端 Base-v1
 
 远端必须使用 Linux、CUDA BF16、干净提交和同一批数据文件。先同步仓库中的
 Tokenizer、prepared manifest 及全部 packed 数组，再执行：
@@ -119,7 +203,7 @@ python scripts/train_pretrain.py \
 固定预算为 8 epochs，约 369.5M supervised token 和 45,191 optimizer steps。
 每 1,000 step 在固定的 1,024 个 dev 窗口上评测；每 5,000 step 保存 checkpoint。
 
-## 5. Base 开发门禁
+## 6. Base 开发门禁
 
 训练完成后只读取 `metrics.jsonl` 和 `training_result.json`：
 
@@ -169,9 +253,10 @@ python scripts/eval_pretrain.py \
   --json > runs/native-60m-base-v1-s42/final-test.json
 ```
 
-## 6. 停止规则
+## 7. 停止规则
 
 - 本地 MPS 门禁失败：修训练链路，不上远端。
+- 本地 100-step pilot 未通过全部预注册门禁：保留证据并诊断，不上远端。
 - 远端数值异常、token coverage 不合格或任一语言未改善：停止在 Base。
 - final dev 比最佳 checkpoint 回退超过 2%：从已有 checkpoint 诊断训练日程，
   不直接进入后训练。

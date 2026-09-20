@@ -144,7 +144,7 @@ python scripts/eval_pretrain.py \
 已有同名 run 时换新 ID，不要删除旧记录来绕开覆盖保护。
 恢复只用于完成原预算，不能给已经结束的两步 Smoke 直接追加训练。
 
-60M 当前采用“本地 MPS smoke → 远端 CUDA Base”两级门禁，执行入口见
+60M 当前采用“本地 MPS smoke → 本地 MPS pilot → 远端 CUDA Base”三级门禁，执行入口见
 [Native-60M Base 从零训练手册](./docs/BASE_TRAINING_GUIDE.md)。
 
 ## 模型与数据
@@ -197,11 +197,12 @@ flowchart TD
 | --- | --- |
 | 已完成 | 七篇中文教程、Docsify 在线阅读站与 CPU 离线实验 |
 | 已实现 | Native 10M/60M、双语 BPE、磁盘 Packing、Pretrain、评测与 checkpoint 恢复 |
-| 当前进行中 | Native-60M Base 从零重训；本地 MPS smoke 已通过，远端 CUDA 待运行 |
+| 当前进行中 | Native-60M Base 从零重训；本地 MPS smoke/pilot 已通过，远端 CUDA 待运行 |
 | 后续方向，尚未实现 | SFT、DPO、GRPO、Qwen 迁移、模型导出与服务 |
 
 当前 60M 路线从随机权重重新开始，只使用
-[`native-60m-base-local-smoke.yaml`](./configs/pipelines/native-60m-base-local-smoke.yaml)
+[`native-60m-base-local-smoke.yaml`](./configs/pipelines/native-60m-base-local-smoke.yaml)、
+[`native-60m-base-local-pilot100.yaml`](./configs/pipelines/native-60m-base-local-pilot100.yaml)
 和 [`native-60m-base-v1.yaml`](./configs/pipelines/native-60m-base-v1.yaml)。
 固定边界、门禁和命令见
 [Base 从零训练手册](./docs/BASE_TRAINING_GUIDE.md)。
