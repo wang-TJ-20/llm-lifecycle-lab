@@ -35,7 +35,6 @@ class PublicMixtureRecipe(JsonContract):
     description: str
     components: tuple[str, ...]
     strategy: str
-    annotate_component: bool = False
     expected_source_sha256: str | None = None
     schema_version: str = SCHEMA_VERSION
 
@@ -74,7 +73,6 @@ class PublicMixtureRecipe(JsonContract):
                 description=str(value["description"]),
                 components=tuple(str(item) for item in components),
                 strategy=str(mixing["strategy"]),
-                annotate_component=bool(mixing.get("annotate_component", False)),
                 expected_source_sha256=(
                     str(mixing["output_sha256"])
                     if mixing.get("output_sha256") is not None
@@ -97,7 +95,6 @@ class PublicMixtureManifest(JsonContract):
     source_sha256: str
     license: str
     languages: tuple[str, ...]
-    annotate_component: bool = False
     created_at: str = field(default_factory=utc_now)
     schema_version: str = SCHEMA_VERSION
 
@@ -153,7 +150,6 @@ class PublicMixtureManifest(JsonContract):
             source_sha256=str(value["source_sha256"]),
             license=str(value["license"]),
             languages=tuple(str(item) for item in languages),
-            annotate_component=bool(value.get("annotate_component", False)),
             created_at=str(value["created_at"]),
             schema_version=str(value["schema_version"]),
         )
@@ -224,11 +220,7 @@ def materialize_public_mixture(
 
     source_path = temporary / "source.jsonl"
     try:
-        records = _write_round_robin(
-            ordered,
-            source_path,
-            annotate_component=recipe.annotate_component,
-        )
+        records = _write_round_robin(ordered, source_path)
         source_sha256 = sha256_file(source_path)
         if (
             recipe.expected_source_sha256 is not None
@@ -250,7 +242,6 @@ def materialize_public_mixture(
             source_sha256=source_sha256,
             license=_license_expression(source_manifests),
             languages=_languages(source_manifests),
-            annotate_component=recipe.annotate_component,
         )
         _write_json(temporary / "mixture_manifest.json", manifest.to_dict())
         os.replace(temporary, target)
@@ -309,8 +300,6 @@ def _load_components(
 def _write_round_robin(
     components: list[tuple[Path, PublicSourceManifest]],
     path: Path,
-    *,
-    annotate_component: bool = False,
 ) -> int:
     expected_counts = [manifest.records for _, manifest in components]
     actual_counts = [0] * len(components)
@@ -349,10 +338,6 @@ def _write_round_robin(
                             )
                         seen_ids.add(record_id)
                         record["language"] = components[index][1].language
-                        if annotate_component:
-                            record["source_recipe_id"] = (
-                                components[index][1].recipe_id
-                            )
                         output.write(
                             json.dumps(
                                 record,
@@ -393,8 +378,6 @@ def _verify_mixture_manifest_recipe(manifest: PublicMixtureManifest) -> None:
         mismatches.append("components")
     if manifest.strategy != recipe.strategy:
         mismatches.append("strategy")
-    if manifest.annotate_component != recipe.annotate_component:
-        mismatches.append("annotate_component")
     if manifest.records != expected_records:
         mismatches.append("records")
     if manifest.license != _license_expression(component_manifests):

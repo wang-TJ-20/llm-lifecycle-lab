@@ -25,8 +25,6 @@ from llm_lifecycle_lab.training.checkpoint import (
 
 
 class _StubGradScaler:
-    """Expose non-empty scaler state without requiring CUDA."""
-
     def __init__(self, scale: float = 65536.0) -> None:
         self.state = {"scale": scale}
 

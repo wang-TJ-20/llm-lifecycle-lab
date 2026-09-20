@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable, Mapping
-from dataclasses import asdict, dataclass, replace
+from dataclasses import asdict, dataclass
 from itertools import chain
 from pathlib import Path
 from typing import Any
@@ -64,9 +64,6 @@ def evaluate_native_pretraining(
     checkpoint: str | Path,
     split: str = "dev",
     workdir: str | Path = ".",
-    data_manifest: str | Path | None = None,
-    packed_manifest: str | Path | None = None,
-    eval_batches: int | None = None,
 ) -> dict[str, Any]:
     if (
         config.stage is not Stage.PRETRAIN
@@ -77,29 +74,10 @@ def evaluate_native_pretraining(
     root = Path(workdir).resolve()
     model_config_path = _required_path(config.model, "config", root=root)
     tokenizer_path = _required_path(config.model, "tokenizer", root=root)
-    configured_data_manifest_path = _required_path(
-        config.data,
-        "manifest",
-        root=root,
-    )
-    configured_packed_manifest_path = _required_path(
+    data_manifest_path = _required_path(config.data, "manifest", root=root)
+    packed_manifest_path = _required_path(
         config.data,
         "packed_manifest",
-        root=root,
-    )
-    if (data_manifest is None) != (packed_manifest is None):
-        raise ConfigError(
-            "external evaluation requires both data_manifest and packed_manifest"
-        )
-    external_data = data_manifest is not None
-    data_manifest_path = _evaluation_path(
-        data_manifest,
-        default=configured_data_manifest_path,
-        root=root,
-    )
-    packed_manifest_path = _evaluation_path(
-        packed_manifest,
-        default=configured_packed_manifest_path,
         root=root,
     )
     checkpoint_path = Path(checkpoint)
@@ -107,14 +85,12 @@ def evaluate_native_pretraining(
         checkpoint_path = root / checkpoint_path
 
     engine_config = EngineConfig.from_dict(config.training)
-    if eval_batches is not None:
-        if eval_batches <= 0:
-            raise ConfigError("eval_batches must be positive")
-        engine_config = replace(engine_config, eval_batches=eval_batches)
     model_config = load_native_model_config(model_config_path)
     tokenizer = NativeTokenizer.from_directory(tokenizer_path)
     if tokenizer.vocab_size != model_config.vocab_size:
         raise ConfigError("tokenizer and model vocabulary sizes do not match")
+    if tokenizer.manifest.source_data_sha256 != sha256_file(data_manifest_path):
+        raise ConfigError("tokenizer was trained from a different Data Manifest")
 
     metadata = _checkpoint_metadata(checkpoint_path)
     expected = {
@@ -152,32 +128,19 @@ def evaluate_native_pretraining(
         device=device,
         dtype=engine_config.torch_dtype,
     )
-    sample_count = sum(int(batch["input_ids"].shape[0]) for batch in batches)
     result = {
         "checkpoint": str(checkpoint_path),
         "checkpoint_step": metadata.step,
         "split": split,
-        "sample_count": sample_count,
-        "eval_batches": len(batches),
-        "data_manifest": str(data_manifest_path),
-        "data_manifest_sha256": sha256_file(data_manifest_path),
-        "packed_manifest": str(packed_manifest_path),
-        "packed_manifest_sha256": sha256_file(packed_manifest_path),
-        "external_data": external_data,
         **metrics,
     }
     run_path = checkpoint_path.parent.parent
-    default_protocol = not external_data and eval_batches is None
-    if (
-        default_protocol
-        and run_path.name == metadata.run_id
-        and (run_path / "run_manifest.json").is_file()
-    ):
+    if run_path.name == metadata.run_id and (run_path / "run_manifest.json").is_file():
         evaluation = EvaluationReport(
             run_id=metadata.run_id,
             suite=f"pretrain-{split}",
             metrics=metrics,
-            sample_count=sample_count,
+            sample_count=sum(int(batch["input_ids"].shape[0]) for batch in batches),
         )
         report_path = RunArtifacts(
             run_id=metadata.run_id,
@@ -188,18 +151,6 @@ def evaluate_native_pretraining(
         )
         result["report_path"] = str(report_path)
     return result
-
-
-def _evaluation_path(
-    value: str | Path | None,
-    *,
-    default: Path,
-    root: Path,
-) -> Path:
-    if value is None:
-        return default
-    path = Path(value)
-    return path if path.is_absolute() else root / path
 
 
 def run_native_pretraining(
@@ -255,6 +206,8 @@ def run_native_pretraining(
             f"model vocab_size {model_config.vocab_size}"
         )
     data_manifest_sha256 = sha256_file(data_manifest_path)
+    if tokenizer.manifest.source_data_sha256 != data_manifest_sha256:
+        raise ConfigError("tokenizer was trained from a different Data Manifest")
 
     torch.manual_seed(config.seed)
     model = NativeTransformer(model_config)
@@ -325,17 +278,6 @@ def run_native_pretraining(
         artifacts.write_json(
             "data_snapshot.json",
             load_data_manifest(data_manifest_path),
-        )
-        artifacts.write_json(
-            "data_provenance.json",
-            {
-                "training_data_manifest": str(data_manifest_path),
-                "training_data_manifest_sha256": data_manifest_sha256,
-                "tokenizer_source_data_manifest_sha256": (
-                    tokenizer.manifest.source_data_sha256
-                ),
-                "tokenizer_sha256": tokenizer.manifest.content_sha256,
-            },
         )
         artifacts.write_json(
             "packed_data_snapshot.json",

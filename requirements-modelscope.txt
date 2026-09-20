@@ -1,4 +1,0 @@
--r requirements.txt
-
-# ModelScope is optional and used only to download or publish release artifacts.
-modelscope>=1.37,<2

@@ -14,9 +14,6 @@ build/
 /runs/
 /checkpoints/
 /wandb/
-# Pinned upstream snapshots (Qwen weights and tokenizer); re-download, never commit
-/artifacts/
 *.pt
 *.pth
 *.safetensors
-/step-*-model.tar.gz

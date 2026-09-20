@@ -84,8 +84,6 @@ class EngineConfigTests(unittest.TestCase):
 
 
 class _ScalarModel:
-    """Minimal model whose every logit equals the sum of its parameters."""
-
     def __init__(self) -> None:
         self.weight = torch.nn.Parameter(torch.tensor([2.0, -1.0]))
         self._training = False
@@ -126,8 +124,6 @@ class _ScalarModel:
 
 
 class _TokenCountObjective:
-    """Return an analytic loss with a configurable effective-token count."""
-
     name = "stub-pretrain"
 
     def __call__(
@@ -140,25 +136,6 @@ class _TokenCountObjective:
         return ObjectiveOutput(
             loss=loss,
             metrics={"supervised_tokens": float(tokens), "source_bytes": float(tokens)},
-        )
-
-
-class _PairCountObjective(_TokenCountObjective):
-    """Expose pair normalization separately from diagnostic response tokens."""
-
-    name = "stub-dpo"
-
-    def __call__(
-        self, model: _ScalarModel, batch: dict[str, object]
-    ) -> ObjectiveOutput:
-        result = super().__call__(model, batch)
-        return ObjectiveOutput(
-            loss=result.loss,
-            metrics={
-                **result.metrics,
-                "normalization_count": 1.0,
-                "report_pair_accuracy": float(batch["scale"]) - 1.0,
-            },
         )
 
 
@@ -243,67 +220,6 @@ class EngineGradientAccumulationTests(unittest.TestCase):
                 1.75 * math.sqrt(2.0),
                 places=5,
             )
-            self.assertEqual(recorded[0]["tokens"], 40)
-
-    def test_pair_objective_does_not_weight_longer_responses_more(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            run_config = RunConfig(
-                model_route=ModelRoute.NATIVE,
-                run_profile=RunProfile.SMOKE,
-                stage=Stage.DPO,
-                model={"provider": "native", "model_id": "stub"},
-            )
-            artifacts = ArtifactStore(root / "runs").create_run(
-                run_config, run_id="pair-accumulation-test"
-            )
-            config = EngineConfig(
-                sequence_length=8,
-                max_steps=1,
-                micro_batch_size=1,
-                gradient_accumulation_steps=2,
-                learning_rate=1e-6,
-                gradient_clipping=1e9,
-                device="cpu",
-                checkpoint_interval=1,
-                eval_interval=1,
-                log_interval=1,
-            )
-            resolved, budget = config.resolve_budget(
-                examples_per_epoch=2, supervised_tokens_per_epoch=40
-            )
-            model = _ScalarModel()
-            engine = TrainingEngine(
-                config=resolved,
-                budget=budget,
-                artifacts=artifacts,
-                checkpoint_manager=CheckpointManager(
-                    artifacts,
-                    model_route=ModelRoute.NATIVE,
-                    stage=Stage.DPO,
-                    tokenizer_sha256="0" * 64,
-                    config_sha256=config_sha256(run_config),
-                ),
-                seed=0,
-            )
-            stream = DeterministicBatchStream(
-                [
-                    {"input_ids": torch.zeros(1, 8), "tokens": 10, "scale": 1.0},
-                    {"input_ids": torch.zeros(1, 8), "tokens": 30, "scale": 2.0},
-                ],
-                batch_size=1,
-                seed=0,
-                collate_fn=lambda values: values[0],
-            )
-            recorded: list[dict[str, object]] = []
-            engine.train(
-                bundle=SimpleNamespace(model=model),
-                objective=_PairCountObjective(),
-                train_stream=stream,
-                metric_callback=recorded.append,
-            )
-            self.assertAlmostEqual(recorded[0]["train_loss"], 1.5, places=6)
-            self.assertAlmostEqual(recorded[0]["report_pair_accuracy"], 0.5)
             self.assertEqual(recorded[0]["tokens"], 40)
 
 

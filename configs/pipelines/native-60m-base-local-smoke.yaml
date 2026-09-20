@@ -1,6 +1,6 @@
 schema_version: "1.0"
 model_route: native
-run_profile: reproduce
+run_profile: smoke
 stage: pretrain
 seed: 42
 output_dir: runs
@@ -11,23 +11,23 @@ model:
   config: configs/models/tiny-60m.yaml
   tokenizer: data/tokenizers/bilingual-60m-v1
 data:
-  manifest: data/prepared/bilingual-60m-v2/data_manifest.json
-  packed_manifest: data/packed/bilingual-60m-v2-seq512/packed_manifest.json
+  manifest: data/prepared/bilingual-60m-v1/data_manifest.json
+  packed_manifest: data/packed/bilingual-60m-v1-seq512/packed_manifest.json
 training:
-  device: cuda
-  dtype: bfloat16
+  device: mps
+  dtype: float32
   sequence_length: 512
   micro_batch_size: 1
-  gradient_accumulation_steps: 16
-  num_epochs: 1.0
+  gradient_accumulation_steps: 2
+  max_steps: 8
   learning_rate: 0.0003
   weight_decay: 0.1
   beta1: 0.9
   beta2: 0.95
-  warmup_steps: 50
+  warmup_steps: 1
   min_lr_ratio: 0.1
   gradient_clipping: 1.0
-  checkpoint_interval: 500
-  eval_interval: 500
-  eval_batches: 64
-  log_interval: 10
+  checkpoint_interval: 8
+  eval_interval: 4
+  eval_batches: 4
+  log_interval: 1

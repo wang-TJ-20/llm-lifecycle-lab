@@ -36,6 +36,12 @@ class DoctorTests(unittest.TestCase):
             stage=Stage.PRETRAIN,
             model={"provider": "native", "model_id": "smoke-10m"},
         )
+        local_60m = RunConfig(
+            model_route=ModelRoute.NATIVE,
+            run_profile=RunProfile.SMOKE,
+            stage=Stage.PRETRAIN,
+            model={"provider": "native", "model_id": "tiny-60m"},
+        )
         learn = RunConfig(
             model_route=ModelRoute.NATIVE,
             run_profile=RunProfile.LEARN,
@@ -45,6 +51,7 @@ class DoctorTests(unittest.TestCase):
 
         self.assertEqual(profile_for_config(qwen), "qwen3-0.6b-base")
         self.assertEqual(profile_for_config(smoke), "smoke-10m")
+        self.assertEqual(profile_for_config(local_60m), "tiny-60m-local")
         self.assertEqual(profile_for_config(learn), "tiny-60m")
 
     def test_explicit_conflicting_profile_fails(self) -> None:

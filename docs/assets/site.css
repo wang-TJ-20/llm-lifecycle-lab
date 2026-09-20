@@ -281,7 +281,6 @@ button:disabled { cursor: wait; }
 .markdown-section .math-block { max-width: 100%; overflow-x: auto; margin: 26px 0; padding: 4px 0; }
 .katex-display { margin: 0.8em 0; font-size: 0.95em; }
 .markdown-section figure { margin: 28px 0; }
-.markdown-section img { max-width: 100%; height: auto; }
 .tutorial-figure {
   overflow: hidden;
   border: 1px solid var(--line);

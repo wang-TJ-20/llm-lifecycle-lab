@@ -9,12 +9,9 @@ const chapter = "/tutorials/02-bilingual-training-data";
 const tokenizerChapter = "/tutorials/03-tokenizer-and-packing";
 const transformerChapter = "/tutorials/04-small-transformer";
 const finalChapters = [
-  { route: "/tutorials/05-first-pretraining", title: "05 跑通", diagrams: 1, formulas: 2, search: "梯度累积怎样按", command: "pretrain_experiment.py --mode" },
-  { route: "/tutorials/06-evaluating-a-model", title: "06 判断", diagrams: 2, formulas: 4, search: "Loss 为什么要按", command: "pretrain_experiment.py --mode" },
-  { route: "/tutorials/07-resume-and-compare", title: "07 让实验", diagrams: 2, formulas: 0, search: "数据顺序也必须恢复", command: "pretrain_experiment.py --mode" },
-  { route: "/tutorials/08-supervised-fine-tuning", title: "08 让 Base", diagrams: 2, formulas: 1, search: "assistant-only 到底屏蔽", command: "sft_experiment.py --mode" },
-  { route: "/tutorials/09-direct-preference-optimization", title: "09 用偏好", diagrams: 1, formulas: 5, search: "policy 与 reference 各自", command: "dpo_experiment.py --mode" },
-  { route: "/tutorials/10-verifiable-reward-grpo", title: "10 用可验证", diagrams: 1, formulas: 4, search: "组内 advantage 在比较", command: "grpo_experiment.py --mode" },
+  { route: "/tutorials/05-first-pretraining", title: "05 跑通", diagrams: 1, formulas: 2, search: "梯度累积不总是" },
+  { route: "/tutorials/06-evaluating-a-model", title: "06 判断", diagrams: 2, formulas: 4, search: "Loss 为什么要按" },
+  { route: "/tutorials/07-resume-and-compare", title: "07 让实验", diagrams: 2, formulas: 0, search: "数据顺序也必须恢复" },
 ];
 const expectedFigures = new Map([
   ["/tutorials/01-first-parameter-update", 4],
@@ -24,9 +21,6 @@ const expectedFigures = new Map([
   ["/tutorials/05-first-pretraining", 2],
   ["/tutorials/06-evaluating-a-model", 2],
   ["/tutorials/07-resume-and-compare", 2],
-  ["/tutorials/08-supervised-fine-tuning", 0],
-  ["/tutorials/09-direct-preference-optimization", 0],
-  ["/tutorials/10-verifiable-reward-grpo", 0],
 ]);
 const errors = [];
 
@@ -93,9 +87,7 @@ async function main() {
     await page.locator(".mermaid-source svg").waitFor();
     await noOverflow(page);
     assert.equal(await page.locator(".chapter-pagination .next").count(), 1);
-    assert.equal(await page.locator(
-      '.sidebar a[href^="#/tutorials/0"], .sidebar a[href="#/tutorials/10-verifiable-reward-grpo"]'
-    ).count(), 10);
+    assert.equal(await page.locator('.sidebar a[href^="#/tutorials/0"]').count(), 7);
     await page.screenshot({ path: path.join(screenshots, "desktop-home.png") });
 
     await page.locator('.sidebar a[href="#/tutorials/02-bilingual-training-data"]').click();
@@ -267,7 +259,7 @@ async function main() {
       await noOverflow(page);
       await page.screenshot({ path: path.join(screenshots, `desktop-chapter${index + 5}.png`), animations: "disabled" });
       const command = page.locator(".markdown-section > pre").filter({
-        hasText: `python scripts/${lesson.command}`,
+        hasText: "python scripts/pretrain_experiment.py --mode",
       }).first();
       const code = await command.locator("code").textContent();
       await command.getByRole("button", { name: "复制代码", exact: true }).click();
@@ -279,17 +271,6 @@ async function main() {
 
     await ready(page, "/NATIVE_MODEL_GUIDE", "自有模型介绍");
     await noOverflow(page);
-    await ready(page, "/experiments/native-60m-baseline-v1", "60M CUDA Reference");
-    await page.locator('img[src*="native-60m-baseline-v1/loss.svg"]').waitFor();
-    assert.equal(
-      await page.locator('img[src*="native-60m-baseline-v1/"]').count(),
-      5,
-    );
-    await noOverflow(page);
-    await page.screenshot({
-      path: path.join(screenshots, "desktop-60m-baseline-candidate.png"),
-      animations: "disabled",
-    });
     await ready(page, "/does-not-exist", "没有找到这一页");
 
     const phone = await context.newPage();
@@ -409,15 +390,6 @@ async function main() {
       }
     }
 
-    await phone.setViewportSize({ width: 320, height: 720 });
-    await ready(phone, "/experiments/native-60m-baseline-v1", "60M CUDA Reference");
-    await phone.locator('img[src*="native-60m-baseline-v1/loss.svg"]').waitFor();
-    await noOverflow(phone);
-    await phone.screenshot({
-      path: path.join(screenshots, "mobile-60m-baseline-candidate.png"),
-      animations: "disabled",
-    });
-
     const prefixed = await context.newPage();
     await prefixed.route(`${base}/pages-preview/**`, async (route) => {
       const response = await route.fetch({
@@ -437,7 +409,7 @@ async function main() {
       nodes.every((node) => new URL(node.currentSrc || node.src).pathname.startsWith("/pages-preview/"))
     ), "Illustrations must resolve inside the Pages subpath");
     assert.deepEqual(errors, [], "No uncaught browser errors");
-    console.log("PASS: tutorials and experiment record, desktop/mobile, diagrams, illustrations, formulas, theme, clipboard, search, source links, deep links, 404, Pages subpath, and overflow checks.");
+    console.log("PASS: seven-chapter navigation, desktop/mobile, diagrams, illustrations, formulas, theme, clipboard, search, source links, deep links, 404, Pages subpath, and overflow checks.");
   } finally {
     await browser.close();
   }

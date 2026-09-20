@@ -50,6 +50,8 @@ def check_real_batch(config: RunConfig, root: Path) -> CheckResult:
         tokenizer = NativeTokenizer.from_directory(tokenizer_path)
         if tokenizer.vocab_size != model_config.vocab_size:
             raise ValueError("tokenizer and model vocabulary sizes do not match")
+        if tokenizer.manifest.source_data_sha256 != sha256_file(data_manifest_path):
+            raise ValueError("tokenizer was trained from a different Data Manifest")
         packed_manifest_path = _resolve(
             config.data.get("packed_manifest"),
             root,

@@ -54,6 +54,13 @@ _PROFILES = {
         minimum_disk_gib=2,
         require_linux=False,
     ),
+    "tiny-60m-local": ProfileRequirements(
+        require_torch=True,
+        require_cuda=False,
+        minimum_cuda_gib=0,
+        minimum_disk_gib=5,
+        require_linux=False,
+    ),
     "tiny-60m": ProfileRequirements(
         require_torch=True,
         require_cuda=True,
@@ -80,6 +87,8 @@ def profile_for_config(config: RunConfig) -> str:
     if config.model_route is ModelRoute.QWEN3_TRANSFER:
         return "qwen3-0.6b-base"
     if config.run_profile is RunProfile.SMOKE:
+        if str(config.model.get("model_id", "")).startswith("tiny-60m"):
+            return "tiny-60m-local"
         return "smoke-10m"
     return "tiny-60m"
 

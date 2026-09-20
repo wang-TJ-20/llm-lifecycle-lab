@@ -124,7 +124,7 @@ class PublicMixtureTests(unittest.TestCase):
             recipe.mixture_id: recipe for recipe in available_public_mixture_recipes()
         }
 
-        self.assertEqual(len(mixtures), 3)
+        self.assertEqual(len(mixtures), 2)
         self.assertEqual(
             mixtures["bilingual-smoke-v1"].components,
             ("simplestories-smoke-v1", "wikipedia-zh-smoke-v1"),
@@ -133,16 +133,6 @@ class PublicMixtureTests(unittest.TestCase):
             mixtures["bilingual-60m-v1"].components,
             ("simplestories-60m-v1", "wikipedia-zh-60m-v1"),
         )
-        self.assertEqual(
-            mixtures["bilingual-60m-v2"].components,
-            (
-                "wikipedia-en-primary-60m-v2",
-                "wikipedia-zh-60m-v2",
-                "wikipedia-en-secondary-60m-v2",
-                "simplestories-60m-v1",
-            ),
-        )
-        self.assertTrue(mixtures["bilingual-60m-v2"].annotate_component)
         self.assertEqual(
             mixtures["bilingual-smoke-v1"].expected_source_sha256,
             "4a6cb466167566d151dd4f597f29522a5157047b93989917776d8983a6118883",

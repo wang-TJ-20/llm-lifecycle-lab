@@ -5,7 +5,6 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Mapping
-from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -43,22 +42,6 @@ def load_run_config(path: str | Path) -> RunConfig:
         return RunConfig.from_dict(load_mapping(path))
     except ContractError as exc:
         raise ConfigError(f"invalid config {Path(path)}: {exc}") from exc
-
-
-def with_init_checkpoint(
-    config: RunConfig,
-    checkpoint: str | Path | None,
-) -> RunConfig:
-    """Return a config whose immutable model mapping names the selected parent."""
-
-    if checkpoint is None:
-        return config
-    if config.stage.value not in {"sft", "dpo", "grpo"}:
-        raise ConfigError("--init-checkpoint is valid only for SFT, DPO, and GRPO")
-    return replace(
-        config,
-        model={**config.model, "init_checkpoint": str(checkpoint)},
-    )
 
 
 def canonical_json(data: Mapping[str, Any]) -> str:
