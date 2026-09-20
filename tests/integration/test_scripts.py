@@ -12,6 +12,7 @@ import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_NAMES = (
+    "analyze_capability_outputs",
     "benchmark_inference",
     "build_model_release",
     "chat",

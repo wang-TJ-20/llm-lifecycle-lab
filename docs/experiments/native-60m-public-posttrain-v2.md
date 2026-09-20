@@ -492,21 +492,26 @@ STOP: both R1 SFT arms failed; do not run DPO or GRPO   (exit=1)
 DPO、GRPO qualification 与三个 KL arm 未运行，这是**协议要求的正确终端状态**，
 不是遗漏。
 
-## 13. 承接：Base-v3 设计（现行手册 §10）
+## 13. 承接：先执行 SFT-v3，再决定是否 Base-v3
 
-现行手册 §10 明确是下一轮的**设计约束**，当前仓库没有对应 recipe/config，
-不得把该节改写成临时命令开跑。本轮结果给出了必须遵守此约束的证据：
+现行
+[PUBLIC_POSTTRAINING_GUIDE](../PUBLIC_POSTTRAINING_GUIDE.md)
+已根据本轮结果推进到 SFT-v3。新的执行顺序是：
 
-- Base 侧：Base-v2 与 Base-repeat 存在已观测的领域 tradeoff（第 9 节），
-  且两者 token 数不同（510.61M vs 369.48M），**不能**宣称 compute-matched；
-  §10.5 的「约 460M seen token Base-v3 vs 10-epoch v1 repeat」仍是唯一能把
-  数据效应与计算量效应分开的设计。
-- 后训练侧：要让 §6.2 的能力门禁有机会通过，光换 Base 不够，必须有办法处理
-  「长答案先验 vs 精确匹配探针」的分布不匹配（例如为指代/提取/计数类任务
-  引入公开非合成的短答案语料，并作为新 recipe ID 下的独立实验臂）。这属于新的
-  后训练数据配方，不在本轮契约内。
-- 在此之前，§10.10 的 sealed test anchor 必须先冻结：本轮与 v1/v2 的 test 都已
-  被使用或历史消费，不能再用作阈值来源。
+1. 对保留的 R1 step-50 至 step-383 checkpoint 做 D0 诊断，不更新权重；
+2. 冻结 `lifecycle-v4` sealed test，最终选型前不读取；
+3. 物化 `public-60m-v3`，引入固定 revision/hash 的 SQuAD、CMRC 人工短答案；
+4. 对公开标注答案只做确定性 JSON 序列化，不生成语义答案；
+5. 用 supervised-token quota 固定 general/short QA/classification/numeric/
+   structured 为 40%/25%/10%/15%/10%；
+6. 从 Base-v2 运行 old-data/8M、balanced-data/2M、balanced-data/8M，与已完成的
+   old-data/2M 形成析因矩阵；
+7. 只有 balanced/8M 呈现预注册趋势但仍未过门禁，才运行 `5e-5` 敏感性臂；
+8. 只有 SFT 硬门禁通过后才允许 DPO 和 GRPO。
+
+这一步优先于 Base-v3，因为当前证据已定位到后训练数据和 token 权重问题；
+直接更换 Base 不能补足短输出和结构化格式监督。只有 SFT-v3 全部候选仍失败，
+才进入 compute-matched Base-v3 设计。
 
 ## 14. 本轮产物
 

@@ -39,7 +39,10 @@ _STAGES = (RecordKind.SFT, RecordKind.DPO, RecordKind.GRPO)
 _TRANSFORM_STAGES = {
     "oasst-ranked-conversation-v1": ("sft",),
     "dolly-single-turn-sft-v1": ("sft",),
+    "dolly-balanced-sft-v1": ("sft",),
     "hc3-human-single-turn-sft-v1": ("sft",),
+    "squad-extractive-sft-v1": ("sft",),
+    "cmrc-extractive-sft-v1": ("sft",),
     "helpsteer3-single-turn-preference-v1": ("dpo",),
     "hh-helpful-single-turn-preference-v1": ("dpo",),
     "cvalues-helpful-single-turn-preference-v1": ("dpo",),
@@ -653,6 +656,10 @@ def _load_posttraining_records(
         transformed = _transform_source(rows, recipe, source)
         for stage, stage_records in transformed.items():
             records[stage].extend(stage_records)
+    if recipe.recipe_id == "public-60m-v3":
+        records[RecordKind.SFT] = _dedupe_sft_conversations(
+            records[RecordKind.SFT]
+        )
     for stage in _STAGES:
         records[stage].sort(key=lambda row: row["id"])
         expected = recipe.expected_records[stage.value]
@@ -662,6 +669,28 @@ def _load_posttraining_records(
                 f"{len(records[stage])} records; expected {expected}"
             )
     return records, loader_versions
+
+
+def _dedupe_sft_conversations(
+    records: Sequence[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    selected = {}
+    for record in records:
+        identity = canonical_record_sha256(
+            {
+                "messages": [
+                    {
+                        "role": message["role"],
+                        "content": _normalize(message["content"]),
+                    }
+                    for message in record["messages"]
+                ]
+            }
+        )
+        current = selected.get(identity)
+        if current is None or record["id"] < current["id"]:
+            selected[identity] = record
+    return list(selected.values())
 
 
 def _download_sources(
@@ -733,6 +762,19 @@ def _read_oasst(path: Path) -> Iterable[Mapping[str, Any]]:
         raise DataValidationError(f"cannot read OASST Parquet {path}: {exc}") from exc
 
 
+def _read_parquet(path: Path) -> Iterable[Mapping[str, Any]]:
+    try:
+        import pyarrow.parquet as parquet
+    except ImportError as exc:
+        raise DataValidationError(
+            "Parquet materialization requires pyarrow; install requirements.txt"
+        ) from exc
+    try:
+        return parquet.read_table(path).to_pylist()
+    except Exception as exc:
+        raise DataValidationError(f"cannot read Parquet source {path}: {exc}") from exc
+
+
 def _read_jsonl_gzip(path: Path) -> Iterable[Mapping[str, Any]]:
     def rows() -> Iterable[Mapping[str, Any]]:
         try:
@@ -773,6 +815,10 @@ def _read_source_rows(
     path: Path,
     source: PosttrainingSourceRecipe,
 ) -> Iterable[Mapping[str, Any]]:
+    if source.file_format == "parquet" and source.transform != (
+        "oasst-ranked-conversation-v1"
+    ):
+        return _read_parquet(path)
     readers = {
         "parquet": _read_oasst,
         "json": _read_json,
@@ -947,7 +993,15 @@ def _transform_helpsteer(
         recipe.selection[source.source_id],
         f"selection.{source.source_id}",
     )
-    per_language = int(config["records_per_language"])
+    raw_counts = config.get("records_by_language")
+    per_language = (
+        {language: int(raw_counts[language]) for language in ("en", "zh")}
+        if isinstance(raw_counts, Mapping)
+        else {
+            language: int(config["records_per_language"])
+            for language in ("en", "zh")
+        }
+    )
     max_characters = int(config["max_characters"])
     context_policy = config["context_messages"]
     language_map = {"english": "en", "chinese": "zh"}
@@ -1028,12 +1082,13 @@ def _transform_helpsteer(
         ordered = sorted(
             candidates[language], key=lambda item: (item[0], item[1]["id"])
         )
-        if len(ordered) < per_language:
+        required = per_language[language]
+        if len(ordered) < required:
             raise DataValidationError(
                 f"HelpSteer3 has only {len(ordered)} eligible {language} records; "
-                f"recipe requires {per_language}"
+                f"recipe requires {required}"
             )
-        selected.extend(record for _, record in ordered[:per_language])
+        selected.extend(record for _, record in ordered[:required])
     return selected, skipped
 
 
@@ -1046,15 +1101,29 @@ def _transform_dolly(
         recipe.selection[source.source_id],
         f"selection.{source.source_id}",
     )
-    required = int(config["records"])
     max_characters = int(config["max_characters"])
+    balanced = source.transform == "dolly-balanced-sft-v1"
+    required = int(config["records"]) if not balanced else 0
+    required_by_family = (
+        {
+            "general": int(config["general_records"]),
+            "classification": int(config["classification_records"]),
+            "short_qa": int(config["short_qa_records"]),
+        }
+        if balanced
+        else {}
+    )
     candidates: list[tuple[str, dict[str, Any]]] = []
+    candidates_by_family: dict[str, list[tuple[str, dict[str, Any]]]] = {
+        name: [] for name in required_by_family
+    }
     seen = set()
     skipped = 0
     for row in rows:
         instruction = _clean_text(row.get("instruction"))
         context = _clean_text(row.get("context"))
         response = _clean_text(row.get("response"))
+        task = str(row.get("category", "instruction"))
         if instruction is None or response is None:
             skipped += 1
             continue
@@ -1063,6 +1132,30 @@ def _transform_dolly(
             if context is not None
             else instruction
         )
+        family = "general"
+        if balanced:
+            if task == "classification":
+                family = "classification"
+                answer_limit = int(config["classification_max_answer_characters"])
+            elif task in {"closed_qa", "information_extraction"}:
+                family = "short_qa"
+                answer_limit = int(config["short_qa_max_answer_characters"])
+            elif task not in {
+                "brainstorming",
+                "creative_writing",
+                "general_qa",
+                "open_qa",
+                "summarization",
+            }:
+                skipped += 1
+                continue
+            else:
+                answer_limit = max_characters
+            if len(response) > answer_limit:
+                skipped += 1
+                continue
+            if family != "general":
+                prompt += "\n\nReply with the answer only."
         if (
             _has_control_token(prompt, response)
             or len(prompt) + len(response) > max_characters
@@ -1087,15 +1180,35 @@ def _transform_dolly(
             "metadata": {
                 "source": _source_uri(source),
                 "transform": source.transform,
-                "task": str(row.get("category", "instruction")),
+                "task": task,
             },
         }
-        candidates.append(
-            (
-                _selection_key(recipe.recipe_id, source.source_id, identity),
-                record,
-            )
+        selection_parts = (
+            (family, identity) if balanced else (identity,)
         )
+        candidate = (
+            _selection_key(
+                recipe.recipe_id,
+                source.source_id,
+                *selection_parts,
+            ),
+            record,
+        )
+        if balanced:
+            candidates_by_family[family].append(candidate)
+        else:
+            candidates.append(candidate)
+    if balanced:
+        selected = []
+        for family, count in required_by_family.items():
+            selected.extend(
+                _select_candidates(
+                    candidates_by_family[family],
+                    count,
+                    f"{source.source_id}.{family}",
+                )
+            )
+        return selected, skipped
     return _select_candidates(candidates, required, source.source_id), skipped
 
 
@@ -1158,6 +1271,239 @@ def _transform_hc3(
             )
         )
     return _select_candidates(candidates, required, source.source_id), skipped
+
+
+def _transform_extractive_qa(
+    rows: Iterable[Mapping[str, Any]],
+    recipe: PublicPosttrainingRecipe,
+    source: PosttrainingSourceRecipe,
+) -> tuple[list[dict[str, Any]], int]:
+    config = _require_mapping(
+        recipe.selection[source.source_id],
+        f"selection.{source.source_id}",
+    )
+    language = "en" if source.transform == "squad-extractive-sft-v1" else "zh"
+    normal_required = int(config["records"])
+    json_integer_required = int(config["json_integer_records"])
+    json_string_required = int(config["json_string_records"])
+    max_context_characters = int(config["max_context_characters"])
+    max_answer_characters = int(config["max_answer_characters"])
+    max_characters = int(config["max_characters"])
+    normal: list[tuple[str, dict[str, Any]]] = []
+    json_integer: list[tuple[str, dict[str, Any]]] = []
+    json_string: list[tuple[str, dict[str, Any]]] = []
+    seen = set()
+    seen_dialogues = set()
+    skipped = 0
+
+    for row in rows:
+        upstream_id = _clean_text(row.get("id"))
+        question = _clean_text(row.get("question"))
+        context = _clean_text(row.get("context"))
+        answers = row.get("answers")
+        answer_values = answers.get("text") if isinstance(answers, Mapping) else None
+        starts = (
+            answers.get("answer_start") if isinstance(answers, Mapping) else None
+        )
+        answer = (
+            _clean_text(answer_values[0])
+            if isinstance(answer_values, list) and answer_values
+            else None
+        )
+        if (
+            upstream_id is None
+            or question is None
+            or context is None
+            or answer is None
+            or len(answer) > max_answer_characters
+            or _has_control_token(question, context, answer)
+        ):
+            skipped += 1
+            continue
+        answer_start = (
+            int(starts[0])
+            if isinstance(starts, list)
+            and starts
+            and isinstance(starts[0], int)
+            and not isinstance(starts[0], bool)
+            else context.find(answer)
+        )
+        if (
+            answer_start < 0
+            or context[answer_start : answer_start + len(answer)] != answer
+        ):
+            answer_start = context.find(answer)
+        if answer_start < 0:
+            skipped += 1
+            continue
+        excerpt = _context_window(
+            context,
+            answer_start=answer_start,
+            answer_length=len(answer),
+            limit=max_context_characters,
+        )
+        if language == "en":
+            prompt = (
+                "Answer the question from the context. Return only the shortest "
+                f"answer span.\n\nContext:\n{excerpt}\n\nQuestion:\n{question}"
+            )
+        else:
+            prompt = (
+                "根据上下文回答问题，只输出最短答案片段。\n\n"
+                f"上下文：\n{excerpt}\n\n问题：\n{question}"
+            )
+        if len(prompt) + len(answer) > max_characters:
+            skipped += 1
+            continue
+        identity = canonical_record_sha256(
+            {
+                "upstream_id": upstream_id,
+                "question": _normalize(question),
+                "answer": _normalize(answer),
+            }
+        )
+        if identity in seen:
+            skipped += 1
+            continue
+        seen.add(identity)
+        source_id = f"{source.source_id}:{identity}"
+        metadata = {
+            "source": _source_uri(source),
+            "transform": source.transform,
+            "upstream_id": upstream_id,
+            "answer_origin": "human-extractive",
+        }
+        normal_record = {
+            "id": _record_id(source, "short-qa", identity, language),
+            "source_id": source_id,
+            "language": language,
+            "messages": [
+                {"role": "user", "content": prompt},
+                {"role": "assistant", "content": answer},
+            ],
+            "metadata": {**metadata, "task": "short_qa"},
+        }
+        dialogue_identity = canonical_record_sha256(
+            {
+                "prompt": _normalize(prompt),
+                "response": _normalize(answer),
+            }
+        )
+        if dialogue_identity in seen_dialogues:
+            skipped += 1
+            continue
+        seen_dialogues.add(dialogue_identity)
+        normal.append(
+            (
+                _selection_key(
+                    recipe.recipe_id,
+                    source.source_id,
+                    "short-qa",
+                    identity,
+                ),
+                normal_record,
+            )
+        )
+
+        integer = _integer_answer(answer)
+        if integer is not None:
+            structured_prompt = (
+                f'Return JSON only with the key "count" and integer answer.\n\n{prompt}'
+                if language == "en"
+                else f'只输出 JSON，键为 "count"，值为整数答案。\n\n{prompt}'
+            )
+            structured_response = json.dumps(
+                {"count": int(integer)},
+                separators=(",", ":"),
+            )
+            target = json_integer
+            view = "json-integer"
+        else:
+            structured_prompt = (
+                f'Return JSON only with the key "label" and string answer.\n\n{prompt}'
+                if language == "en"
+                else f'只输出 JSON，键为 "label"，值为字符串答案。\n\n{prompt}'
+            )
+            structured_response = json.dumps(
+                {"label": answer},
+                ensure_ascii=False,
+                separators=(",", ":"),
+            )
+            target = json_string
+            view = "json-string"
+        if len(structured_prompt) + len(structured_response) <= max_characters:
+            structured_identity = canonical_record_sha256(
+                {
+                    "prompt": _normalize(structured_prompt),
+                    "response": _normalize(structured_response),
+                }
+            )
+            if structured_identity in seen_dialogues:
+                continue
+            seen_dialogues.add(structured_identity)
+            target.append(
+                (
+                    _selection_key(
+                        recipe.recipe_id,
+                        source.source_id,
+                        view,
+                        identity,
+                    ),
+                    {
+                        "id": _record_id(source, view, identity, language),
+                        "source_id": source_id,
+                        "language": language,
+                        "messages": [
+                            {"role": "user", "content": structured_prompt},
+                            {
+                                "role": "assistant",
+                                "content": structured_response,
+                            },
+                        ],
+                        "metadata": {**metadata, "task": "structured"},
+                    },
+                )
+            )
+
+    selected = _select_candidates(
+        normal,
+        normal_required,
+        f"{source.source_id}.short_qa",
+    )
+    selected.extend(
+        _select_candidates(
+            json_integer,
+            json_integer_required,
+            f"{source.source_id}.json_integer",
+        )
+        if json_integer_required
+        else []
+    )
+    selected.extend(
+        _select_candidates(
+            json_string,
+            json_string_required,
+            f"{source.source_id}.json_string",
+        )
+        if json_string_required
+        else []
+    )
+    return selected, skipped
+
+
+def _context_window(
+    context: str,
+    *,
+    answer_start: int,
+    answer_length: int,
+    limit: int,
+) -> str:
+    if len(context) <= limit:
+        return context
+    left = max(0, answer_start - max(0, (limit - answer_length) // 2))
+    right = min(len(context), left + limit)
+    left = max(0, right - limit)
+    return context[left:right]
 
 
 def _transform_hh_helpful(
@@ -1399,8 +1745,17 @@ def _transform_source(
     if source.transform == "dolly-single-turn-sft-v1":
         records, _ = _transform_dolly(rows, recipe, source)
         return {RecordKind.SFT: records}
+    if source.transform == "dolly-balanced-sft-v1":
+        records, _ = _transform_dolly(rows, recipe, source)
+        return {RecordKind.SFT: records}
     if source.transform == "hc3-human-single-turn-sft-v1":
         records, _ = _transform_hc3(rows, recipe, source)
+        return {RecordKind.SFT: records}
+    if source.transform in {
+        "squad-extractive-sft-v1",
+        "cmrc-extractive-sft-v1",
+    }:
+        records, _ = _transform_extractive_qa(rows, recipe, source)
         return {RecordKind.SFT: records}
     if source.transform == "helpsteer3-single-turn-preference-v1":
         records, _ = _transform_helpsteer(rows, recipe, source)
@@ -1492,16 +1847,14 @@ def _validate_selection(
     sources: Sequence[PosttrainingSourceRecipe],
     selection: Mapping[str, Any],
 ) -> None:
-    by_transform = {
-        source.transform: (source, _require_mapping(
+    transforms = [source.transform for source in sources]
+    if len(transforms) != len(set(transforms)):
+        raise ConfigError("post-training transforms may appear only once per recipe")
+    for source in sources:
+        config = _require_mapping(
             selection[source.source_id],
             f"selection.{source.source_id}",
-        ))
-        for source in sources
-    }
-    if len(by_transform) != len(sources):
-        raise ConfigError("post-training transforms may appear only once per recipe")
-    for source, config in by_transform.values():
+        )
         if source.transform in {
             "dolly-single-turn-sft-v1",
             "hc3-human-single-turn-sft-v1",
@@ -1519,6 +1872,67 @@ def _validate_selection(
             _require_positive_integers(
                 config, ("records", "max_characters"), source.source_id
             )
+            continue
+        if source.transform == "dolly-balanced-sft-v1":
+            fields = {
+                "strategy",
+                "general_records",
+                "classification_records",
+                "short_qa_records",
+                "classification_max_answer_characters",
+                "short_qa_max_answer_characters",
+                "max_characters",
+            }
+            if set(config) != fields or config["strategy"] != "stable-hash-rank":
+                raise ConfigError(
+                    f"invalid {source.source_id} balanced selection"
+                )
+            _require_positive_integers(
+                config,
+                tuple(fields - {"strategy"}),
+                source.source_id,
+            )
+            continue
+        if source.transform in {
+            "squad-extractive-sft-v1",
+            "cmrc-extractive-sft-v1",
+        }:
+            fields = {
+                "strategy",
+                "records",
+                "json_integer_records",
+                "json_string_records",
+                "max_context_characters",
+                "max_answer_characters",
+                "max_characters",
+            }
+            if set(config) != fields or config["strategy"] != "stable-hash-rank":
+                raise ConfigError(
+                    f"invalid {source.source_id} extractive selection"
+                )
+            _require_positive_integers(
+                config,
+                (
+                    "records",
+                    "max_context_characters",
+                    "max_answer_characters",
+                    "max_characters",
+                ),
+                source.source_id,
+            )
+            _require_nonnegative_integers(
+                config,
+                ("json_integer_records", "json_string_records"),
+                source.source_id,
+            )
+            if (
+                int(config["json_integer_records"])
+                + int(config["json_string_records"])
+                <= 0
+            ):
+                raise ConfigError(
+                    f"{source.source_id} must include a structured view"
+                )
             continue
         if source.transform == "oasst-ranked-conversation-v1":
             _validate_oasst_selection(config)
@@ -1552,13 +1966,14 @@ def _validate_oasst_selection(oasst: Mapping[str, Any]) -> None:
 
 
 def _validate_helpsteer_selection(helpsteer: Mapping[str, Any]) -> None:
-    if set(helpsteer) != {
+    common = {
         "strategy",
-        "records_per_language",
         "max_characters",
         "context_messages",
         "nonzero_preference",
-    }:
+    }
+    count_fields = set(helpsteer) - common
+    if count_fields not in ({"records_per_language"}, {"records_by_language"}):
         raise ConfigError("invalid HelpSteer3 selection fields")
     if (
         helpsteer["strategy"] != "stable-hash-rank"
@@ -1567,11 +1982,20 @@ def _validate_helpsteer_selection(helpsteer: Mapping[str, Any]) -> None:
     ):
         raise ConfigError("invalid HelpSteer3 selection policy")
 
-    _require_positive_integers(
-        helpsteer,
-        ("records_per_language", "max_characters"),
-        "HelpSteer3",
-    )
+    _require_positive_integers(helpsteer, ("max_characters",), "HelpSteer3")
+    if "records_per_language" in helpsteer:
+        _require_positive_integers(
+            helpsteer,
+            ("records_per_language",),
+            "HelpSteer3",
+        )
+    else:
+        counts = helpsteer["records_by_language"]
+        if not isinstance(counts, Mapping) or set(counts) != {"en", "zh"}:
+            raise ConfigError(
+                "HelpSteer3 records_by_language must declare en and zh"
+            )
+        _require_positive_integers(counts, ("en", "zh"), "HelpSteer3")
 
 
 def _validate_msvamp_selection(msvamp: Mapping[str, Any]) -> None:
@@ -1606,6 +2030,22 @@ def _require_positive_integers(
     ):
         raise ConfigError(
             f"{source_name} selection counts must be positive integers"
+        )
+
+
+def _require_nonnegative_integers(
+    mapping: Mapping[str, Any],
+    names: Sequence[str],
+    source_name: str,
+) -> None:
+    if any(
+        not isinstance(mapping[name], int)
+        or isinstance(mapping[name], bool)
+        or mapping[name] < 0
+        for name in names
+    ):
+        raise ConfigError(
+            f"{source_name} selection counts must be non-negative integers"
         )
 
 

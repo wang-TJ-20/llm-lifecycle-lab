@@ -30,6 +30,7 @@
 | 构建模型发布包 | `build_model_release.py` | 安全解包、绑定 Tokenizer、生成报告与文件 hash |
 | 下载并验证公开模型 | `run_published_model.py` | ModelScope 下载、完整性校验、续写与 Smoke 评测 |
 | 统一能力评测及纵向比较 | `evaluate_capabilities.py` | `evaluation/` 中的协议、评分、语料检查与报告 |
+| 诊断能力输出形态 | `analyze_capability_outputs.py` | 汇总 exact、answer-contained、extra-text 与 JSON parse 指标 |
 | SFT 训练与恢复 | `train_sft.py` | `data/sft.py` 与 `training/sft.py` |
 | 离线 SFT 闭环 | `sft_experiment.py` | 临时 Base → SFT → 同协议评测及恢复对照 |
 | 续写与多轮对话 | `chat.py` | Native/HF 后端、显式上下文策略 |
@@ -114,14 +115,16 @@ python scripts/build_model_release.py \
 
 `data.py posttrain-recipes` 查看固定公开后训练配方，
 `fetch-posttrain` 一次物化 SFT、DPO、GRPO 三份规范化 source。命令必须显式接受
-Apache-2.0 与 CC-BY-4.0，随后每个阶段独立执行 `prepare --group-by source_id`。
+配方声明的全部许可证，随后每个阶段独立执行 `prepare --group-by source_id`。
 `check-posttrain` 在 CPU 上加载全部 split，并检查评测泄漏与跨阶段 source_id 交集。
 完整 hash、规模和 CUDA 顺序见
 [公开数据后训练](../docs/PUBLIC_POSTTRAINING_GUIDE.md)。
 
 `train_sft.py` 继承 Base 权重与 Tokenizer，但重置新阶段的训练状态；
 `--resume-run` 才恢复同一次 SFT 的完整状态。
-assistant-only 掩码在数据层构造，训练循环复用现有 `TrainingEngine`。
+assistant-only 掩码在数据层构造，训练循环复用现有 `TrainingEngine`。配置
+`data.sampling.strategy=supervised-token-quota` 时，按任务族的累计监督 token
+配额确定性采样，并随 checkpoint 保存精确位置。
 
 ```bash
 python scripts/sft_experiment.py --mode train

@@ -121,7 +121,8 @@ NEGATIVE: tuple[tuple[str, str], ...] = (
 def _pick(pairs: Sequence[tuple[str, ...]], index: int, language: str) -> str:
     """Wrap around short word lists so any count stays valid."""
     entry = pairs[index % len(pairs)]
-    return entry[0] if language == "en" else entry[1]
+    value = entry[0] if language == "en" else entry[1]
+    return f"{value}{index}" if index >= 1000 else value
 
 
 # --------------------------------------------------------------------------
@@ -143,6 +144,12 @@ def _sentiment(index: int, language: str) -> tuple[str, dict[str, Any]]:
     positive = index % 2 == 0
     pool = POSITIVE if positive else NEGATIVE
     sentence = _pick(pool, index // 2, language)
+    if index >= 1000:
+        sentence += (
+            f" Review code {index}."
+            if language == "en"
+            else f" 评价编号{index}。"
+        )
     if language == "en":
         prompt = f"Classify '{sentence}' Reply only positive or negative."
         rule = {
@@ -370,6 +377,24 @@ CONTINUATION = (
     ("One day, a boy", "有一天，一个男"),
     ("There was a dragon", "那里有一只龙"),
 )
+SEALED_CORPUS = (
+    (
+        "A mechanic checked the blue bicycle before the afternoon delivery. "
+        "The brakes worked and both tires held air.",
+        "技师在下午送货前检查了蓝色自行车。刹车正常，两个轮胎也没有漏气。",
+    ),
+    (
+        "The museum stores fragile maps in a cool room. "
+        "Staff inspect each drawer at the end of the month.",
+        "博物馆把易损地图保存在凉爽的房间里。工作人员每月底检查每个抽屉。",
+    ),
+)
+SEALED_CONTINUATION = (
+    ("Before sunrise, the baker", "日出之前，面包师"),
+    ("Across the narrow bridge", "穿过狭窄的桥"),
+    ("Inside the old station", "在老车站里面"),
+    ("After the final lesson", "最后一节课以后"),
+)
 
 
 def _polyfill(patterns, count: int, kind: str, language: str, offset: int):
@@ -386,10 +411,18 @@ def _polyfill(patterns, count: int, kind: str, language: str, offset: int):
 
 
 def build_cases(
-    *, instruction: int, qa: int, fmt: int, multiturn: int, preference: int
+    *,
+    instruction: int,
+    qa: int,
+    fmt: int,
+    multiturn: int,
+    preference: int,
+    offset: int = 0,
 ) -> list[dict[str, Any]]:
     cases: list[dict[str, Any]] = []
-    for index, (en, zh) in enumerate(CORPUS):
+    corpus = SEALED_CORPUS if offset >= 1000 else CORPUS
+    continuation = SEALED_CONTINUATION if offset >= 1000 else CONTINUATION
+    for index, (en, zh) in enumerate(corpus):
         cases.append(
             {
                 "id": f"corpus-en-{index + 1}",
@@ -408,7 +441,7 @@ def build_cases(
                 "text": zh,
             }
         )
-    for index, (en, zh) in enumerate(CONTINUATION):
+    for index, (en, zh) in enumerate(continuation):
         cases.append(
             {
                 "id": f"continue-en-{index + 1}",
@@ -430,7 +463,13 @@ def build_cases(
 
     for language in ("en", "zh"):
         for position, case in enumerate(
-            _polyfill(INSTRUCTION_PATTERNS, instruction, "instruction", language, 0)
+            _polyfill(
+                INSTRUCTION_PATTERNS,
+                instruction,
+                "instruction",
+                language,
+                offset,
+            )
         ):
             family = INSTRUCTION_PATTERNS[
                 position % len(INSTRUCTION_PATTERNS)
@@ -442,13 +481,15 @@ def build_cases(
                     "group": f"inst-{family}",
                 }
             )
-        for position, case in enumerate(_polyfill(QA_PATTERNS, qa, "qa", language, 0)):
+        for position, case in enumerate(
+            _polyfill(QA_PATTERNS, qa, "qa", language, offset)
+        ):
             family = QA_PATTERNS[position % len(QA_PATTERNS)].__name__[1:]
             cases.append(
                 {**case, "id": f"qa-{language}-{position:02d}", "group": f"qa-{family}"}
             )
         for position, case in enumerate(
-            _polyfill(FORMAT_PATTERNS, fmt, "format", language, 0)
+            _polyfill(FORMAT_PATTERNS, fmt, "format", language, offset)
         ):
             family = FORMAT_PATTERNS[position % len(FORMAT_PATTERNS)].__name__[1:]
             cases.append(
@@ -459,7 +500,7 @@ def build_cases(
                 }
             )
         for position in range(multiturn):
-            turns, _ = _multiturn(position, language)
+            turns, _ = _multiturn(offset + position, language)
             cases.append(
                 {
                     "id": f"dialog-{language}-{position:02d}",
@@ -471,7 +512,7 @@ def build_cases(
             )
         for position in range(preference):
             pattern = PREFERENCE_PATTERNS[position % len(PREFERENCE_PATTERNS)]
-            prompt, chosen, rejected = pattern(position, language)
+            prompt, chosen, rejected = pattern(offset + position, language)
             family = pattern.__name__[6:]
             cases.append(
                 {
@@ -538,6 +579,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--multiturn", type=int, default=4)
     parser.add_argument("--preference", type=int, default=16)
     parser.add_argument("--seed", type=int, default=DEFAULT_SEED)
+    parser.add_argument("--offset", type=int, default=0)
     parser.add_argument(
         "--source",
         type=Path,
@@ -562,6 +604,7 @@ def main(argv: list[str] | None = None) -> int:
             fmt=args.format,
             multiturn=args.multiturn,
             preference=args.preference,
+            offset=args.offset,
         )
         leakage = check_leakage(cases, list(args.source))
         total = sum(leakage.values())
@@ -573,12 +616,13 @@ def main(argv: list[str] | None = None) -> int:
             "suite_id": args.suite_id,
             "license": SUITE_LICENSE,
             "description": (
-                "Project-authored bilingual probes, version 3. v1/v2 score "
+                f"Project-authored bilingual probes, {args.suite_id}. v1/v2 score "
                 "instruction and qa over 4 cases each, so one flipped case "
                 "moves the metric by 0.25 -- the size of every measured "
-                "post-SFT difference. v3 scales each scored category to 30+ "
+                "post-SFT difference. This suite scales each scored category to 30+ "
                 "cases. Built by scripts/build_evaluation_suite.py (seed "
-                f"{args.seed}) and leakage-checked against the training "
+                f"{args.seed}, offset {args.offset}) and leakage-checked against "
+                "the training "
                 "sources. Not a general benchmark; do not train on these."
             ),
             "cases": cases,

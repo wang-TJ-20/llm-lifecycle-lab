@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+from collections import defaultdict
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +18,13 @@ from llm_lifecycle_lab.evaluation.corpus import normalize
 from llm_lifecycle_lab.evaluation.suite import digest, load_suite
 from llm_lifecycle_lab.exceptions import ContractError, DataValidationError
 from llm_lifecycle_lab.tokenizer import NativeTokenizer
+
+_SHORT_QA_TASKS = {
+    "closed_qa",
+    "information_extraction",
+    "nlpcc_dbqa",
+    "short_qa",
+}
 
 
 def encode_sft_example(
@@ -134,6 +143,12 @@ def load_sft_splits(
             raise DataValidationError(format_validation_failure(validated.report))
         examples = []
         language_counts = {"en": 0, "zh": 0}
+        task_counts: dict[str, dict[str, int]] = defaultdict(
+            lambda: {"examples": 0, "supervised_tokens": 0}
+        )
+        stratum_counts: dict[str, dict[str, int]] = defaultdict(
+            lambda: {"examples": 0, "supervised_tokens": 0}
+        )
         for row in validated.records:
             if "template_id" in row and not isinstance(row["template_id"], str):
                 raise ContractError("SFT template_id must be text")
@@ -175,8 +190,22 @@ def load_sft_splits(
             )
             example["example_id_sha256"] = digest({"id": row["id"]})
             example["language"] = row["language"]
+            example["task_family"] = _task_family(row)
+            example["sampling_stratum"] = (
+                f"{example['task_family']}.{row['language']}"
+            )
+            supervised_tokens = int((example["labels"][1:] != -100).sum())
+            example["supervised_token_count"] = supervised_tokens
             examples.append(example)
             language_counts[row["language"]] += 1
+            task_counts[example["task_family"]]["examples"] += 1
+            task_counts[example["task_family"]][
+                "supervised_tokens"
+            ] += supervised_tokens
+            stratum_counts[example["sampling_stratum"]]["examples"] += 1
+            stratum_counts[example["sampling_stratum"]][
+                "supervised_tokens"
+            ] += supervised_tokens
         if not examples or not all(language_counts.values()):
             raise ContractError(f"SFT {split.name} must contain both en and zh")
         splits[split.name] = examples
@@ -184,9 +213,29 @@ def load_sft_splits(
             "examples": len(examples),
             "languages": language_counts,
             "supervised_tokens": sum(
-                int((example["labels"][1:] != -100).sum()) for example in examples
+                example["supervised_token_count"] for example in examples
             ),
+            "task_families": dict(sorted(task_counts.items())),
+            "sampling_strata": dict(sorted(stratum_counts.items())),
         }
     # JSON conversion checks the summary before it becomes a training artifact.
     json.dumps(summary, allow_nan=False)
     return splits, summary
+
+
+def _task_family(row: Mapping[str, Any]) -> str:
+    metadata = row.get("metadata")
+    values = metadata if isinstance(metadata, Mapping) else {}
+    task = str(values.get("task", "")).strip()
+    transform = str(values.get("transform", "")).strip()
+    if task == "classification":
+        return "classification"
+    if task in _SHORT_QA_TASKS:
+        return "short_qa"
+    if task == "structured":
+        return "structured"
+    if task in {"math-verifiable", "numeric"} or transform == (
+        "msvamp-parallel-integer-v1"
+    ):
+        return "numeric"
+    return "general"

@@ -11,6 +11,8 @@ from llm_lifecycle_lab.data.posttraining import (
     PublicPosttrainingBundleManifest,
     PublicPosttrainingRecipe,
     _load_posttraining_records,
+    _transform_dolly,
+    _transform_extractive_qa,
     _transform_helpsteer,
     _transform_msvamp,
     _transform_oasst,
@@ -127,7 +129,7 @@ class PublicPosttrainingTests(unittest.TestCase):
         recipes = available_public_posttraining_recipes()
         self.assertEqual(
             tuple(recipe.recipe_id for recipe in recipes),
-            ("public-60m-v1", "public-60m-v2"),
+            ("public-60m-v1", "public-60m-v2", "public-60m-v3"),
         )
         recipe = next(
             item for item in recipes if item.recipe_id == "public-60m-v1"
@@ -177,6 +179,125 @@ class PublicPosttrainingTests(unittest.TestCase):
         )
         self.assertEqual({row["messages"][-1]["content"] for row in warmup}, {"7"})
         self.assertEqual({row["metadata"]["verifier"] for row in grpo}, {"integer"})
+
+    def test_v3_short_answer_and_structured_views_preserve_public_answers(
+        self,
+    ) -> None:
+        recipe = next(
+            item
+            for item in available_public_posttraining_recipes()
+            if item.recipe_id == "public-60m-v3"
+        )
+        selection = {
+            name: dict(value) for name, value in recipe.selection.items()
+        }
+        selection["squad"] = {
+            **selection["squad"],
+            "records": 1,
+            "json_integer_records": 1,
+            "json_string_records": 1,
+        }
+        fixture = replace(
+            recipe,
+            recipe_id="fixture-public-v3",
+            selection=selection,
+            expected_source_sha256={"sft": None, "dpo": None, "grpo": None},
+        )
+        rows = [
+            {
+                "id": "integer",
+                "context": "The box contains 7 cards.",
+                "question": "How many cards are in the box?",
+                "answers": {"text": ["7"], "answer_start": [17]},
+            },
+            {
+                "id": "string",
+                "context": "The meeting is in Paris.",
+                "question": "Where is the meeting?",
+                "answers": {"text": ["Paris"], "answer_start": [18]},
+            },
+        ]
+        records, skipped = _transform_extractive_qa(
+            rows,
+            fixture,
+            fixture.source("squad"),
+        )
+        self.assertEqual(skipped, 0)
+        self.assertEqual(len(records), 3)
+        responses = {row["messages"][-1]["content"] for row in records}
+        self.assertIn('{"count":7}', responses)
+        self.assertIn('{"label":"Paris"}', responses)
+        self.assertTrue(responses & {"7", "Paris"})
+        by_source = {}
+        for row in records:
+            by_source.setdefault(row["source_id"], 0)
+            by_source[row["source_id"]] += 1
+        self.assertTrue(any(count == 2 for count in by_source.values()))
+
+    def test_v3_dolly_selection_is_balanced_by_task_family(self) -> None:
+        recipe = next(
+            item
+            for item in available_public_posttraining_recipes()
+            if item.recipe_id == "public-60m-v3"
+        )
+        selection = {
+            name: dict(value) for name, value in recipe.selection.items()
+        }
+        selection["dolly"] = {
+            **selection["dolly"],
+            "general_records": 1,
+            "classification_records": 1,
+            "short_qa_records": 1,
+        }
+        fixture = replace(
+            recipe,
+            recipe_id="fixture-public-v3",
+            selection=selection,
+            expected_source_sha256={"sft": None, "dpo": None, "grpo": None},
+        )
+        rows = [
+            {
+                "instruction": "Explain rain.",
+                "context": "",
+                "response": "Condensed water falls from clouds.",
+                "category": "open_qa",
+            },
+            {
+                "instruction": "Choose A or B.",
+                "context": "",
+                "response": "A",
+                "category": "classification",
+            },
+            {
+                "instruction": "Where is the event?",
+                "context": "The event is in Lima.",
+                "response": "Lima",
+                "category": "closed_qa",
+            },
+        ]
+        records, skipped = _transform_dolly(
+            rows,
+            fixture,
+            fixture.source("dolly"),
+        )
+        self.assertEqual(skipped, 0)
+        self.assertEqual(
+            {row["metadata"]["task"] for row in records},
+            {"open_qa", "classification", "closed_qa"},
+        )
+        concise = [
+            row
+            for row in records
+            if row["metadata"]["task"] in {"classification", "closed_qa"}
+        ]
+        self.assertTrue(
+            all(
+                row["messages"][0]["content"].endswith(
+                    "Reply with the answer only."
+                )
+                for row in concise
+            )
+        )
 
     def test_materialize_requires_all_and_only_declared_licenses(self) -> None:
         with (

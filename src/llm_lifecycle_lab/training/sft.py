@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Callable, Mapping
 from dataclasses import asdict, dataclass
 from functools import partial
@@ -27,6 +28,7 @@ from llm_lifecycle_lab.provenance import capture_runtime_provenance
 from llm_lifecycle_lab.tokenizer import NativeTokenizer
 from llm_lifecycle_lab.training.batching import (
     DeterministicBatchStream,
+    DeterministicTokenQuotaBatchStream,
     stable_stratified_subset,
 )
 from llm_lifecycle_lab.training.checkpoint import CheckpointManager
@@ -114,6 +116,10 @@ def run_native_sft(
         sequence_length=engine_config.sequence_length,
         evaluation_suite=suite_path,
     )
+    train = splits["train"]
+    sampling = _resolve_sampling(config.data, summary["splits"]["train"])
+    if sampling["strategy"] != "shuffle":
+        summary["sampling"] = sampling
     initialization = {
         "mode": "weights-only-new-stage",
         "parent_checkpoint": parent_metadata.to_dict(),
@@ -125,6 +131,8 @@ def run_native_sft(
         "optimizer_inherited": False,
         "initial_step": 0,
     }
+    if sampling["strategy"] != "shuffle":
+        initialization["sampling"] = sampling
     model = NativeTransformer(model_config)
     model.load(parent / "model")
     bundle = ModelBundle(
@@ -143,17 +151,27 @@ def run_native_sft(
         ),
     )
     collate = partial(collate_sft, pad_token_id=tokenizer.pad_token_id)
-    train = splits["train"]
     engine_config, budget = engine_config.resolve_budget(
         examples_per_epoch=len(train),
-        supervised_tokens_per_epoch=summary["splits"]["train"]["supervised_tokens"],
+        supervised_tokens_per_epoch=sampling["estimated_tokens_per_virtual_epoch"],
     )
-    stream = DeterministicBatchStream(
-        train,
-        batch_size=engine_config.micro_batch_size,
-        seed=config.seed,
-        collate_fn=collate,
-    )
+    if sampling["strategy"] == "shuffle":
+        stream = DeterministicBatchStream(
+            train,
+            batch_size=engine_config.micro_batch_size,
+            seed=config.seed,
+            collate_fn=collate,
+        )
+    else:
+        stream = DeterministicTokenQuotaBatchStream(
+            train,
+            batch_size=engine_config.micro_batch_size,
+            seed=config.seed,
+            collate_fn=collate,
+            stratum_field=sampling["stratum_field"],
+            token_count_field="supervised_token_count",
+            weights=sampling["weights"],
+        )
     indices = stable_stratified_subset(
         splits["dev"],
         limit=engine_config.eval_batches * engine_config.micro_batch_size,
@@ -219,3 +237,79 @@ def run_native_sft(
         metric_callback=metric_callback,
     )
     return SFTRun(artifacts, result, model.parameter_count, budget)
+
+
+def _resolve_sampling(
+    data_config: Mapping[str, Any],
+    train_summary: Mapping[str, Any],
+) -> dict[str, Any]:
+    raw = data_config.get("sampling")
+    supervised_tokens = int(train_summary["supervised_tokens"])
+    examples = int(train_summary["examples"])
+    if raw is None:
+        return {
+            "strategy": "shuffle",
+            "estimated_tokens_per_virtual_epoch": supervised_tokens,
+        }
+    if not isinstance(raw, Mapping):
+        raise ConfigError("SFT data.sampling must be a mapping")
+    if set(raw) != {"strategy", "weights"}:
+        raise ConfigError("SFT data.sampling must declare strategy and weights")
+    if raw["strategy"] != "supervised-token-quota":
+        raise ConfigError("unsupported SFT data.sampling strategy")
+    raw_weights = raw["weights"]
+    if not isinstance(raw_weights, Mapping):
+        raise ConfigError("SFT data.sampling.weights must be a mapping")
+
+    task_summary = train_summary["task_families"]
+    expected_tasks = set(task_summary)
+    sampling_strata = set(train_summary["sampling_strata"])
+    if set(raw_weights) == expected_tasks:
+        stratum_field = "task_family"
+        stratum_summary = task_summary
+    elif set(raw_weights) == sampling_strata:
+        stratum_field = "sampling_stratum"
+        stratum_summary = train_summary["sampling_strata"]
+    else:
+        expected = (
+            expected_tasks
+            if len(expected_tasks) <= len(sampling_strata)
+            else sampling_strata
+        )
+        missing = sorted(expected - set(raw_weights))
+        extra = sorted(set(raw_weights) - expected)
+        raise ConfigError(
+            "SFT token quota weights must exactly cover task families or "
+            "task-language strata; "
+            f"missing={missing}, extra={extra}"
+        )
+    weights = {}
+    for task in sorted(raw_weights):
+        value = raw_weights[task]
+        if (
+            not isinstance(value, (int, float))
+            or isinstance(value, bool)
+            or not math.isfinite(float(value))
+            or float(value) <= 0
+        ):
+            raise ConfigError("SFT token quota weights must be finite and positive")
+        weights[task] = float(value)
+    total_weight = sum(weights.values())
+    weights = {task: value / total_weight for task, value in weights.items()}
+
+    inverse_mean = 0.0
+    for task, weight in weights.items():
+        values = stratum_summary[task]
+        mean_tokens = float(values["supervised_tokens"]) / int(values["examples"])
+        inverse_mean += weight / mean_tokens
+    estimated_mean_tokens = 1.0 / inverse_mean
+    return {
+        "strategy": "supervised-token-quota",
+        "stratum_field": stratum_field,
+        "weights": weights,
+        "estimated_tokens_per_example": estimated_mean_tokens,
+        "estimated_tokens_per_virtual_epoch": max(
+            1,
+            round(examples * estimated_mean_tokens),
+        ),
+    }
