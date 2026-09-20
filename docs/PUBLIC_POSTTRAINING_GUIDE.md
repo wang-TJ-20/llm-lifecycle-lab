@@ -4,7 +4,10 @@
 **已经完成，不得重跑**。执行者应从第 4 节 D0 诊断开始，然后按
 SFT-v3、DPO、GRPO 的门禁顺序继续。
 
-历史结果与完整指标见
+SFT-v3 析因矩阵已执行完毕（四臂全部未通过硬门禁，第 8–10 节因此未运行），
+结果记录与机制归因见
+[Native-60M 公开数据后训练 v3](./experiments/native-60m-public-posttrain-v3.md)；
+更早的历史结果与完整指标见
 [Native-60M 公开数据后训练 v2](./experiments/native-60m-public-posttrain-v2.md)。
 
 ## 1. 当前状态与结论
