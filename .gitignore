@@ -17,3 +17,6 @@ build/
 *.pt
 *.pth
 *.safetensors
+
+# LFS 跟踪的最终 base 模型权重（覆盖上面的 *.pt 忽略）
+!models/base-v1-final/model.pt
