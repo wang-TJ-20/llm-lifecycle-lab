@@ -275,3 +275,30 @@ GATE_PASSED True
 | eval_zh_tokens | 277500.0 |
 
 产物：`runs/native-60m-base-v1-s42/final-test.json`
+
+### 训练曲线（已导出图片）
+
+原始逐 step 数据全部保存在 `runs/native-60m-base-v1-s42/metrics.jsonl`（4521 行：每 10 步一条训练记录 + 47 条 eval 记录，含 `train_loss / eval_loss / eval_en_loss / eval_zh_loss / learning_rate / tokens_per_second / gradient_norm / target_token_coverage` 等字段）。
+
+已用 `metrics.jsonl` 渲染成 PNG 供本地查看（无需 tensorboard）：
+
+| 文件 | 内容 |
+| --- | --- |
+| `runs/native-60m-base-v1-s42/curves/losses.png` | train / eval / en / zh loss 随 step 变化 |
+| `runs/native-60m-base-v1-s42/curves/lr_throughput.png` | 学习率曲线 + tokens/s 吞吐 |
+| `runs/native-60m-base-v1-s42/curves/grad_coverage.png` | 梯度范数 + token coverage |
+
+> 本地复现命令（需 matplotlib）：
+> ```bash
+> python - <<'PY'
+> import json,matplotlib; matplotlib.use("Agg"); import matplotlib.pyplot as plt
+> from pathlib import Path
+> run=Path("runs/native-60m-base-v1-s42"); lines=[json.loads(l) for l in (run/"metrics.jsonl").read_text().splitlines() if l.strip()]
+> tr=[r for r in lines if r.get("train_loss") is not None]; tr.sort(key=lambda r:r["step"])
+> ev=[r for r in lines if r.get("eval_loss") is not None]; ev.sort(key=lambda r:r["step"])
+> ts=[r["step"] for r in tr]
+> plt.plot(ts,[r["train_loss"] for r in tr],label="train")
+> plt.plot([r["step"] for r in ev],[r["eval_loss"] for r in ev],"o-",label="eval")
+> plt.legend(); plt.savefig("curve.png",dpi=120)
+> PY
+> ```
