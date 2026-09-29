@@ -1,0 +1,35 @@
+data:
+  evaluation_suite: configs/evaluation/lifecycle-v1.yaml
+  manifest: data/prepared/sft-bilingual-v1/data_manifest.json
+model:
+  lora:
+    alpha: 16
+    dropout: 0.0
+    rank: 8
+    target_modules:
+    - q_proj
+    - v_proj
+  model_id: Qwen/Qwen3-0.6B-Base
+  provider: huggingface
+  revision: da87bfb608c14b7cf20ba1ce41287e8de496c0cd
+  snapshot: /root/zitong/llm-lifecycle-lab/artifacts/qwen3-0.6b-base
+  tokenizer_revision: da87bfb608c14b7cf20ba1ce41287e8de496c0cd
+  training_method: lora
+  transformers_version: 4.53.3
+model_route: qwen3-transfer
+output_dir: runs
+run_profile: learn
+schema_version: '1.0'
+seed: 42
+stage: sft
+training:
+  checkpoint_interval: 1
+  device: cpu
+  dtype: float32
+  eval_batches: 2
+  eval_interval: 1
+  gradient_accumulation_steps: 2
+  learning_rate: 0.0001
+  max_steps: 2
+  micro_batch_size: 1
+  sequence_length: 512
