@@ -6,7 +6,22 @@
     "model_route": "native",
     "stage": "pretrain",
     "description": "Final base-model weights from the native-60m-base-v1 pretraining run, exported for release/serving.",
-    "created_at": "2026-09-30"
+    "created_at": "2026-09-30",
+    "license": {
+      "identifier": "CC-BY-SA-4.0",
+      "file": "LICENSE_MODEL",
+      "legal_code": "https://creativecommons.org/licenses/by-sa/4.0/legalcode",
+      "scope": [
+        "model.pt",
+        "tokenizer.json",
+        "tokenizer_manifest.json"
+      ],
+      "exclusions": [
+        "implementation source code",
+        "upstream training datasets",
+        "model outputs"
+      ]
+    }
   },
   "source_run": {
     "run_id": "native-60m-base-v1-s42",
@@ -36,6 +51,7 @@
     "lfs_oid_sha256": "4cdbd642cb878c0e7f5de4b7988751e92de533afa1317256ace20aea078f9398",
     "size_bytes": 251740405,
     "sha256": "4cdbd642cb878c0e7f5de4b7988751e92de533afa1317256ace20aea078f9398",
+    "license": "CC-BY-SA-4.0",
     "verification": "Byte-identical (sha256) to runs/native-60m-base-v1-s42/checkpoints/step-00045191/model/model.pt"
   },
   "model_config": {
@@ -57,6 +73,7 @@
     "requested_vocab_size": 16384,
     "chat_template_version": "native-chat-v1",
     "content_sha256": "7455ac1168f36a3d7dca03fee28784f97899fe233f496484a11e5da2e44a2f32",
+    "license": "CC-BY-SA-4.0",
     "special_tokens": {
       "<|bos|>": 1,
       "<|eos|>": 2,

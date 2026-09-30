@@ -1,0 +1,27 @@
+Native-60M Base v1 Model Artifact License
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+
+Copyright (c) 2026 wang-TJ-20
+
+The following files in this release are licensed under the Creative Commons
+Attribution-ShareAlike 4.0 International license:
+
+- model.pt
+- tokenizer.json
+- tokenizer_manifest.json
+
+The full legal code is available at:
+
+https://creativecommons.org/licenses/by-sa/4.0/legalcode
+
+Attribution should identify the work as "Native-60M Base v1", identify the
+publisher as "wang-TJ-20", include the source repository URL below, provide a
+link to the license, and indicate whether changes were made:
+
+https://github.com/wang-TJ-20/llm-lifecycle-lab
+
+This license notice applies only to the three files listed above. It does not
+change the Apache-2.0 license of the implementation source code, grant rights
+to the upstream training datasets beyond their respective licenses, or assert
+copyright or license restrictions over model outputs.

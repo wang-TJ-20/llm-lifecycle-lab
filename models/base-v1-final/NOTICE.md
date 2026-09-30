@@ -27,9 +27,15 @@ The combined data manifest records `CC-BY-SA-3.0 AND MIT`.
 
 ## Model Weights
 
-No separate model-weight license is asserted by this package pending an
-explicit release decision. Keep the ModelScope repository private until the
-publisher has reviewed the upstream terms and selected an appropriate public
-license.
+The model weights (`model.pt`) and tokenizer artifacts (`tokenizer.json` and
+`tokenizer_manifest.json`) are distributed under Creative Commons
+Attribution-ShareAlike 4.0 International (`CC-BY-SA-4.0`):
+
+https://creativecommons.org/licenses/by-sa/4.0/legalcode
+
+The implementation remains under Apache-2.0, and the upstream training data
+remains under its respective licenses. The model artifact license does not
+assert restrictions over model outputs. See `LICENSE_MODEL` for the exact
+scope and attribution instructions.
 
 This notice is informational and is not legal advice.

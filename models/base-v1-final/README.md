@@ -1,3 +1,12 @@
+---
+license: cc-by-sa-4.0
+license_link: https://creativecommons.org/licenses/by-sa/4.0/legalcode
+language:
+- en
+- zh
+pipeline_tag: text-generation
+---
+
 # Native-60M Base v1
 
 Native-60M Base v1 is a 62.9M-parameter bilingual decoder-only language model
@@ -32,6 +41,7 @@ should not be expected to follow chat instructions reliably.
 | `tokenizer_manifest.json` | Tokenizer identity and chat protocol |
 | `provenance.json` | Training, evaluation, source and hash provenance |
 | `SHA256SUMS` | Integrity hashes for release files |
+| `LICENSE_MODEL` | CC-BY-SA-4.0 terms for the weights and tokenizer |
 | `NOTICE.md` | Software and training-data license notices |
 
 ## Loading
@@ -126,7 +136,15 @@ is retained explicitly in `provenance.json`.
 
 ## License and Attribution
 
-The implementation repository is licensed under Apache-2.0. The training data
-records MIT and CC-BY-SA-3.0 source licenses. No separate model-weight license
-is asserted by this package pending an explicit release decision. See
-`NOTICE.md` before redistribution or public deployment.
+The model weights (`model.pt`) and tokenizer artifacts (`tokenizer.json` and
+`tokenizer_manifest.json`) are licensed under Creative Commons
+Attribution-ShareAlike 4.0 International (`CC-BY-SA-4.0`). Attribute the work as
+"Native-60M Base v1" by `wang-TJ-20`, link to the source repository and license,
+and indicate whether changes were made. Adapted material must be distributed
+under the same license.
+
+The implementation source code remains licensed under Apache-2.0. The training
+data remains subject to its upstream MIT and CC-BY-SA-3.0 licenses. The model
+artifact license does not assert restrictions over model outputs. See
+`LICENSE_MODEL` for the exact scope and legal-code link, and `NOTICE.md` for
+upstream attribution.
