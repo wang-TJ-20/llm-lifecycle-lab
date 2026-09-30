@@ -1,0 +1,139 @@
+{
+  "package": {
+    "name": "base-v1-final",
+    "title": "Native 60M Bilingual Base Model (v1, final)",
+    "model_id": "tiny-60m",
+    "model_route": "native",
+    "stage": "pretrain",
+    "description": "Final base-model weights from the native-60m-base-v1 pretraining run, exported for release/serving.",
+    "created_at": "2026-09-30"
+  },
+  "source_run": {
+    "run_id": "native-60m-base-v1-s42",
+    "run_profile": "reproduce",
+    "seed": 42,
+    "pipeline_config": "configs/pipelines/native-60m-base-v1.yaml",
+    "resolved_config_sha256": "f3940412977c6fc44ae51a2c9c976ae7d47783ea54896ad87c190c41b46cd202",
+    "status": "completed",
+    "run_created_at": "2026-09-29T06:40:42+00:00"
+  },
+  "checkpoint": {
+    "checkpoint_id": "step-00045191",
+    "global_step": 45191,
+    "source_checkpoint_dir": "runs/native-60m-base-v1-s42/checkpoints/step-00045191",
+    "config_sha256": "f3940412977c6fc44ae51a2c9c976ae7d47783ea54896ad87c190c41b46cd202",
+    "tokenizer_sha256": "7455ac1168f36a3d7dca03fee28784f97899fe233f496484a11e5da2e44a2f32",
+    "created_at": "2026-09-29T12:04:11+00:00"
+  },
+  "weights": {
+    "file": "model.pt",
+    "format": "torch.save (state_dict)",
+    "storage": "git-lfs",
+    "lfs_oid_sha256": "4cdbd642cb878c0e7f5de4b7988751e92de533afa1317256ace20aea078f9398",
+    "size_bytes": 251740405,
+    "sha256": "4cdbd642cb878c0e7f5de4b7988751e92de533afa1317256ace20aea078f9398",
+    "verification": "Byte-identical (sha256) to runs/native-60m-base-v1-s42/checkpoints/step-00045191/model/model.pt"
+  },
+  "model_config": {
+    "file": "config.json",
+    "architecture": "dense-decoder",
+    "model_id": "tiny-60m",
+    "config_source": "configs/models/tiny-60m.yaml",
+    "note": "Copied from checkpoint model/config.json"
+  },
+  "tokenizer": {
+    "file": "tokenizer.json",
+    "manifest": "tokenizer_manifest.json",
+    "tokenizer_id": "bilingual-60m-v1",
+    "vocab_size": 16384,
+    "algorithm": "byte-level-bpe",
+    "normalizer": "NFKC",
+    "min_frequency": 2,
+    "requested_vocab_size": 16384,
+    "chat_template_version": "native-chat-v1",
+    "content_sha256": "7455ac1168f36a3d7dca03fee28784f97899fe233f496484a11e5da2e44a2f32",
+    "special_tokens": {
+      "<|bos|>": 1,
+      "<|eos|>": 2,
+      "<|unk|>": 3,
+      "<|pad|>": 0,
+      "<|im_start|>": 4,
+      "<|im_end|>": 5,
+      "<|reserved_0|>": 6,
+      "<|reserved_1|>": 7,
+      "<|reserved_2|>": 8,
+      "<|reserved_3|>": 9,
+      "<|reserved_4|>": 10,
+      "<|reserved_5|>": 11,
+      "<|reserved_6|>": 12,
+      "<|reserved_7|>": 13
+    },
+    "source": "data/tokenizers/bilingual-60m-v1 (copied from run tokenizer/)"
+  },
+  "training": {
+    "optimizer": "adamw",
+    "learning_rate": 0.0003,
+    "min_lr_ratio": 0.1,
+    "warmup_steps": 50,
+    "betas": [0.9, 0.95],
+    "weight_decay": 0.1,
+    "gradient_clipping": 1.0,
+    "num_epochs": 8.0,
+    "sequence_length": 512,
+    "micro_batch_size": 1,
+    "gradient_accumulation_steps": 16,
+    "effective_batch_tokens": 8192,
+    "dtype": "bfloat16",
+    "device": "cuda"
+  },
+  "training_budget": {
+    "max_steps": 45191,
+    "target_train_tokens": 369476240,
+    "estimated_train_tokens": 369480328,
+    "tokens_seen": 369480328,
+    "target_token_coverage": 1.0000110643109283,
+    "examples_per_epoch": 90381,
+    "supervised_tokens_per_epoch": 46184530,
+    "epochs_seen": 8.000088514487427
+  },
+  "data": {
+    "corpus": "bilingual-60m-v1",
+    "prepared_manifest": "data/prepared/bilingual-60m-v1/data_manifest.json",
+    "packed_manifest": "data/packed/bilingual-60m-v1-seq512/packed_manifest.json",
+    "tokenizer": "data/tokenizers/bilingual-60m-v1"
+  },
+  "evaluation": {
+    "final_train_loss": 1.788147408515215,
+    "best_eval_loss": 2.7064902595011517,
+    "dev_eval_at_final_step": {
+      "split": "dev",
+      "eval_loss": 2.7545488604228012,
+      "eval_en_loss": 1.9535689680065067,
+      "eval_zh_loss": 3.490611949773023,
+      "baseline_eval_loss": 9.859895057044923
+    },
+    "test_eval": {
+      "split": "test",
+      "checkpoint_step": 45191,
+      "eval_loss": 2.731877171783708,
+      "eval_perplexity": 15.361696514509088,
+      "eval_en_loss": 1.9555547977087155,
+      "eval_en_perplexity": 7.0678391571300825,
+      "eval_en_tokens": 245764,
+      "eval_zh_loss": 3.419416282367276,
+      "eval_zh_perplexity": 30.551576321368643,
+      "eval_zh_tokens": 277500,
+      "eval_tokens": 523264,
+      "eval_bits_per_byte": 1.0224588108217805
+    }
+  },
+  "usage": {
+    "load_example": "tok = AutoTokenizer.from_pretrained('models/base-v1-final'); model = AutoModelForCausalLM.from_pretrained('models/base-v1-final')",
+    "note": "config.json is the native tiny-60m config; convert to a HuggingFace config if loading with transformers directly."
+  },
+  "repository": {
+    "remote": "github-wangtj:wang-TJ-20/llm-lifecycle-lab.git",
+    "model_package_path": "models/base-v1-final/",
+    "run_artifacts_path": "results/native-60m-base-v1-s42/"
+  }
+}

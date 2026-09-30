@@ -1,0 +1,34 @@
+{
+  "chat_template": "{%- for message in messages %}\n{{- '<|im_start|>' + message['role'] + '\\n' + message['content'] + '<|im_end|>\\n' }}\n{%- endfor %}\n{%- if add_generation_prompt %}\n{{- '<|im_start|>assistant\\n' }}\n{%- endif %}",
+  "chat_template_version": "native-chat-v1",
+  "content_sha256": "7455ac1168f36a3d7dca03fee28784f97899fe233f496484a11e5da2e44a2f32",
+  "revision": "7455ac1168f36a3d7dca03fee28784f97899fe233f496484a11e5da2e44a2f32",
+  "schema_version": "1.0",
+  "source_data_sha256": "11a0c0abf73abcb36fcd269565363ef60564d778cb6006b23ff381a069d577b8",
+  "special_tokens": {
+    "<|bos|>": 1,
+    "<|eos|>": 2,
+    "<|im_end|>": 5,
+    "<|im_start|>": 4,
+    "<|pad|>": 0,
+    "<|reserved_0|>": 6,
+    "<|reserved_1|>": 7,
+    "<|reserved_2|>": 8,
+    "<|reserved_3|>": 9,
+    "<|reserved_4|>": 10,
+    "<|reserved_5|>": 11,
+    "<|reserved_6|>": 12,
+    "<|reserved_7|>": 13,
+    "<|unk|>": 3
+  },
+  "tokenizer_id": "bilingual-60m-v1",
+  "trainer_config": {
+    "algorithm": "byte-level-bpe",
+    "min_frequency": 2,
+    "normalizer": "NFKC",
+    "protocol_version": "native-chat-v1",
+    "requested_vocab_size": 16384,
+    "train_split_sha256": "de279e8d7cad465efe03c65a341612abfb17984b9276ce1930f96324f901040b"
+  },
+  "vocab_size": 16384
+}
