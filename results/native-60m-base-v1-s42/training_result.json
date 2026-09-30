@@ -1,0 +1,11 @@
+{
+  "best_eval_loss": 2.7064902595011517,
+  "elapsed_seconds": 19408.2183390446,
+  "epochs_seen": 8.000088514487427,
+  "final_checkpoint": "/root/zitong/llm-lifecycle-lab/runs/native-60m-base-v1-s42/checkpoints/step-00045191",
+  "final_loss": 1.788147408515215,
+  "global_step": 45191,
+  "target_token_coverage": 1.0000110643109283,
+  "target_train_tokens": 369476240,
+  "tokens_seen": 369480328
+}

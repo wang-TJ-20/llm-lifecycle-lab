@@ -1,0 +1,18 @@
+{
+  "checkpoint": "/root/zitong/llm-lifecycle-lab/runs/native-60m-base-v1-s42/checkpoints/step-00045191",
+  "checkpoint_step": 45191,
+  "eval_bits_per_byte": 1.0224588108217805,
+  "eval_en_bits_per_byte": 0.6618030619560229,
+  "eval_en_loss": 1.9555547977087155,
+  "eval_en_perplexity": 7.0678391571300825,
+  "eval_en_tokens": 245764.0,
+  "eval_loss": 2.731877171783708,
+  "eval_perplexity": 15.361696514509088,
+  "eval_tokens": 523264.0,
+  "eval_zh_bits_per_byte": 1.412271036725537,
+  "eval_zh_loss": 3.419416282367276,
+  "eval_zh_perplexity": 30.551576321368643,
+  "eval_zh_tokens": 277500.0,
+  "report_path": "/root/zitong/llm-lifecycle-lab/runs/native-60m-base-v1-s42/evaluations/pretrain-test-step-00045191.json",
+  "split": "test"
+}

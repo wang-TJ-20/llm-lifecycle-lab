@@ -1,0 +1,112 @@
+{
+  "created_at": "2026-09-09T09:44:25+00:00",
+  "dataset_id": "bilingual-60m-v1",
+  "group_by": "source_id",
+  "license": "CC-BY-SA-3.0 AND MIT",
+  "processing_steps": [
+    "validate-schema",
+    "deterministic-group-split:0.8:0.1:0.1"
+  ],
+  "record_kind": "pretrain",
+  "schema_version": "1.0",
+  "source": {
+    "path": "/Users/bytedance/Desktop/llm-lifecycle-lab/data/raw/bilingual-60m-v1/source.jsonl",
+    "sha256": "af07e4c3a610637239a3295fd4754af316bd74c5d08bc25b63fd04a147339589",
+    "size_bytes": 290865344
+  },
+  "source_metadata": {
+    "components": [
+      {
+        "config": "default",
+        "created_at": "2026-09-09T08:38:05+00:00",
+        "language": "en",
+        "license": "MIT",
+        "loader_versions": {
+          "huggingface_hub": "0.36.2",
+          "pyarrow": "25.0.1"
+        },
+        "recipe_id": "simplestories-60m-v1",
+        "records": 100000,
+        "repository": "SimpleStories/SimpleStories",
+        "revision": "e63b8adc3b1a1bdc7cac5b500d150b71346b0628",
+        "schema_version": "1.0",
+        "selection": {
+          "max_records": 100000,
+          "min_characters": 64,
+          "strategy": "source-prefix"
+        },
+        "skipped_records": 0,
+        "source_file": "source.jsonl",
+        "source_sha256": "e1ddf88e44e31a0858733c66f9b8ab3eaa7b91db1e73cfb6a97b0a7dd161763e",
+        "split": "train",
+        "synthetic": true,
+        "upstream_file": "data/train-00000-of-00007.parquet",
+        "upstream_file_sha256": "ca33531b99f3bebb4125e82f56017c223a4900331b55bcf7cde1b0f750d88fd4"
+      },
+      {
+        "config": "20231101.zh",
+        "created_at": "2026-09-09T09:43:47+00:00",
+        "language": "zh",
+        "license": "CC-BY-SA-3.0",
+        "loader_versions": {
+          "huggingface_hub": "0.36.2",
+          "pyarrow": "25.0.1"
+        },
+        "recipe_id": "wikipedia-zh-60m-v1",
+        "records": 126000,
+        "repository": "wikimedia/wikipedia",
+        "revision": "b04c8d1ceb2f5cd4588862100d08de323dccfbaa",
+        "schema_version": "1.0",
+        "selection": {
+          "expected_source_sha256": "fdf06f43db54c564945725e175d5196f93824a1b411558763ff30d318128a9a0",
+          "max_records": 126000,
+          "min_characters": 64,
+          "strategy": "source-prefix"
+        },
+        "skipped_records": 898,
+        "source_file": "source.jsonl",
+        "source_sha256": "fdf06f43db54c564945725e175d5196f93824a1b411558763ff30d318128a9a0",
+        "split": "train",
+        "synthetic": false,
+        "upstream_file": "20231101.zh/train-00002-of-00006.parquet",
+        "upstream_file_sha256": "ec8f6c0dd1418b8fcd454278fb4f2bc7cd0ce8312f29c80b672533942601338f"
+      }
+    ],
+    "created_at": "2026-09-09T09:44:06+00:00",
+    "languages": [
+      "en",
+      "zh"
+    ],
+    "license": "CC-BY-SA-3.0 AND MIT",
+    "mixture_id": "bilingual-60m-v1",
+    "records": 226000,
+    "schema_version": "1.0",
+    "source_file": "source.jsonl",
+    "source_sha256": "af07e4c3a610637239a3295fd4754af316bd74c5d08bc25b63fd04a147339589",
+    "strategy": "round-robin"
+  },
+  "split_seed": 42,
+  "splits": [
+    {
+      "groups": 180657,
+      "name": "train",
+      "path": "train.jsonl",
+      "records": 180657,
+      "sha256": "de279e8d7cad465efe03c65a341612abfb17984b9276ce1930f96324f901040b"
+    },
+    {
+      "groups": 22853,
+      "name": "dev",
+      "path": "dev.jsonl",
+      "records": 22853,
+      "sha256": "a5f81ab21e7ba97c9efba8d631e5eb2cbec46fa2b68ea1ae3ded4755ea92eeae"
+    },
+    {
+      "groups": 22490,
+      "name": "test",
+      "path": "test.jsonl",
+      "records": 22490,
+      "sha256": "5e525cbed3b83fb6d8e959202f0d3f3906d6056d1a7602f7d9976ae13637544e"
+    }
+  ]
+}
