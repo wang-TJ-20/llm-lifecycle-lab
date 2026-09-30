@@ -21,7 +21,8 @@
 
 第一篇不下载语料、不训练 Tokenizer，也不要求 GPU。
 后面的两步 Smoke 用来验证完整链路；60M 教学训练的目标环境是
-Linux + 单张 24GB NVIDIA GPU。CPU 实验通过不代表已经完成 CUDA 训练验证。
+Linux + 单张 24GB NVIDIA GPU。CPU 实验通过不代表已经完成 CUDA 训练验证；
+本项目发布的 Base-v1 已独立完成该 CUDA 训练与评测。
 
 ## 主线目录
 
@@ -40,6 +41,12 @@ Linux + 单张 24GB NVIDIA GPU。CPU 实验通过不代表已经完成 CUDA 训�
 第五至七篇使用 `scripts/pretrain_experiment.py` 的临时双语微型实验，
 不下载数据、不覆盖已有产物；真实 Smoke 与 60M 操作另有明确前提。
 
+主线中的概念与门禁已经落到公开的
+[`Native-60M Base-v1`](https://modelscope.cn/models/wzt777/native-60m-base-v1)：
+8 epochs、45,191 optimizer steps、369,480,328 个监督 token。完成第六篇后，
+可以用同一套“固定条件、总体与分语言指标、生成边界”的方法复核真实权重；
+具体命令和结果见第六篇的“公开 Base-v1”一节。
+
 ## 文章与指南的分工
 
 系列文章负责建立连续的理解，指南负责提供完整操作步骤和参数说明。
@@ -54,6 +61,8 @@ Linux + 单张 24GB NVIDIA GPU。CPU 实验通过不代表已经完成 CUDA 训�
 | 理解训练预算、累积和日志，跑通微型预训练 | [第五篇](./05-first-pretraining.md) |
 | 理解指标聚合、双语覆盖和生成检查 | [第六篇](./06-evaluating-a-model.md) |
 | 验证中断恢复，固定实验条件与验收边界 | [第七篇](./07-resume-and-compare.md) |
+| 下载、校验并加载公开 Base-v1 | [第六篇：复核公开 Base-v1](./06-evaluating-a-model.md#7-复核公开的-base-v1) |
+| 查看 Base-v1 的完整训练证据与限制 | [Base-v1 执行结果](../BASE_TRAINING_RESULTS.md) |
 | 下载或接入自己的数据，训练 Tokenizer，生成 Packing | [数据介绍与准备](../DATA_GUIDE.md) |
 | 查模型结构、参数预算和张量形状 | [自有模型介绍](../NATIVE_MODEL_GUIDE.md) |
 | 安装环境，运行训练、恢复和评测，定位报错 | [Pretrain 训练文档](../NATIVE_PRETRAIN_GUIDE.md) |
@@ -75,8 +84,9 @@ Linux + 单张 24GB NVIDIA GPU。CPU 实验通过不代表已经完成 CUDA 训�
 文档站预览、图解与公式写法见 [文档站维护](../SITE_GUIDE.md)。
 
 当前项目已实现 Native 模型、BPE Tokenizer、磁盘 Packing、Pretrain、恢复和评测，
-但仓库不附带训练好的权重，完整 CUDA 参考实验尚未完成。
-文章不会把两步 Smoke 或随机 token 实验写成语言能力结论。
+并发布了通过既定 Base 门禁的 Native-60M Base-v1 权重与 Tokenizer。
+它不等于完成独立的结构消融 Reference，也不具备未经验证的指令跟随能力；
+文章不会把两步 Smoke、随机 token 实验或一次 Base 训练扩大为这些结论。
 
 ## 后续如何继续
 

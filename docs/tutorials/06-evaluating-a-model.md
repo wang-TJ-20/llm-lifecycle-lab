@@ -20,7 +20,7 @@
 
 **本篇先固定评测材料和计数口径，再讨论分数。**
 我们会读取真实评测路径的结果，也会观察一个指标稍有改善、
-但仍然只会重复片段的微型模型。
+但仍然只会重复片段的微型模型，最后用同一方法复核已发布的 Base-v1。
 
 ## 1. 先给每个数字补上比较条件
 
@@ -344,7 +344,90 @@ python scripts/eval_pretrain.py \
 这条命令验证评测链路，不会让两步 Smoke 变成效果实验。
 也不要为了凑出一条漂亮的 test 曲线，对很多 checkpoint 反复挑选。
 
-## 7. 怎样组织一份可信的结论
+## 7. 复核公开的 Base-v1
+
+前面的微型实验用于理解方法。项目的 canonical Base 是
+[`wzt777/native-60m-base-v1`](https://modelscope.cn/models/wzt777/native-60m-base-v1)，
+它从随机初始化训练 8 epochs，在固定数据上完成 45,191 optimizer steps 和
+369,480,328 个监督 token。发布包同时包含权重、Tokenizer、配置、provenance
+与 SHA-256 清单。
+
+下载到 Git 忽略的目录：
+
+```bash
+python -m pip install "modelscope-hub==0.1.8"
+ms download wzt777/native-60m-base-v1 \
+  --repo-type model \
+  --local-dir build/native-60m-base-v1
+```
+
+macOS 使用 `shasum -a 256 -c SHA256SUMS`，Linux 使用
+`sha256sum -c SHA256SUMS`。例如在 macOS 上：
+
+```bash
+(cd build/native-60m-base-v1 && shasum -a 256 -c SHA256SUMS)
+```
+
+不要只检查文件存在。加载器还会校验 Tokenizer 内容哈希、模型配置，并严格匹配
+`state_dict`：
+
+```python
+from pathlib import Path
+
+from llm_lifecycle_lab.model.native import (
+    NativeTransformer,
+    load_native_model_config,
+)
+from llm_lifecycle_lab.tokenizer import NativeTokenizer
+
+model_dir = Path("build/native-60m-base-v1")
+tokenizer = NativeTokenizer.from_directory(model_dir)
+model = NativeTransformer(load_native_model_config(model_dir / "config.json"))
+model.load(model_dir)
+model.eval()
+
+assert model.parameter_count == 62_927_616
+assert tokenizer.vocab_size == 16_384
+```
+
+权重文件的固定 SHA-256 是
+`4cdbd642cb878c0e7f5de4b7988751e92de533afa1317256ace20aea078f9398`。
+该包是模型级发布物，不含 optimizer、scheduler、RNG 与数据流位置，
+因此可以用于推理或作为后续阶段的初始化权重，但不能冒充可原地恢复的训练 checkpoint。
+
+### 实测结果
+
+每个 dev/test 结果都来自固定的 1,024 个窗口：
+
+| 检查点与 split | 总体 loss | 英文 loss | 中文 loss | 总体 BPB |
+| --- | ---: | ---: | ---: | ---: |
+| step 0，dev | 9.859895 | 9.844470 | 9.874070 | 3.664932 |
+| step 45,191，dev | 2.754549 | 1.953569 | 3.490612 | 1.023868 |
+| step 45,191，test | 2.731877 | 1.955555 | 3.419416 | 1.022459 |
+
+这些数字支持以下有限结论：
+
+1. 总体、英文和中文 dev loss 都相对同一 run 的 step 0 明显下降。
+2. 最终 dev loss 比最优 dev loss 2.706490 高 1.776%，仍在预先固定的 2% 回退界限内。
+3. test 只在开发门禁通过后运行一次；523,264 个监督目标中，英文 245,764，
+   中文 277,500。
+4. test 英文 BPB 为 0.661803，中文 BPB 为 1.412271。中文仍明显弱于英文，
+   不能只用总体 loss 掩盖这个差距。
+
+这证明固定配方下的双语 Base 训练闭环成立，不证明模型具备可靠聊天、指令遵循、
+事实正确性或生产安全性。完整证据见
+[Base-v1 执行结果](../BASE_TRAINING_RESULTS.md) 与
+[`results/native-60m-base-v1-s42/`](../../results/native-60m-base-v1-s42/)。
+训练进程启动时工作树含 5 个未跟踪条目；该 provenance 偏离已公开记录，
+并通过源码、配置、数据、Tokenizer 与最终权重哈希复核后接受为当前 canonical Base，
+不能在报告中省略。
+
+权重与 Tokenizer 采用 `CC-BY-SA-4.0`，实现代码仍为 Apache-2.0，
+训练数据继续受各自上游许可约束。准确范围见
+[`LICENSE_MODEL`](../../models/base-v1-final/LICENSE_MODEL) 与
+[`NOTICE.md`](../../models/base-v1-final/NOTICE.md)。
+
+## 8. 怎样组织一份可信的结论
 
 先报告事实，再讨论可能原因：
 
@@ -364,7 +447,8 @@ python scripts/eval_pretrain.py \
 
 本项目冻结 Reference 要求最终总体和中英文指标都改善，
 并核对样本量、预算和输入版本，但**自动验收通过仍只支持规范覆盖的结论**。
-当前尚无完成该规范的 CUDA 参考结果，不能借微型实验代替它。
+Base-v1 已通过 `BASE_TRAINING_GUIDE.md` 中的 CUDA 开发门禁；它不自动替代
+`native-60m-baseline-v1` 的独立 Reference 验收，也不构成四臂结构消融结果。
 
 下一篇处理最后一块：如何保留足够的状态，
 让一次中断不改变实验路线，也让两次实验真的可比较。

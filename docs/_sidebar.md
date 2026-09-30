@@ -12,7 +12,9 @@
   - [07 让实验可以恢复和比较](/tutorials/07-resume-and-compare)
 
 - **操作与原理参考**
+  - [公开 Native-60M Base](https://modelscope.cn/models/wzt777/native-60m-base-v1)
   - [Base 从零训练手册](/BASE_TRAINING_GUIDE)
+  - [Base-v1 执行结果](/BASE_TRAINING_RESULTS)
   - [数据介绍与准备](/DATA_GUIDE)
   - [自有模型介绍](/NATIVE_MODEL_GUIDE)
   - [Pretrain 训练文档](/NATIVE_PRETRAIN_GUIDE)

@@ -1,11 +1,14 @@
 # Native-60M Base 从零训练手册
 
-本文是当前唯一的 Base 训练入口。旧 Base 实验结果以及 SFT、DPO、GRPO 路线已从
-工作树移除；归档只用于追溯，不作为本轮输入。
+本文保留 Native-60M Base-v1 的冻结训练路线和验收门禁。旧 Base 实验结果以及
+SFT、DPO、GRPO 路线已从工作树移除；归档只用于追溯，不作为本轮输入。
+该路线现已执行完成，最终权重、Tokenizer 与 provenance 位于
+[`models/base-v1-final/`](../models/base-v1-final/)，完整结果见
+[`BASE_TRAINING_RESULTS.md`](./BASE_TRAINING_RESULTS.md)。
 
-本轮只回答一个问题：**Native-60M 能否从随机权重开始，在同一套冻结数据和
-held-out 上稳定学到更低的双语语言模型损失。** 在 Base 门禁通过前，不设计或运行
-任何后训练阶段。
+本轮执行时只回答一个问题：**Native-60M 能否从随机权重开始，在同一套冻结数据和
+held-out 上稳定学到更低的双语语言模型损失。** Base-v1 已通过预先固定的开发门禁；
+本文中的命令与停止规则继续作为重跑约束，而不是待执行计划。
 
 ## 1. 固定边界
 
@@ -43,7 +46,12 @@ recipe 和共同评测 anchor，不能把两套 held-out 的绝对 loss 直接�
 | --- | --- | --- |
 | 本地 Native-60M MPS smoke | 通过 | 8 steps；dev loss 9.834474 → 8.748201；en/zh 均下降 |
 | 本地 Native-60M MPS pilot | 通过 | 100 steps；dev loss 9.855341 → 7.299100；en/zh 均下降 |
-| 远端 Base-v1 | 未运行 | 仅在本地 pilot 通过后启动 |
+| 远端 Base-v1 | 通过 | 45,191 steps；dev loss 9.859895 → 2.754549；一次性 test loss 2.731877 |
+
+Canonical run 为 `native-60m-base-v1-s42`。公开下载地址是
+[`wzt777/native-60m-base-v1`](https://modelscope.cn/models/wzt777/native-60m-base-v1)，
+权重 SHA-256 为
+`4cdbd642cb878c0e7f5de4b7988751e92de533afa1317256ace20aea078f9398`。
 
 ## 3. 本地 MPS 门禁
 
@@ -179,8 +187,8 @@ PY
 
 ## 5. 远端 Base-v1
 
-远端必须使用 Linux、CUDA BF16、干净提交和同一批数据文件。先同步仓库中的
-Tokenizer、prepared manifest 及全部 packed 数组，再执行：
+复现完整 run 时必须使用 Linux、CUDA BF16、干净提交和同一批数据文件。先同步仓库中的
+Tokenizer、prepared manifest 及全部 packed 数组，再使用新的 run ID 执行：
 
 ```bash
 set -euo pipefail
@@ -194,18 +202,21 @@ pytest -q
 python scripts/validate_config.py configs/pipelines/native-60m-base-v1.yaml
 python scripts/doctor.py --config configs/pipelines/native-60m-base-v1.yaml
 
-test ! -e runs/native-60m-base-v1-s42
+test ! -e runs/native-60m-base-v1-reproduction-s42
 python scripts/train_pretrain.py \
   --config configs/pipelines/native-60m-base-v1.yaml \
-  --run-id native-60m-base-v1-s42
+  --run-id native-60m-base-v1-reproduction-s42
 ```
 
 固定预算为 8 epochs，约 369.5M supervised token 和 45,191 optimizer steps。
 每 1,000 step 在固定的 1,024 个 dev 窗口上评测；每 5,000 step 保存 checkpoint。
+Canonical run 的实际耗时为 19,408.22 秒，处理 369,480,328 个监督 token。
 
-## 6. Base 开发门禁
+## 6. Base 开发门禁与已确认结果
 
-训练完成后只读取 `metrics.jsonl` 和 `training_result.json`：
+Canonical run 已通过该门禁。重跑时仍只读取 `metrics.jsonl` 和
+`training_result.json`，使用下面的预注册判断。以下代码复核 canonical run；
+验证新 run 时只替换 `run` 路径，不修改判断条件：
 
 ```bash
 python - <<'PY'
@@ -240,6 +251,19 @@ print("PASS: Base-v1 development gate")
 PY
 ```
 
+Canonical run 的关键结果：
+
+| 指标 | step 0 dev | step 45,191 dev | step 45,191 test |
+| --- | ---: | ---: | ---: |
+| 总体 loss | 9.859895 | 2.754549 | 2.731877 |
+| 英文 loss | 9.844470 | 1.953569 | 1.955555 |
+| 中文 loss | 9.874070 | 3.490612 | 3.419416 |
+| 总体 BPB | 3.664932 | 1.023868 | 1.022459 |
+
+最终 dev loss 比最优值 2.706490 高 1.776%，在固定的 2% 回退界限内；
+`target_token_coverage=1.0000110643`。中文 loss/BPB 仍显著高于英文，
+该差距必须保留在后续 SFT 数据与评测设计中。
+
 门禁失败时保留全部证据并停止。只允许从中间 checkpoint 做同配置诊断，不允许
 降低阈值或切换数据后继续复用同一 run ID。
 
@@ -252,6 +276,9 @@ python scripts/eval_pretrain.py \
   --split test \
   --json > runs/native-60m-base-v1-s42/final-test.json
 ```
+
+Canonical run 已按该协议执行一次 test；报告保存在
+[`results/native-60m-base-v1-s42/final-test.json`](../results/native-60m-base-v1-s42/final-test.json)。
 
 ## 7. 停止规则
 

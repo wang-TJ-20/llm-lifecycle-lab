@@ -717,7 +717,8 @@ python scripts/inspect_model.py --config configs/models/tiny-60m.yaml
 [自有模型介绍](../NATIVE_MODEL_GUIDE.md#2-两档模型)。
 比较宽浅/深窄或 QK-Norm 时，应固定数据、Tokenizer、训练预算和评测方式，
 不能拿随机初始化输出给哪种结构更好下结论。
-当前 60M 完整 CUDA 参考训练尚未完成。
+已发布 Base-v1 只完成宽浅、QK-Norm 关闭这一配方的 8-epoch CUDA 训练；
+这里的四臂 Reference 对照尚未完成，不能由单臂结果替代。
 
 </details>
 

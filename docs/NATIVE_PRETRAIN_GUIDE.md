@@ -7,6 +7,9 @@
 > 当前 Native-60M 的实际执行命令、预算和门禁只以
 > [Base 从零训练手册](./BASE_TRAINING_GUIDE.md)为准。本文的 Reference 小节只保留
 > 通用机制说明，不得用其中旧 1-epoch 配方启动新 Base。
+> 8-epoch Base-v1 已训练完成并公开发布；下载与加载见
+> [`models/base-v1-final/README.md`](../models/base-v1-final/README.md)，
+> 最终结果见 [`BASE_TRAINING_RESULTS.md`](./BASE_TRAINING_RESULTS.md)。
 
 初次实践顺序：本文第 2 节安装环境 -> 数据文档完成 Smoke 数据准备 -> 本文第 3～5 节
 训练与评测。只有通过 Smoke 后，再进入 60M；不需要一次运行全部消融配置。
@@ -362,7 +365,8 @@ python scripts/eval_pretrain.py \
 ```
 
 改变预算后不得照抄上述 step，以训练输出的 `final_checkpoint` 为准。
-当前仓库尚未完成 60M 全程 CUDA 参考运行，不提供虚构的耗时、成本或质量预期。
+本节 `native-v1.yaml` 的旧 1-epoch 教学配方不是已发布的 8-epoch Base-v1，
+也没有完成独立 CUDA Reference 验收；不得把发布结果套用到这份旧配方。
 
 ## 7. 自定义实验配置
 

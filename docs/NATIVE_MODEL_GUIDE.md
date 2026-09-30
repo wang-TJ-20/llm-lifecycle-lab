@@ -4,7 +4,9 @@
 训练数据就能执行的模型实验。模型是从随机权重开始训练，不是裁剪或微调 Qwen 得到的。
 
 数据来源及 Tokenizer 准备见 [数据介绍与准备](./DATA_GUIDE.md)；环境安装、训练与恢复见
-[Pretrain 训练文档](./NATIVE_PRETRAIN_GUIDE.md)。本仓库不附带训练完成的模型权重。
+[Pretrain 训练文档](./NATIVE_PRETRAIN_GUIDE.md)。训练完成的 Native-60M Base-v1
+已发布到 [ModelScope](https://modelscope.cn/models/wzt777/native-60m-base-v1)，
+仓库内的 canonical 发布包位于 [`models/base-v1-final/`](../models/base-v1-final/)。
 
 ## 1. 设计目标
 
@@ -100,7 +102,9 @@ SFT/DPO/GRPO 不需要扩展 embedding 或改变已有 token ID。
 数据、训练预算、源码与验收由
 [`native-60m-baseline-v1.yaml`](../configs/reference/native-60m-baseline-v1.yaml) 固定。
 执行顺序见 [固定 60M 基线](./NATIVE_PRETRAIN_GUIDE.md#92-固定-60m-基线)。
-规范与输入冻结不等于完成了正式 CUDA 训练，也不表示模型质量已达标。
+已发布 Base-v1 完成的是 `native-60m-base-v1.yaml` 的 8-epoch CUDA 配方；
+这里的 `native-60m-baseline-v1` 是另一份 1-epoch Reference 规范，
+不能用 Base-v1 的结果替代其独立验收。
 
 项目提供四个约 60M 配方，组成宽浅/深窄与 QK-Norm 的 2×2 对照：
 
@@ -378,6 +382,44 @@ model/
 
 这保证了“模型结构不一致但误用旧 checkpoint”的情况会 fail-fast。
 
+### 9.1 加载已发布的 Base-v1
+
+从 ModelScope 下载完整发布目录：
+
+```bash
+python -m pip install "modelscope-hub==0.1.8"
+ms download wzt777/native-60m-base-v1 \
+  --repo-type model \
+  --local-dir build/native-60m-base-v1
+(cd build/native-60m-base-v1 && shasum -a 256 -c SHA256SUMS)
+```
+
+上面的校验命令适用于 macOS；Linux 将最后一行改为
+`sha256sum -c SHA256SUMS`。加载时不要把 10M/其他 60M 配方的配置或 Tokenizer
+混入同一目录：
+
+```python
+from pathlib import Path
+
+from llm_lifecycle_lab.model.native import (
+    NativeTransformer,
+    load_native_model_config,
+)
+from llm_lifecycle_lab.tokenizer import NativeTokenizer
+
+model_dir = Path("build/native-60m-base-v1")
+tokenizer = NativeTokenizer.from_directory(model_dir)
+model = NativeTransformer(load_native_model_config(model_dir / "config.json"))
+model.load(model_dir)
+model.eval()
+```
+
+发布包中的 `model.pt` 是严格加载的 `state_dict`，不是 Hugging Face
+`save_pretrained` 目录。它不含 optimizer、scheduler、RNG 或数据流位置，
+不能直接用于原 run 的精确恢复。权重与 Tokenizer 采用 `CC-BY-SA-4.0`；
+模型结构和训练代码仍为 Apache-2.0。完整说明见
+[`models/base-v1-final/README.md`](../models/base-v1-final/README.md)。
+
 ## 10. 当前设计取舍
 
 这个 Native 模型当前刻意保持简洁：
@@ -479,7 +521,7 @@ SFT 之前应使用普通文本续写观察模型，而不是用聊天质量判�
 | 推理 logits | 支持 `logits_to_keep` 以限制输出位置 | 已支持生成时只投影最后位置，训练默认保留全序列，KV Cache 不裁剪 |
 | HF 兼容 | `PreTrainedModel`、`PretrainedConfig` 与生成接口 | 后续以独立适配/导出层对接，不在 Native forward 中加入训练阶段分支 |
 | 长上下文 | 配置更大 RoPE cache 和可选 YaRN | 512 长度训练不能据此宣称具备 32K 能力；需长文本数据与专门评测后再扩展 |
-| MoE | 有专家路由、top-k 和辅助 loss | 暂不引入；它增加变量与算子调度成本，不能解决尚未完成的 Dense CUDA 基线验证 |
+| MoE | 有专家路由、top-k 和辅助 loss | 暂不引入；它增加变量与算子调度成本，也不能替代当前 Dense Base 的数据与评测改进 |
 
 ### 公平比较需要控制什么
 

@@ -4,6 +4,7 @@
 从零训练的过程、各阶段门禁结论与产物位置，便于在本地复现与核验。
 
 > 生成时间：2026-09-29
+> 最终核验与发布：2026-09-30
 > 仓库：`/root/zitong/llm-lifecycle-lab`
 
 ## 0. 执行环境（与手册假设的差异）
@@ -26,8 +27,9 @@
 2. `native-60m-base-v1.yaml` 本身已是 `device: cuda` / `dtype: bfloat16`，无需改动，
    run ID 保持 `native-60m-base-v1-s42`。
 3. 工作树存在未跟踪文件（新增的两个 CUDA 配置、预置的 `artifacts/`、`step-00005649-model.tar.gz`
-   以及训练日志），因此未满足手册“远端干净提交”的附加要求；这不影响训练与门禁的数值结论，
-   仅作为偏离记录。
+   以及训练日志），因此未满足手册“远端干净提交”的附加要求。该项是明确的 provenance
+   偏离，不能解释为完全复现；在源码、配置、数据、Tokenizer 和最终 checkpoint 哈希均
+   与归档证据一致后，本次权重被例外接受为 canonical Base-v1，不因此放宽后续 run 的要求。
 4. 数据、`tokenizer`、模型配置均未改动，使用手册指定的
    `data/tokenizers/bilingual-60m-v1`、`data/prepared/bilingual-60m-v1`、
    `data/packed/bilingual-60m-v1-seq512`。
@@ -117,7 +119,7 @@ python scripts/eval_pretrain.py \
 分语言趋势：en 9.848→6.291，zh 9.863→8.256，均下降；checkpoint 重载评测与训练末评测
 逐位一致（float32），可作为后续 45k 步训练链路正确性的旁证。
 
-## 5. 阶段 3 — 远端 Base-v1（训练中）
+## 5. 阶段 3 — 远端 Base-v1（PASS）
 
 配置 `native-60m-base-v1.yaml`：8 epoch，bf16，seq512，micro_batch=1，grad_accum=16，
 `warmup_steps=50`，`checkpoint_interval=5000`，`eval_interval=1000`，`eval_batches=1024`。
@@ -151,9 +153,9 @@ nohup python scripts/train_pretrain.py \
 - baseline（step0）参考值：
   `eval_loss=9.859895057044923`、`eval_en_loss=9.844470420304159`、
   `eval_zh_loss=9.874069731564312`。
-- 实测速率约 0.45 s/step → 预估总时长 ≈ **5.6 小时**。
+- 实际训练耗时 19,408.22 秒，约 **5 小时 23 分**。
 
-### 5.1 Base 开发门禁（训练完成后运行）
+### 5.1 Base 开发门禁（已运行）
 
 ```bash
 cd /root/zitong/llm-lifecycle-lab
@@ -191,7 +193,7 @@ PY
 门禁通过标准（不修改阈值）：`global_step==45191`、`target_token_coverage∈[1.0,1.01]`、
 `final.eval_loss <= 0.5*baseline.eval_loss`、en/zh 均低于 baseline、final 不比 best 回退 >2%。
 
-### 5.2 门禁通过后 — test 集一次性评测
+### 5.2 门禁通过后 — test 集一次性评测（已运行）
 
 ```bash
 source /root/.venv60m/bin/activate
@@ -211,21 +213,25 @@ python scripts/eval_pretrain.py \
    `data/packed/bilingual-60m-v1-seq512/packed_manifest.json` 存在且 `doctor.py` 通过。
 4. **smoke 门禁**：运行 §3 命令，再跑 §3 门禁断言，应 PASS。
 5. **pilot 门禁**：运行 §4 命令（含重载评测），再跑 §4 门禁断言，应 PASS。
-6. **Base-v1**：确认 §5 推导的 `max_steps==45191`；训练结束后运行 §5.1 门禁，
-   通过后再运行 §5.2 的 test 评测。
+6. **Base-v1**：确认 §5 推导的 `max_steps==45191`；归档结果应通过 §5.1 门禁，
+   且只能存在按 §5.2 协议生成的一次性 test 结果。
 7. **关键文件**：每个 run 目录下都应存在 `run_manifest.json`（status=completed）、
    `metrics.jsonl`、`training_result.json`，Base-v1 还需 `checkpoints/step-00045191`。
 
 ## 7. 当前已确认结论
 
-- ✅ 训练链路、数据、Tokenizer 在本机与本机 CUDA 上可复现手册基线（smoke/pilot 数值吻合）。
-- ✅ 本地两级门禁均 PASS。
-- ⏳ Base-v1 正在训练，ETA ≈ 5.6h；完成后执行 §5.1 / §5.2 即可闭合 Base 开发门禁。
+- 训练链路、数据与 Tokenizer 在 CUDA smoke/pilot 上复现了手册基线。
+- Base-v1 完成 45,191 steps，开发门禁全部通过，test 按约定只运行一次。
+- 最终权重已核对为 canonical Base-v1；模型参数量为 62,927,616，
+  Tokenizer 词表为 16,384。
+- 中文 test loss 3.419416、BPB 1.412271，均明显高于英文的 1.955555 和
+  0.661803。后续不能只看总体 loss，需要继续保留双语分层门禁。
+- 训练启动时工作树不干净是保留的 provenance 偏离；本次接受不构成以后忽略
+  clean-tree 门禁的先例。
 
+## 8. Base-v1 最终结果
 
-## 8. Base-v1 最终结果（自动补齐）
-
-- 门禁结论：****PASS****
+- 门禁结论：**PASS**
 - 门禁详细输出：
 
 ```
@@ -270,35 +276,81 @@ GATE_PASSED True
 | eval_perplexity | 15.361696514509088 |
 | eval_en_perplexity | 7.0678391571300825 |
 | eval_zh_perplexity | 30.551576321368643 |
+| eval_bits_per_byte | 1.0224588108217805 |
+| eval_en_bits_per_byte | 0.6618030619560229 |
+| eval_zh_bits_per_byte | 1.412271036725537 |
 | eval_tokens | 523264.0 |
 | eval_en_tokens | 245764.0 |
 | eval_zh_tokens | 277500.0 |
 
-产物：`runs/native-60m-base-v1-s42/final-test.json`
+源 run 产物为 `runs/native-60m-base-v1-s42/final-test.json`；仓库内的只读归档副本是
+[`results/native-60m-base-v1-s42/final-test.json`](../results/native-60m-base-v1-s42/final-test.json)。
 
-### 训练曲线（已导出图片）
+### 训练曲线再生成
 
-原始逐 step 数据全部保存在 `runs/native-60m-base-v1-s42/metrics.jsonl`（4521 行：每 10 步一条训练记录 + 47 条 eval 记录，含 `train_loss / eval_loss / eval_en_loss / eval_zh_loss / learning_rate / tokens_per_second / gradient_norm / target_token_coverage` 等字段）。
+原始逐 step 数据已归档到
+[`results/native-60m-base-v1-s42/metrics.jsonl`](../results/native-60m-base-v1-s42/metrics.jsonl)
+（4521 行：每 10 步一条训练记录 + 47 条 eval 记录）。它包含
+`train_loss`、`eval_loss`、`eval_en_loss`、`eval_zh_loss`、`learning_rate`、
+`tokens_per_second`、`gradient_norm` 与 `target_token_coverage` 等字段。
 
-已用 `metrics.jsonl` 渲染成 PNG 供本地查看（无需 tensorboard）：
-
-| 文件 | 内容 |
-| --- | --- |
-| `runs/native-60m-base-v1-s42/curves/losses.png` | train / eval / en / zh loss 随 step 变化 |
-| `runs/native-60m-base-v1-s42/curves/lr_throughput.png` | 学习率曲线 + tokens/s 吞吐 |
-| `runs/native-60m-base-v1-s42/curves/grad_coverage.png` | 梯度范数 + token coverage |
-
-> 本地复现命令（需 matplotlib）：
+仓库不提交派生曲线图片；可以从归档指标重新生成，避免图片与原始数据漂移：
 > ```bash
 > python - <<'PY'
-> import json,matplotlib; matplotlib.use("Agg"); import matplotlib.pyplot as plt
+> import json
 > from pathlib import Path
-> run=Path("runs/native-60m-base-v1-s42"); lines=[json.loads(l) for l in (run/"metrics.jsonl").read_text().splitlines() if l.strip()]
-> tr=[r for r in lines if r.get("train_loss") is not None]; tr.sort(key=lambda r:r["step"])
-> ev=[r for r in lines if r.get("eval_loss") is not None]; ev.sort(key=lambda r:r["step"])
-> ts=[r["step"] for r in tr]
-> plt.plot(ts,[r["train_loss"] for r in tr],label="train")
-> plt.plot([r["step"] for r in ev],[r["eval_loss"] for r in ev],"o-",label="eval")
-> plt.legend(); plt.savefig("curve.png",dpi=120)
+>
+> import matplotlib
+> matplotlib.use("Agg")
+> import matplotlib.pyplot as plt
+>
+> run = Path("results/native-60m-base-v1-s42")
+> lines = [
+>     json.loads(line)
+>     for line in (run / "metrics.jsonl").read_text().splitlines()
+>     if line.strip()
+> ]
+> train = sorted(
+>     (row for row in lines if row.get("train_loss") is not None),
+>     key=lambda row: row["step"],
+> )
+> evaluation = sorted(
+>     (row for row in lines if row.get("eval_loss") is not None),
+>     key=lambda row: row["step"],
+> )
+> output = Path("build/base-v1-losses.png")
+> output.parent.mkdir(parents=True, exist_ok=True)
+> plt.plot(
+>     [row["step"] for row in train],
+>     [row["train_loss"] for row in train],
+>     label="train",
+> )
+> plt.plot(
+>     [row["step"] for row in evaluation],
+>     [row["eval_loss"] for row in evaluation],
+>     "o-",
+>     label="eval",
+> )
+> plt.legend()
+> plt.savefig(output, dpi=120)
+> print(output)
 > PY
 > ```
+
+## 9. Canonical 发布
+
+| 项目 | 值 |
+| --- | --- |
+| ModelScope | [`wzt777/native-60m-base-v1`](https://modelscope.cn/models/wzt777/native-60m-base-v1) |
+| 仓库发布包 | [`models/base-v1-final/`](../models/base-v1-final/) |
+| 归档证据 | [`results/native-60m-base-v1-s42/`](../results/native-60m-base-v1-s42/) |
+| ModelScope visibility | `public` |
+| 权重与 Tokenizer 许可 | `CC-BY-SA-4.0` |
+| 实现代码许可 | `Apache-2.0` |
+| `model.pt` SHA-256 | `4cdbd642cb878c0e7f5de4b7988751e92de533afa1317256ace20aea078f9398` |
+
+发布前后均完成 `SHA256SUMS` 全量校验、ModelScope 回拉逐字节比较和 Native 严格加载。
+发布包仅包含模型级 `state_dict`，不包含 optimizer、scheduler、RNG 或数据流状态；
+不能用它恢复原预训练 run。许可范围与上游数据 notices 见
+[`LICENSE_MODEL`](../models/base-v1-final/LICENSE_MODEL) 和
+[`NOTICE.md`](../models/base-v1-final/NOTICE.md)。

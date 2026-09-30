@@ -32,6 +32,12 @@
 不等于回到中断时的随机状态。
 而 optimizer 的动量也不可能从权重反推出唯一值。
 
+已发布的 [`Native-60M Base-v1`](../../models/base-v1-final/) 是模型级产物的
+具体例子：它包含 `model.pt`、模型配置、Tokenizer、provenance 和校验清单，
+适合加载推理或作为后续阶段的初始化权重；它不包含 optimizer、scheduler、RNG
+与数据流位置，不能单独恢复原来的预训练 run。可恢复训练仍应使用 run 中的完整
+checkpoint，而不是从发布目录猜测缺失状态。
+
 ```mermaid
 flowchart TD
   accTitle: 完整恢复需要同时恢复计算与数据状态
@@ -337,7 +343,7 @@ python scripts/verify_reference.py \
 完成后使用 `verify_reference.py --run <路径>` 验收产物、预算与评测。
 完整启动命令见 [固定 60M 基线](../NATIVE_PRETRAIN_GUIDE.md#92-固定-60m-基线)。
 
-规范已冻结不代表已获得验收通过的权重。
+该 Reference 规范已冻结不代表已经获得该规范下验收通过的权重。
 当前完整 CUDA Reference 训练尚未完成，不使用本篇 CPU 恢复实验替代它。
 
 </details>
@@ -354,8 +360,9 @@ python scripts/verify_reference.py \
 6. 固定范围、分语言指标与生成共同支持有限的结论。
 7. Checkpoint 与实验条件让过程能够恢复和比较。
 
-这还不是一个训练完成的通用助手。下一阶段应先完成可靠的 60M 参考训练，
-保留完整结果，再讨论结构消融或新增 SFT、DPO、GRPO 等阶段。
+这还不是一个训练完成的通用助手。Native-60M Base-v1 已完成并公开发布，
+下一阶段应先冻结 SFT 数据、初始化约束与评测门禁；独立 Reference 和结构消融
+仍按各自规范执行，不能由 Base-v1 的一次训练结果替代。
 新增功能时延续同一标准：**实现、最小验证和解释对应起来，结论不超过证据。**
 
 [返回系列目录](./README.md) | [上一篇：判断模型到底学到了什么](./06-evaluating-a-model.md)

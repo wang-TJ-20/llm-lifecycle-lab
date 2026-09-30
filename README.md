@@ -4,9 +4,9 @@
 
 **从一次参数更新开始，亲手理解语言模型的训练过程**
 
-原生 PyTorch 小模型 · 中英文数据 · 七篇实践教程 · 可复现的训练实验
+原生 PyTorch 小模型 · 中英文数据 · 七篇实践教程 · 已发布 Native-60M Base
 
-[在线阅读](https://wang-tj-20.github.io/llm-lifecycle-lab/) · [教程目录](#教程目录) · [快速开始](#快速开始) · [项目进展](#项目进展) · [参与贡献](#参与贡献)
+[在线阅读](https://wang-tj-20.github.io/llm-lifecycle-lab/) · [公开权重](https://modelscope.cn/models/wzt777/native-60m-base-v1) · [教程目录](#教程目录) · [快速开始](#快速开始) · [项目进展](#项目进展)
 
 </div>
 
@@ -34,8 +34,9 @@ loss 下降能说明什么？进程中断后，怎样继续同一次实验？
 - **读懂训练结果**：区分 step、监督 token 和预算，结合双语指标与生成解释模型表现。
 - **做可比较的实验**：固定输入和配置，检查 checkpoint、数据位置与中断恢复。
 
-> 当前已完成七篇预训练主线及配套实现。仓库不附带训练好的权重，
-> 60M 完整 CUDA 参考实验尚未完成；微型实验和两步 Smoke 不代表语言能力。
+> 七篇预训练主线、Native-60M Base-v1 的 8-epoch CUDA 训练及发布均已完成。
+> 权重与 Tokenizer 可从 [ModelScope](https://modelscope.cn/models/wzt777/native-60m-base-v1)
+> 下载，也保存在 `models/base-v1-final/`。它是 Base 模型，不是指令微调后的聊天模型。
 
 ## 选择你的起点
 
@@ -43,7 +44,8 @@ loss 下降能说明什么？进程中断后，怎样继续同一次实验？
 | --- | --- | --- |
 | 离线机制实验 | CPU；安装依赖后无需下载语料 | 观察参数更新，验证微型训练、评测和恢复 |
 | 10M 双语 Smoke | CPU / Apple Silicon MPS / CUDA；需准备公共语料 | 跑通真实数据上的两步训练与评测 |
-| 60M 教学与 Reference | 目标为 Linux + 单张 24GB NVIDIA GPU；需配套数据 | 正式训练、结构对照与固定基线验收 |
+| 已发布 Native-60M Base | CPU 可加载；CUDA 可加速生成；约 252 MB | 下载权重、校验来源并观察 Base 续写 |
+| 60M 训练复现与 Reference | 目标为 Linux + 单张 24GB NVIDIA GPU；需配套数据 | 从零复现训练、结构对照与固定基线验收 |
 
 **第一次接触，先看第一篇并运行离线实验。**
 10M 用于快速验证，60M 是效果研究的主基线；无需先购买 GPU 才开始学习。
@@ -94,7 +96,52 @@ Python 要求为 3.11 或更高。脚本直接加载仓库中的 `src/`，
 **不需要 `pip install -e .` 或手动设置 `PYTHONPATH`**。
 基础 Doctor 不替代真实训练前的配置化检查。
 
-### 2. 不下载数据，先观察一次参数更新
+### 2. 下载并验证公开 Base
+
+发布仓库为
+[`wzt777/native-60m-base-v1`](https://modelscope.cn/models/wzt777/native-60m-base-v1)。
+以下命令把权重、Tokenizer、模型配置和 provenance 下载到 Git 忽略的 `build/`：
+
+```bash
+python -m pip install "modelscope-hub==0.1.8"
+ms download wzt777/native-60m-base-v1 \
+  --repo-type model \
+  --local-dir build/native-60m-base-v1
+```
+
+在 macOS 上校验全部发布文件：
+
+```bash
+(cd build/native-60m-base-v1 && shasum -a 256 -c SHA256SUMS)
+```
+
+Linux 使用 `sha256sum -c SHA256SUMS`。加载时必须让模型配置、权重与 Tokenizer
+来自同一发布目录：
+
+```python
+from pathlib import Path
+
+from llm_lifecycle_lab.model.native import (
+    NativeTransformer,
+    load_native_model_config,
+)
+from llm_lifecycle_lab.tokenizer import NativeTokenizer
+
+model_dir = Path("build/native-60m-base-v1")
+tokenizer = NativeTokenizer.from_directory(model_dir)
+model = NativeTransformer(load_native_model_config(model_dir / "config.json"))
+model.load(model_dir)
+model.eval()
+
+print(model.parameter_count)  # 62927616
+print(tokenizer.vocab_size)   # 16384
+```
+
+该包使用项目自有加载器，不兼容 Hugging Face `AutoModelForCausalLM`。
+完整来源、指标、限制与许可见
+[`models/base-v1-final/README.md`](./models/base-v1-final/README.md)。
+
+### 3. 不下载数据，先观察一次参数更新
 
 ```bash
 python scripts/model_experiment.py
@@ -108,7 +155,7 @@ python scripts/model_experiment.py
 `checkpoint_matches_full=True`。随机 token 的 loss 不用于判断语言能力。
 逐步解释见 [第一篇](./docs/tutorials/01-first-parameter-update.md)。
 
-### 3. 跑通微型训练、评测与恢复
+### 4. 跑通微型训练、评测与恢复
 
 ```bash
 python scripts/pretrain_experiment.py --mode train
@@ -124,7 +171,7 @@ python scripts/pretrain_experiment.py --mode resume
 这里的微型模型不是正式 10M/60M 配方，模板数据也不用于证明语言能力。
 完整解读见 [第五至七篇](./docs/tutorials/05-first-pretraining.md)。
 
-### 4. 在真实双语数据上运行 Smoke
+### 5. 在真实双语数据上运行 Smoke
 
 先按 [数据指南](./docs/DATA_GUIDE.md#4-第一次实践10m-双语-smoke)
 确认许可，完成下载、混合、切分、Tokenizer 训练和 Packing，再执行：
@@ -165,6 +212,21 @@ Native 是自有的 decoder-only Transformer，从随机权重训练，不是裁
 两者共用 `model_route: native`，具体结构由模型配置选择，
 实践级别由 `run_profile` 区分。
 
+### 已发布的 Base-v1
+
+`Native-60M Base v1` 从随机初始化训练 8 epochs，共处理 369,480,328 个监督 token，
+最终 step 为 45,191。固定 1,024-window test 评测得到总体 loss 2.731877、
+英文 loss 1.955555、中文 loss 3.419416。中文指标仍明显弱于英文，因此该版本应作为
+可复现实验基线，而不是通用双语助手。
+
+| 项目 | 位置 |
+| --- | --- |
+| 公开下载 | [ModelScope: `wzt777/native-60m-base-v1`](https://modelscope.cn/models/wzt777/native-60m-base-v1) |
+| 仓库发布包 | [`models/base-v1-final/`](./models/base-v1-final/) |
+| 完整训练证据 | [`results/native-60m-base-v1-s42/`](./results/native-60m-base-v1-s42/) |
+| 执行结果 | [`docs/BASE_TRAINING_RESULTS.md`](./docs/BASE_TRAINING_RESULTS.md) |
+| 权重 SHA-256 | `4cdbd642cb878c0e7f5de4b7988751e92de533afa1317256ace20aea078f9398` |
+
 ### 默认覆盖中文与英文
 
 | 语言 | 数据来源 | 内容与来源许可 |
@@ -197,15 +259,17 @@ flowchart TD
 | --- | --- |
 | 已完成 | 七篇中文教程、Docsify 在线阅读站与 CPU 离线实验 |
 | 已实现 | Native 10M/60M、双语 BPE、磁盘 Packing、Pretrain、评测与 checkpoint 恢复 |
-| 当前进行中 | Native-60M Base 从零重训；本地 MPS smoke/pilot 已通过，远端 CUDA 待运行 |
-| 后续方向，尚未实现 | SFT、DPO、GRPO、Qwen 迁移、模型导出与服务 |
+| 已发布 | Native-60M Base-v1；CUDA 训练门禁、独立 test、发布包与 ModelScope 回拉验证均通过 |
+| 当前准备 | 基于 canonical Base 冻结 SFT 数据、评测门禁与初始化约束 |
+| 后续方向，尚未实现 | SFT、DPO、GRPO、Hugging Face 导出与模型服务 |
 
-当前 60M 路线从随机权重重新开始，只使用
+Base-v1 从随机权重开始，只使用
 [`native-60m-base-local-smoke.yaml`](./configs/pipelines/native-60m-base-local-smoke.yaml)、
 [`native-60m-base-local-pilot100.yaml`](./configs/pipelines/native-60m-base-local-pilot100.yaml)
 和 [`native-60m-base-v1.yaml`](./configs/pipelines/native-60m-base-v1.yaml)。
-固定边界、门禁和命令见
-[Base 从零训练手册](./docs/BASE_TRAINING_GUIDE.md)。
+固定边界与复现命令见 [Base 从零训练手册](./docs/BASE_TRAINING_GUIDE.md)，
+实测结果与已知 provenance 偏离见
+[Base-v1 执行结果](./docs/BASE_TRAINING_RESULTS.md)。
 
 当前精确恢复对照覆盖 CPU；不承诺所有设备和精度逐位一致。
 评测受配置中的样本预算限制，不默认代表全量 dev/test。
@@ -217,7 +281,8 @@ flowchart TD
 | --- | --- |
 | [数据介绍与准备](./docs/DATA_GUIDE.md) | 来源、许可、公开/自有数据、切分、Tokenizer、Packing 与迁移 |
 | [自有模型介绍](./docs/NATIVE_MODEL_GUIDE.md) | 模型结构、参数预算、前向、生成与结构消融 |
-| [Base 从零训练手册](./docs/BASE_TRAINING_GUIDE.md) | 当前唯一执行路线：本地 MPS 门禁与远端 CUDA Base |
+| [Base 从零训练手册](./docs/BASE_TRAINING_GUIDE.md) | Base-v1 的本地门禁、远端 CUDA 配方与复现步骤 |
+| [Base-v1 执行结果](./docs/BASE_TRAINING_RESULTS.md) | 最终指标、训练证据、发布包与已知限制 |
 | [Pretrain 训练文档](./docs/NATIVE_PRETRAIN_GUIDE.md) | 环境、训练、评测、恢复、Reference 验收与排错 |
 | [脚本阅读指南](./scripts/README.md) | 从每个脚本的 `main()` 进入核心实现 |
 | [文档站维护](./docs/SITE_GUIDE.md) | 本地预览、GitHub Pages 发布与新增章节 |
@@ -231,6 +296,8 @@ tests/         单元、集成与文档站检查
 .github/       CI
 data/          本地语料与数据产物，Git 忽略
 runs/          本地训练记录与权重，Git 忽略
+models/        经审核发布的模型包；大文件使用 Git LFS
+results/       经筛选提交的 canonical 实验证据
 ```
 
 从脚本进入实现，从教程理解实验；权重、数据和历史 run 不是可以随意清理的缓存。
@@ -246,7 +313,8 @@ runs/          本地训练记录与权重，Git 忽略
 - 报错请附命令、配置、Python/PyTorch 版本、设备和脱敏日志。
 - 修改行为时补充对应测试，并同步受影响的教程与示例输出。
 - 提交实验结果时记录数据版本、预算和对照条件，区分观察与推测。
-- 不提交训练语料、模型权重、凭据或本地运行产物。
+- 不提交训练语料、凭据或未经审核的本地运行产物；正式发布权重必须使用 Git LFS，
+  并同时提交 provenance、校验和、模型卡与许可文件。
 
 <details>
 <summary>开发验证命令</summary>
@@ -274,5 +342,8 @@ requirements 与锁环境两条安装路径。
 
 ## 开源许可
 
-本仓库采用 [Apache License 2.0](./LICENSE)。
-所使用的公开数据与第三方资源各自遵循原有许可，不因本仓库许可而自动改变。
+源代码采用 [Apache License 2.0](./LICENSE)。Native-60M Base-v1 的
+`model.pt`、`tokenizer.json` 和 `tokenizer_manifest.json` 采用
+[CC-BY-SA-4.0](./models/base-v1-final/LICENSE_MODEL)；公开数据与第三方资源
+仍各自遵循原有许可。具体边界见
+[`models/base-v1-final/NOTICE.md`](./models/base-v1-final/NOTICE.md)。

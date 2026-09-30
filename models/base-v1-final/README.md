@@ -44,6 +44,31 @@ should not be expected to follow chat instructions reliably.
 | `LICENSE_MODEL` | CC-BY-SA-4.0 terms for the weights and tokenizer |
 | `NOTICE.md` | Software and training-data license notices |
 
+## Download and Verify
+
+Download the complete release from
+[ModelScope](https://modelscope.cn/models/wzt777/native-60m-base-v1):
+
+```bash
+python -m pip install "modelscope-hub==0.1.8"
+ms download wzt777/native-60m-base-v1 \
+  --repo-type model \
+  --local-dir native-60m-base-v1
+```
+
+Verify every file listed in the release manifest:
+
+```bash
+# Linux
+(cd native-60m-base-v1 && sha256sum -c SHA256SUMS)
+
+# macOS
+(cd native-60m-base-v1 && shasum -a 256 -c SHA256SUMS)
+```
+
+The expected SHA-256 for `model.pt` is
+`4cdbd642cb878c0e7f5de4b7988751e92de533afa1317256ace20aea078f9398`.
+
 ## Loading
 
 This is a native `llm-lifecycle-lab` checkpoint. It is not directly compatible
@@ -63,10 +88,13 @@ Load the downloaded model directory:
 ```python
 from pathlib import Path
 
+import torch
+
 from llm_lifecycle_lab.model.native import (
     NativeTransformer,
     load_native_model_config,
 )
+from llm_lifecycle_lab.model.protocol import GenerationConfig
 from llm_lifecycle_lab.tokenizer import NativeTokenizer
 
 model_dir = Path("/path/to/native-60m-base-v1")
@@ -76,7 +104,19 @@ model = NativeTransformer(
 )
 model.load(model_dir)
 model.eval()
+
+prompt = "Once upon a time"
+input_ids = torch.tensor([tokenizer.encode(prompt, add_bos=True)])
+output = model.generate(
+    input_ids=input_ids,
+    attention_mask=None,
+    config=GenerationConfig(max_new_tokens=32),
+)
+print(tokenizer.decode(output.token_ids[0].tolist()))
 ```
+
+Greedy decoding is used by default. Treat the output as raw Base-model
+continuation, not as an instruction-following response.
 
 ## Training Data
 
