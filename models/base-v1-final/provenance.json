@@ -14,6 +14,10 @@
     "seed": 42,
     "pipeline_config": "configs/pipelines/native-60m-base-v1.yaml",
     "resolved_config_sha256": "f3940412977c6fc44ae51a2c9c976ae7d47783ea54896ad87c190c41b46cd202",
+    "git_commit": "373156d0a0330ceb4aecaa8e4bdeaece8e4f5a9a",
+    "source_sha256": "b69542a5616ad84ed9161e1577d078b1183a41a90905df087161ab20271d0bd2",
+    "dirty": true,
+    "provenance_deviation": "The run started with five untracked entries. The recorded source hash, pipeline config hash, model config hash, tokenizer hash, and data hashes match the canonical artifacts.",
     "status": "completed",
     "run_created_at": "2026-09-29T06:40:42+00:00"
   },
@@ -36,6 +40,7 @@
   },
   "model_config": {
     "file": "config.json",
+    "sha256": "64cfc541595cfd1e18fcada7cee887e0a0647a2309744b0da7e55f5e785a01a0",
     "architecture": "dense-decoder",
     "model_id": "tiny-60m",
     "config_source": "configs/models/tiny-60m.yaml",
@@ -128,8 +133,9 @@
     }
   },
   "usage": {
-    "load_example": "tok = AutoTokenizer.from_pretrained('models/base-v1-final'); model = AutoModelForCausalLM.from_pretrained('models/base-v1-final')",
-    "note": "config.json is the native tiny-60m config; convert to a HuggingFace config if loading with transformers directly."
+    "loader": "llm_lifecycle_lab.model.native.NativeTransformer",
+    "load_example": "root = Path('models/base-v1-final'); tok = NativeTokenizer.from_directory(root); model = NativeTransformer(load_native_model_config(root / 'config.json')); model.load(root)",
+    "note": "This release uses the repository's native model implementation and is not compatible with Hugging Face AutoModelForCausalLM."
   },
   "repository": {
     "remote": "github-wangtj:wang-TJ-20/llm-lifecycle-lab.git",
