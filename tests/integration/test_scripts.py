@@ -14,14 +14,21 @@ SCRIPT_NAMES = (
     "data",
     "doctor",
     "eval_pretrain",
+    "eval_sft",
+    "evaluate_capabilities",
     "inspect_model",
     "inspect_tokenizer",
     "model_experiment",
     "pretrain_experiment",
+    "sft_experiment",
     "train_pretrain",
+    "train_sft",
     "train_tokenizer",
     "validate_config",
     "verify_reference",
+    "verify_sft_data",
+    "verify_sft_init",
+    "verify_sft_run",
 )
 
 
@@ -175,6 +182,108 @@ def test_reference_script_requires_exactly_one_mode(
         "verify_reference",
         "--spec",
         "missing.yaml",
+        *arguments,
+        cwd=tmp_path,
+        expected_code=2,
+    )
+
+
+def test_sft_initialization_script_verifies_frozen_base() -> None:
+    result = run_script(
+        "verify_sft_init",
+        "--spec",
+        "configs/gates/native-60m-sft-v1-base-init.yaml",
+        "--inputs-only",
+        "--json",
+        cwd=PROJECT_ROOT,
+    )
+
+    report = json.loads(result.stdout)
+    assert report["gate_id"] == "native-60m-sft-v1-base-init"
+    assert report["scope"] == "inputs-only"
+    assert report["ok"] is True
+    assert report["counts"] == {"fail": 0, "pass": 10, "warn": 0}
+
+
+def test_sft_data_script_verifies_frozen_contract_without_local_data() -> None:
+    result = run_script(
+        "verify_sft_data",
+        "--spec",
+        "configs/gates/native-60m-sft-v1-data.yaml",
+        "--contract-only",
+        "--json",
+        cwd=PROJECT_ROOT,
+    )
+
+    report = json.loads(result.stdout)
+    assert report["gate_id"] == "native-60m-sft-v1-data"
+    assert report["scope"] == "contract-only"
+    assert report["ok"] is True
+    assert report["counts"] == {"fail": 0, "pass": 5, "warn": 0}
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        (),
+        ("--contract-only", "--inputs-only"),
+        ("--inputs-only", "--preflight"),
+    ],
+)
+def test_sft_data_script_requires_exactly_one_mode(
+    tmp_path: Path,
+    arguments: tuple[str, ...],
+) -> None:
+    run_script(
+        "verify_sft_data",
+        "--spec",
+        "missing.yaml",
+        *arguments,
+        cwd=tmp_path,
+        expected_code=2,
+    )
+
+
+def test_sft_run_script_reports_missing_completed_run() -> None:
+    result = run_script(
+        "verify_sft_run",
+        "--spec",
+        "configs/gates/native-60m-sft-v1-run.yaml",
+        "--run",
+        "runs/missing",
+        "--dev",
+        "--json",
+        cwd=PROJECT_ROOT,
+        expected_code=1,
+    )
+
+    report = json.loads(result.stdout)
+    assert report["gate_id"] == "native-60m-sft-v1-run"
+    assert report["scope"] == "development"
+    assert report["ok"] is False
+    assert report["checks"][0]["name"] == "execution-lock"
+    assert report["checks"][0]["status"] == "pass"
+    assert report["checks"][1]["name"] == "required-artifacts"
+    assert report["checks"][1]["status"] == "fail"
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        (),
+        ("--dev", "--sealed-test"),
+    ],
+)
+def test_sft_run_script_requires_exactly_one_scope(
+    tmp_path: Path,
+    arguments: tuple[str, ...],
+) -> None:
+    run_script(
+        "verify_sft_run",
+        "--spec",
+        "missing.yaml",
+        "--run",
+        "missing",
         *arguments,
         cwd=tmp_path,
         expected_code=2,

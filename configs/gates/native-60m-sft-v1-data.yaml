@@ -1,0 +1,68 @@
+schema_version: "1.0"
+gate_id: native-60m-sft-v1-data
+
+locks:
+  base_gate: configs/gates/native-60m-sft-v1-base-init.yaml
+  base_gate_sha256: de131c9b8e8cf83fe347557fabc0c18737de813e86f05bd1ed35b933c431f0ff
+  recipe: configs/data/sft-public-balanced-v1.yaml
+  recipe_sha256: 88ccafb905cb839707e03c57358d23fbaad1ca0e298e27495ce4a0ab5fbf98e2
+
+paths:
+  canonical_source: data/raw/sft-public-balanced-v1/source.jsonl
+  prepared_manifest: data/prepared/sft-public-balanced-v1/data_manifest.json
+  tokenizer: models/base-v1-final
+
+identity:
+  recipe_id: sft-public-balanced-v1
+  selection_namespace: public-60m-v3
+  dataset_id: sft-public-balanced-v1
+  record_kind: sft
+  source_records: 14799
+  source_sha256: 9ba984310ef0996237908b5843c67d869796fef37e312d2b811f23a647fa772b
+  tokenizer_id: bilingual-60m-v1
+  tokenizer_sha256: 7455ac1168f36a3d7dca03fee28784f97899fe233f496484a11e5da2e44a2f32
+  tokenizer_manifest_sha256: 977ba505539007af8e18b25a418f6f8390c45c95271d1534017ec91e6b0d53e1
+  chat_template_version: native-chat-v1
+
+preparation:
+  split_seed: 42
+  group_by: source_id
+  ratios:
+    train: 0.8
+    dev: 0.1
+    test: 0.1
+  license: Apache-2.0 AND CC-BY-SA-3.0 AND CC-BY-SA-4.0
+
+quality:
+  required_languages: [en, zh]
+  max_sequence_length: 512
+  train_examples: 11882
+  train_supervised_tokens: 475264
+  train_language_examples:
+    en: 5938
+    zh: 5944
+  train_task_examples:
+    general: 4114
+    short_qa: 5292
+    classification: 363
+    numeric: 1298
+    structured: 815
+
+policy:
+  public_only: true
+  allow_synthetic: false
+  require_pinned_revisions: true
+  require_pinned_file_hashes: true
+  allowed_source_ids:
+    - oasst1
+    - dolly
+    - hc3-chinese
+    - squad
+    - cmrc2018
+    - msvamp
+  excluded_source_ids:
+    - helpsteer3
+  supervision: assistant-only
+  truncation: forbidden
+  duplicate_normalization: NFKC-whitespace-collapse-v1
+  require_clean_git: true

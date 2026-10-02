@@ -54,7 +54,9 @@ flowchart TD
 七篇主线已完整。当前代码已经实现 Native 模型、BPE Tokenizer、磁盘 Packing、
 Pretrain、恢复和评测，可以先沿操作指南进行实践。
 Native-60M Base-v1 也已完成 8-epoch CUDA 训练并公开发布；
-SFT、DPO、GRPO 等后续训练阶段尚未实现。
+SFT 已完成 Base/data/run 三层门禁、真实数据物化、assistant-only Trainer、
+quota sampler、恢复与同协议能力评测，本地 smoke 已通过，正式 SFT-v1 尚未运行。
+DPO、GRPO 等后续训练阶段尚未实现。
 
 ## 已发布 Base-v1
 
@@ -70,6 +72,9 @@ provenance 和 SHA-256 清单。它从随机初始化训练 45,191 steps，共�
 - 下载、校验和加载：[发布模型卡](../models/base-v1-final/README.md)
 - 从零训练配方：[Base 从零训练手册](./BASE_TRAINING_GUIDE.md)
 - 完整结果与偏离记录：[Base-v1 执行结果](./BASE_TRAINING_RESULTS.md)
+- SFT 唯一执行入口：[Native-60M SFT 训练手册](./SFT_TRAINING_GUIDE.md)
+- SFT 唯一允许的初始化输入：[SFT 初始化门禁](./SFT_INITIALIZATION_GATE.md)
+- SFT 唯一允许的公开数据契约：[SFT 数据门禁](./SFT_DATA_GATE.md)
 - 评测方法与实测解读：[第六篇](./tutorials/06-evaluating-a-model.md)
 
 ## 开始前
@@ -92,6 +97,9 @@ Base-v1 已在 RTX 4090 上完成并发布。复现训练仍需准备冻结数�
 | 怎样下载和加载已发布的 Base？ | [Native-60M Base-v1 模型卡](../models/base-v1-final/README.md) |
 | 怎样从随机初始化复现 Base？ | [Native-60M Base 从零训练手册](./BASE_TRAINING_GUIDE.md) |
 | Base-v1 最终结果和证据在哪里？ | [Base-v1 执行结果](./BASE_TRAINING_RESULTS.md) |
+| 怎样在远端训练、恢复和验收 SFT？ | [Native-60M SFT 训练手册](./SFT_TRAINING_GUIDE.md) |
+| SFT 必须从哪个 Base 开始？ | [SFT 初始化门禁](./SFT_INITIALIZATION_GATE.md) |
+| SFT 允许哪些数据，如何验收？ | [SFT 数据门禁](./SFT_DATA_GATE.md) |
 | 怎样训练、恢复、评测与排错？ | [Pretrain 训练文档](./NATIVE_PRETRAIN_GUIDE.md) |
 
 完整的章节安排与写作约定见 [实践系列导读](./tutorials/README.md)。

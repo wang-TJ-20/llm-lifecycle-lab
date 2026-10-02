@@ -17,7 +17,8 @@
 ## 1. 当前能力与目录
 
 已实现 Native 10M/60M、BPE、Pretrain、checkpoint 与 dev/test 评测。
-SFT、DPO、GRPO、Qwen 迁移、HF 导出和服务尚未实现。
+SFT 已由独立的 [Native-60M SFT 训练手册](./SFT_TRAINING_GUIDE.md)维护；
+DPO、GRPO、Qwen 迁移、HF 导出和服务尚未实现。
 
 | 目录 | 职责 | 是否应保留 |
 | --- | --- | --- |

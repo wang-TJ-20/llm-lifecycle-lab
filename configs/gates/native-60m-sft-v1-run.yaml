@@ -1,0 +1,63 @@
+schema_version: "1.0"
+gate_id: native-60m-sft-v1-run
+
+locks:
+  pipeline_config: configs/pipelines/native-60m-sft-v1.yaml
+  pipeline_file_sha256: 93c4d7252700ce8bb5976cdafe5641e1e24c46ed59816a34a2d34e9ed4eb2f42
+  pipeline_config_sha256: 0da95bf9fc925cee7d2fa983e1fb144fd1a45e661fbf4d2b931b338302e2145b
+  base_gate: configs/gates/native-60m-sft-v1-base-init.yaml
+  base_gate_sha256: de131c9b8e8cf83fe347557fabc0c18737de813e86f05bd1ed35b933c431f0ff
+  data_gate: configs/gates/native-60m-sft-v1-data.yaml
+  data_gate_sha256: f35ec67bd5cd238220ff8a6d730421b33224ace9886f53e760945e3cad4dd509
+  evaluation_suite: configs/evaluation/lifecycle-v4.yaml
+  evaluation_suite_file_sha256: cbc4c6e0216ac6186a607f9de9c2081b86ff0e347deac21d71f74203e9dd72e5
+  evaluation_suite_sha256: 35fd17acbb9ed14aef7bfbe89b10b5c2ee0586cf2c378f102c268532f65fb2be
+
+identity:
+  model_route: native
+  run_profile: reproduce
+  stage: sft
+  parent_run_id: native-60m-base-v1-s42
+  parent_checkpoint_step: 45191
+  parent_weights_sha256: 4cdbd642cb878c0e7f5de4b7988751e92de533afa1317256ace20aea078f9398
+  parent_model_config_sha256: 64cfc541595cfd1e18fcada7cee887e0a0647a2309744b0da7e55f5e785a01a0
+  tokenizer_sha256: 7455ac1168f36a3d7dca03fee28784f97899fe233f496484a11e5da2e44a2f32
+  data_manifest_sha256: 37741217a1d783c86c358015b3f555ba77e93fa483bbdf700e9e785ea53fd91e
+
+training:
+  budget_mode: max_train_tokens
+  global_step: 14020
+  target_train_tokens: 8000000
+  expected_tokens_seen: 8004634
+  minimum_target_token_coverage: 1.0
+  maximum_target_token_coverage: 1.001
+  required_training_metric_keys:
+    - train_loss
+    - gradient_norm
+    - eval_loss
+    - eval_en_loss
+    - eval_zh_loss
+    - eval_tokens
+    - eval_en_tokens
+    - eval_zh_tokens
+
+evaluation:
+  dev_suite: sft-dev
+  dev_examples: 1459
+  test_suite: sft-test
+  test_examples: 1458
+  required_metric_keys:
+    - eval_loss
+    - eval_perplexity
+    - eval_tokens
+    - eval_en_loss
+    - eval_en_perplexity
+    - eval_en_tokens
+    - eval_zh_loss
+    - eval_zh_perplexity
+    - eval_zh_tokens
+
+runtime:
+  platform_system: Linux
+  accelerator_type: cuda
+  require_clean_source: true

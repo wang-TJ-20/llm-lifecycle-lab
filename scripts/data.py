@@ -38,6 +38,10 @@ from llm_lifecycle_lab.data.public import (
     materialize_public_dataset,
 )
 from llm_lifecycle_lab.data.schemas import format_validation_failure, validate_jsonl
+from llm_lifecycle_lab.data.sft_public import (
+    load_public_sft_source_manifest,
+    materialize_public_sft,
+)
 from llm_lifecycle_lab.data.split import SplitRatios
 from llm_lifecycle_lab.exceptions import LLMLabError
 
@@ -56,6 +60,19 @@ def build_parser() -> argparse.ArgumentParser:
     fetch.add_argument("--recipe", required=True)
     fetch.add_argument("--output", type=Path, required=True)
     fetch.add_argument("--accept-license", required=True)
+
+    fetch_sft = commands.add_parser(
+        "fetch-sft",
+        help="materialize one frozen public SFT recipe without later-stage data",
+    )
+    fetch_sft.add_argument("--recipe", type=Path, required=True)
+    fetch_sft.add_argument("--output", type=Path, required=True)
+    fetch_sft.add_argument(
+        "--accept-license",
+        action="append",
+        required=True,
+        help="repeat once for each license required by the SFT recipe",
+    )
 
     mix = commands.add_parser("mix", help="combine sources using a mixture recipe")
     mix.add_argument("--mixture", required=True)
@@ -141,6 +158,20 @@ def fetch_source(args: argparse.Namespace) -> int:
     return 0
 
 
+def fetch_sft_source(args: argparse.Namespace) -> int:
+    manifest = materialize_public_sft(
+        args.recipe,
+        args.output,
+        accepted_licenses=args.accept_license,
+    )
+    print(f"Materialized public SFT recipe {manifest.recipe_id}")
+    print(f"  path: {args.output / manifest.source_file}")
+    print(f"  records: {manifest.records}")
+    print(f"  sha256: {manifest.source_sha256}")
+    print(f"  manifest: {args.output / 'sft_source_manifest.json'}")
+    return 0
+
+
 def mix_sources(args: argparse.Namespace) -> int:
     manifest = materialize_public_mixture(
         args.mixture,
@@ -171,7 +202,9 @@ def validate_source(args: argparse.Namespace) -> int:
 
 
 def prepare_splits(args: argparse.Namespace) -> int:
-    source_manifest = load_public_source_manifest(args.input)
+    source_manifest = load_public_sft_source_manifest(args.input)
+    if source_manifest is None:
+        source_manifest = load_public_source_manifest(args.input)
     if source_manifest is None:
         source_manifest = load_public_mixture_manifest(args.input)
     if source_manifest is not None and (
@@ -236,6 +269,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     commands = {
         "recipes": list_recipes,
         "fetch": fetch_source,
+        "fetch-sft": fetch_sft_source,
         "mix": mix_sources,
         "validate": validate_source,
         "prepare": prepare_splits,

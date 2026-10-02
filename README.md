@@ -4,7 +4,7 @@
 
 **从一次参数更新开始，亲手理解语言模型的训练过程**
 
-原生 PyTorch 小模型 · 中英文数据 · 七篇实践教程 · 已发布 Native-60M Base
+原生 PyTorch 小模型 · 中英文数据 · 七篇实践教程 · Base → SFT 可复现链路
 
 [在线阅读](https://wang-tj-20.github.io/llm-lifecycle-lab/) · [公开权重](https://modelscope.cn/models/wzt777/native-60m-base-v1) · [教程目录](#教程目录) · [快速开始](#快速开始) · [项目进展](#项目进展)
 
@@ -34,7 +34,8 @@ loss 下降能说明什么？进程中断后，怎样继续同一次实验？
 - **读懂训练结果**：区分 step、监督 token 和预算，结合双语指标与生成解释模型表现。
 - **做可比较的实验**：固定输入和配置，检查 checkpoint、数据位置与中断恢复。
 
-> 七篇预训练主线、Native-60M Base-v1 的 8-epoch CUDA 训练及发布均已完成。
+> 七篇预训练主线、Native-60M Base-v1 的 8-epoch CUDA 训练及发布均已完成；
+> SFT 数据、训练、恢复和评测链路已冻结，正式 SFT-v1 尚未运行。
 > 权重与 Tokenizer 可从 [ModelScope](https://modelscope.cn/models/wzt777/native-60m-base-v1)
 > 下载，也保存在 `models/base-v1-final/`。它是 Base 模型，不是指令微调后的聊天模型。
 
@@ -46,6 +47,7 @@ loss 下降能说明什么？进程中断后，怎样继续同一次实验？
 | 10M 双语 Smoke | CPU / Apple Silicon MPS / CUDA；需准备公共语料 | 跑通真实数据上的两步训练与评测 |
 | 已发布 Native-60M Base | CPU 可加载；CUDA 可加速生成；约 252 MB | 下载权重、校验来源并观察 Base 续写 |
 | 60M 训练复现与 Reference | 目标为 Linux + 单张 24GB NVIDIA GPU；需配套数据 | 从零复现训练、结构对照与固定基线验收 |
+| Native-60M SFT-v1 | 本地 MPS 门禁 + 远端 Linux/CUDA；需冻结 SFT 数据 | 从已发布 Base 进行指令微调、恢复与同协议评测 |
 
 **第一次接触，先看第一篇并运行离线实验。**
 10M 用于快速验证，60M 是效果研究的主基线；无需先购买 GPU 才开始学习。
@@ -260,8 +262,10 @@ flowchart TD
 | 已完成 | 七篇中文教程、Docsify 在线阅读站与 CPU 离线实验 |
 | 已实现 | Native 10M/60M、双语 BPE、磁盘 Packing、Pretrain、评测与 checkpoint 恢复 |
 | 已发布 | Native-60M Base-v1；CUDA 训练门禁、独立 test、发布包与 ModelScope 回拉验证均通过 |
-| 当前准备 | 基于 canonical Base 冻结 SFT 数据、评测门禁与初始化约束 |
-| 后续方向，尚未实现 | SFT、DPO、GRPO、Hugging Face 导出与模型服务 |
+| 已冻结 | SFT Base、公开数据、assistant-only Trainer、quota sampler、评测协议与正式 run 门禁 |
+| 已验证 | SFT 数据 14/14 门禁、本地 8-step smoke、精确恢复和完整命令链 |
+| 当前准备 | 本地 100-step pilot 后，在远端执行 8M-token SFT-v1 |
+| 后续方向，尚未实现 | DPO、GRPO、Hugging Face 导出与模型服务 |
 
 Base-v1 从随机权重开始，只使用
 [`native-60m-base-local-smoke.yaml`](./configs/pipelines/native-60m-base-local-smoke.yaml)、
@@ -283,12 +287,15 @@ Base-v1 从随机权重开始，只使用
 | [自有模型介绍](./docs/NATIVE_MODEL_GUIDE.md) | 模型结构、参数预算、前向、生成与结构消融 |
 | [Base 从零训练手册](./docs/BASE_TRAINING_GUIDE.md) | Base-v1 的本地门禁、远端 CUDA 配方与复现步骤 |
 | [Base-v1 执行结果](./docs/BASE_TRAINING_RESULTS.md) | 最终指标、训练证据、发布包与已知限制 |
+| [SFT 训练手册](./docs/SFT_TRAINING_GUIDE.md) | 数据物化、本地门禁、远端训练/恢复、dev、sealed test 与归档 |
+| [SFT 初始化门禁](./docs/SFT_INITIALIZATION_GATE.md) | 冻结 Base-v1 初始化身份、质量证据与 clean-run 要求 |
+| [SFT 数据门禁](./docs/SFT_DATA_GATE.md) | 冻结公开来源、许可、切分、对话协议与数据质量要求 |
 | [Pretrain 训练文档](./docs/NATIVE_PRETRAIN_GUIDE.md) | 环境、训练、评测、恢复、Reference 验收与排错 |
 | [脚本阅读指南](./scripts/README.md) | 从每个脚本的 `main()` 进入核心实现 |
 | [文档站维护](./docs/SITE_GUIDE.md) | 本地预览、GitHub Pages 发布与新增章节 |
 
 ```text
-configs/       模型、Pipeline 与 Reference 配置
+configs/       模型、Pipeline、Reference 与阶段门禁配置
 docs/          七篇教程、操作指南与阅读站
 scripts/       可直接运行的实践入口
 src/           模型、数据与训练共享实现

@@ -1,0 +1,126 @@
+schema_version: "1.0"
+recipe_id: sft-public-balanced-v1
+selection_namespace: public-60m-v3
+description: Public bilingual SFT data with conversation, short-answer, numeric, classification, and structured supervision.
+
+sources:
+  - source_id: oasst1
+    transform: oasst-ranked-conversation-v1
+    provider: huggingface
+    repository: OpenAssistant/oasst1
+    revision: fdf72ae0827c1cda404aff25b6603abec9e3399b
+    file: data/train-00000-of-00001-b42a775f407cee45.parquet
+    file_sha256: bbfadf5ed1278ba2208c837fdcad865adf65f5df55d80abadab2745db13fcb5e
+    format: parquet
+    license: Apache-2.0
+    split: train
+    selection:
+      strategy: stable-hash-rank
+      records_per_language: 350
+      max_messages: 8
+      max_characters: 500
+      require_all_assistant_rank_zero: true
+      reject_synthetic: true
+  - source_id: dolly
+    transform: dolly-balanced-sft-v1
+    provider: huggingface
+    repository: databricks/databricks-dolly-15k
+    revision: bdd27f4d94b9c1f951818a7da7fd7aeea5dbff1a
+    file: databricks-dolly-15k.jsonl
+    file_sha256: 2df9083338b4abd6bceb5635764dab5d833b393b55759dffb0959b6fcbf794ec
+    format: jsonl
+    license: CC-BY-SA-3.0
+    split: train
+    selection:
+      strategy: stable-hash-rank
+      general_records: 2050
+      classification_records: 450
+      short_qa_records: 250
+      classification_max_answer_characters: 40
+      short_qa_max_answer_characters: 120
+      max_characters: 500
+  - source_id: hc3-chinese
+    transform: hc3-human-single-turn-sft-v1
+    provider: huggingface
+    repository: Hello-SimpleAI/HC3-Chinese
+    revision: 09a687b8dc164b89e7df95abf15df3b216bc31c2
+    file: all.jsonl
+    file_sha256: 425e7071bbd5dd88efd85d51e28a5adec9c72e04d96c52d194bdfb95fef00b0d
+    format: jsonl
+    license: CC-BY-SA-4.0
+    split: train
+    selection:
+      strategy: stable-hash-rank
+      records: 2750
+      max_characters: 500
+  - source_id: squad
+    transform: squad-extractive-sft-v1
+    provider: huggingface
+    repository: rajpurkar/squad
+    revision: 7b6d24c440a36b6815f21b70d25016731768db1f
+    file: plain_text/train-00000-of-00001.parquet
+    file_sha256: ea7f52bac024f6b1bdc7aaa2a4ee302cba8c2fdc8d4a235cf18a9a5196b6175b
+    format: parquet
+    license: CC-BY-SA-4.0
+    split: train
+    selection:
+      strategy: stable-hash-rank
+      records: 3000
+      json_integer_records: 250
+      json_string_records: 250
+      max_context_characters: 280
+      max_answer_characters: 40
+      max_characters: 480
+  - source_id: cmrc2018
+    transform: cmrc-extractive-sft-v1
+    provider: huggingface
+    repository: hfl/cmrc2018
+    revision: 137f2c45a24275fb68f6961c4d357f46288886aa
+    file: data/train-00000-of-00001.parquet
+    file_sha256: 2b5ee0ce1caf754c8d164eeba467039d17a8e8b41ad7a791262869d7470826fb
+    format: parquet
+    license: CC-BY-SA-4.0
+    split: train
+    selection:
+      strategy: stable-hash-rank
+      records: 3000
+      json_integer_records: 0
+      json_string_records: 500
+      max_context_characters: 280
+      max_answer_characters: 40
+      max_characters: 480
+  - source_id: msvamp
+    transform: msvamp-parallel-integer-v1
+    provider: huggingface
+    repository: Mathoctopus/MSVAMP
+    revision: 301e2b3b168be70058c89c21c2fbdc9262102add
+    file: test_Chinese.json
+    file_sha256: 31e136303b56ed1734d3e9fbcdcff4499f974a0857298816c41e1c5c0be6b4bd
+    format: jsonl
+    license: Apache-2.0
+    split: test_Chinese
+    selection:
+      strategy: stable-hash-partition
+      expected_groups: 1000
+      sft_warmup_groups: 800
+      reserved_groups: 200
+
+output:
+  record_kind: sft
+  records: 14799
+  sha256: 9ba984310ef0996237908b5843c67d869796fef37e312d2b811f23a647fa772b
+
+preparation:
+  dataset_id: sft-public-balanced-v1
+  split_seed: 42
+  group_by: source_id
+  ratios:
+    train: 0.8
+    dev: 0.1
+    test: 0.1
+  license: Apache-2.0 AND CC-BY-SA-3.0 AND CC-BY-SA-4.0
+
+reserved:
+  helpsteer3:
+    stage: dpo
+    reason: Preference pairs are excluded from SFT supervision.

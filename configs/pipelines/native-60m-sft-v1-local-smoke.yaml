@@ -1,0 +1,47 @@
+schema_version: "1.0"
+model_route: native
+run_profile: smoke
+stage: sft
+seed: 42
+output_dir: runs
+model:
+  provider: native
+  model_id: tiny-60m
+  base_package: models/base-v1-final
+  tokenizer: models/base-v1-final
+data:
+  base_gate: configs/gates/native-60m-sft-v1-base-init.yaml
+  data_gate: configs/gates/native-60m-sft-v1-data.yaml
+  manifest: data/prepared/sft-public-balanced-v1/data_manifest.json
+  evaluation_suite: configs/evaluation/lifecycle-v4.yaml
+  evaluation_suite_sha256: cbc4c6e0216ac6186a607f9de9c2081b86ff0e347deac21d71f74203e9dd72e5
+  sampling:
+    strategy: supervised-token-quota
+    weights:
+      general.en: 0.175
+      general.zh: 0.225
+      short_qa.en: 0.10
+      short_qa.zh: 0.15
+      classification.en: 0.10
+      numeric.en: 0.075
+      numeric.zh: 0.075
+      structured.en: 0.05
+      structured.zh: 0.05
+training:
+  device: mps
+  dtype: float32
+  sequence_length: 512
+  micro_batch_size: 1
+  gradient_accumulation_steps: 2
+  max_steps: 8
+  learning_rate: 0.00002
+  weight_decay: 0.1
+  beta1: 0.9
+  beta2: 0.95
+  warmup_steps: 1
+  min_lr_ratio: 0.1
+  gradient_clipping: 1.0
+  checkpoint_interval: 8
+  eval_interval: 4
+  eval_batches: 4
+  log_interval: 1

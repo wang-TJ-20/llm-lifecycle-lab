@@ -1,0 +1,1207 @@
+schema_version: '1.0'
+suite_id: lifecycle-v4
+license: Apache-2.0
+description: Project-authored bilingual probes, lifecycle-v4. v1/v2 score instruction
+  and qa over 4 cases each, so one flipped case moves the metric by 0.25 -- the size
+  of every measured post-SFT difference. This suite scales each scored category to
+  30+ cases. Built by scripts/build_evaluation_suite.py (seed 31337, offset 1000)
+  and leakage-checked against the training sources. Not a general benchmark; do not
+  train on these.
+cases:
+- id: corpus-en-1
+  group: corpus-1
+  language: en
+  kind: corpus
+  text: A mechanic checked the blue bicycle before the afternoon delivery. The brakes
+    worked and both tires held air.
+- id: corpus-zh-1
+  group: corpus-1
+  language: zh
+  kind: corpus
+  text: 技师在下午送货前检查了蓝色自行车。刹车正常，两个轮胎也没有漏气。
+- id: corpus-en-2
+  group: corpus-2
+  language: en
+  kind: corpus
+  text: The museum stores fragile maps in a cool room. Staff inspect each drawer at
+    the end of the month.
+- id: corpus-zh-2
+  group: corpus-2
+  language: zh
+  kind: corpus
+  text: 博物馆把易损地图保存在凉爽的房间里。工作人员每月底检查每个抽屉。
+- id: continue-en-1
+  group: continue-1
+  language: en
+  kind: continuation
+  prompt: Before sunrise, the baker
+- id: continue-zh-1
+  group: continue-1
+  language: zh
+  kind: continuation
+  prompt: 日出之前，面包师
+- id: continue-en-2
+  group: continue-2
+  language: en
+  kind: continuation
+  prompt: Across the narrow bridge
+- id: continue-zh-2
+  group: continue-2
+  language: zh
+  kind: continuation
+  prompt: 穿过狭窄的桥
+- id: continue-en-3
+  group: continue-3
+  language: en
+  kind: continuation
+  prompt: Inside the old station
+- id: continue-zh-3
+  group: continue-3
+  language: zh
+  kind: continuation
+  prompt: 在老车站里面
+- id: continue-en-4
+  group: continue-4
+  language: en
+  kind: continuation
+  prompt: After the final lesson
+- id: continue-zh-4
+  group: continue-4
+  language: zh
+  kind: continuation
+  prompt: 最后一节课以后
+- kind: instruction
+  language: en
+  prompt: 'Return only the text inside brackets: [ivory1000].'
+  rule:
+    type: exact
+    answer: ivory1000
+  id: inst-en-00
+  group: inst-bracket
+- kind: instruction
+  language: en
+  prompt: Classify 'I hate this show. Review code 1001.' Reply only positive or negative.
+  rule:
+    type: exact
+    answer: negative
+    choices:
+    - positive
+    - negative
+  id: inst-en-01
+  group: inst-sentiment
+- kind: instruction
+  language: en
+  prompt: Write back the number 8034838 using digits only.
+  rule:
+    type: exact
+    answer: '8034838'
+  id: inst-en-02
+  group: inst-digit_echo
+- kind: instruction
+  language: en
+  prompt: Output just the single word willow1003; no other text.
+  rule:
+    type: exact
+    answer: willow1003
+  id: inst-en-03
+  group: inst-word_output
+- kind: instruction
+  language: en
+  prompt: 'Return only the text inside brackets: [granite1004].'
+  rule:
+    type: exact
+    answer: granite1004
+  id: inst-en-04
+  group: inst-bracket
+- kind: instruction
+  language: en
+  prompt: Classify 'Service was slow and rude. Review code 1005.' Reply only positive
+    or negative.
+  rule:
+    type: exact
+    answer: negative
+    choices:
+    - positive
+    - negative
+  id: inst-en-05
+  group: inst-sentiment
+- kind: instruction
+  language: en
+  prompt: Write back the number 8066514 using digits only.
+  rule:
+    type: exact
+    answer: '8066514'
+  id: inst-en-06
+  group: inst-digit_echo
+- kind: instruction
+  language: en
+  prompt: Output just the single word birch1007; no other text.
+  rule:
+    type: exact
+    answer: birch1007
+  id: inst-en-07
+  group: inst-word_output
+- kind: instruction
+  language: en
+  prompt: 'Return only the text inside brackets: [silver1008].'
+  rule:
+    type: exact
+    answer: silver1008
+  id: inst-en-08
+  group: inst-bracket
+- kind: instruction
+  language: en
+  prompt: Classify 'I hate this show. Review code 1009.' Reply only positive or negative.
+  rule:
+    type: exact
+    answer: negative
+    choices:
+    - positive
+    - negative
+  id: inst-en-09
+  group: inst-sentiment
+- kind: instruction
+  language: en
+  prompt: Write back the number 8098190 using digits only.
+  rule:
+    type: exact
+    answer: '8098190'
+  id: inst-en-10
+  group: inst-digit_echo
+- kind: instruction
+  language: en
+  prompt: Output just the single word velvet1011; no other text.
+  rule:
+    type: exact
+    answer: velvet1011
+  id: inst-en-11
+  group: inst-word_output
+- kind: instruction
+  language: en
+  prompt: 'Return only the text inside brackets: [amber1012].'
+  rule:
+    type: exact
+    answer: amber1012
+  id: inst-en-12
+  group: inst-bracket
+- kind: instruction
+  language: en
+  prompt: Classify 'Service was slow and rude. Review code 1013.' Reply only positive
+    or negative.
+  rule:
+    type: exact
+    answer: negative
+    choices:
+    - positive
+    - negative
+  id: inst-en-13
+  group: inst-sentiment
+- kind: instruction
+  language: en
+  prompt: Write back the number 8129866 using digits only.
+  rule:
+    type: exact
+    answer: '8129866'
+  id: inst-en-14
+  group: inst-digit_echo
+- kind: instruction
+  language: en
+  prompt: Output just the single word basalt1015; no other text.
+  rule:
+    type: exact
+    answer: basalt1015
+  id: inst-en-15
+  group: inst-word_output
+- kind: qa
+  language: en
+  prompt: A box holds 1002 cups; 1 more are put in. How many now? Answer with a digit.
+  rule:
+    type: exact
+    answer: '1003'
+  id: qa-en-00
+  group: qa-container
+- kind: qa
+  language: en
+  prompt: Tomas1001's home city is Lima1001. Which city is that? Reply only Lima1001
+    or Bern.
+  rule:
+    type: exact
+    answer: Lima1001
+    choices:
+    - Lima1001
+    - Bern
+  id: qa-en-01
+  group: qa-resident
+- kind: qa
+  language: en
+  prompt: The list is crystal, saffron, silver. Name the first item only.
+  rule:
+    type: exact
+    answer: crystal
+  id: qa-en-02
+  group: qa-list_first
+- kind: qa
+  language: en
+  prompt: Which number is larger, 13049 or 13056? Reply with that number only.
+  rule:
+    type: exact
+    answer: '13056'
+  id: qa-en-03
+  group: qa-larger
+- kind: qa
+  language: en
+  prompt: A box holds 1006 cards; 1 more are put in. How many now? Answer with a digit.
+  rule:
+    type: exact
+    answer: '1007'
+  id: qa-en-04
+  group: qa-container
+- kind: qa
+  language: en
+  prompt: Yusuf1005's home city is Nara1005. Which city is that? Reply only Nara1005
+    or Doha.
+  rule:
+    type: exact
+    answer: Nara1005
+    choices:
+    - Nara1005
+    - Doha
+  id: qa-en-05
+  group: qa-resident
+- kind: qa
+  language: en
+  prompt: The list is onyx, copper, amber. Name the first item only.
+  rule:
+    type: exact
+    answer: onyx
+  id: qa-en-06
+  group: qa-list_first
+- kind: qa
+  language: en
+  prompt: Which number is larger, 13101 or 13108? Reply with that number only.
+  rule:
+    type: exact
+    answer: '13108'
+  id: qa-en-07
+  group: qa-larger
+- kind: qa
+  language: en
+  prompt: A box holds 1010 stones; 1 more are put in. How many now? Answer with a
+    digit.
+  rule:
+    type: exact
+    answer: '1011'
+  id: qa-en-08
+  group: qa-container
+- kind: qa
+  language: en
+  prompt: Ravi1009's home city is Riga1009. Which city is that? Reply only Riga1009
+    or Oslo.
+  rule:
+    type: exact
+    answer: Riga1009
+    choices:
+    - Riga1009
+    - Oslo
+  id: qa-en-09
+  group: qa-resident
+- kind: qa
+  language: en
+  prompt: The list is marble, cobalt, ivory. Name the first item only.
+  rule:
+    type: exact
+    answer: marble
+  id: qa-en-10
+  group: qa-list_first
+- kind: qa
+  language: en
+  prompt: Which number is larger, 13153 or 13160? Reply with that number only.
+  rule:
+    type: exact
+    answer: '13160'
+  id: qa-en-11
+  group: qa-larger
+- kind: qa
+  language: en
+  prompt: A box holds 1014 coins; 1 more are put in. How many now? Answer with a digit.
+  rule:
+    type: exact
+    answer: '1015'
+  id: qa-en-12
+  group: qa-container
+- kind: qa
+  language: en
+  prompt: Kwame1013's home city is Kyoto1013. Which city is that? Reply only Kyoto1013
+    or Porto.
+  rule:
+    type: exact
+    answer: Kyoto1013
+    choices:
+    - Kyoto1013
+    - Porto
+  id: qa-en-13
+  group: qa-resident
+- kind: qa
+  language: en
+  prompt: The list is cedar, bronze, granite. Name the first item only.
+  rule:
+    type: exact
+    answer: cedar
+  id: qa-en-14
+  group: qa-list_first
+- kind: qa
+  language: en
+  prompt: Which number is larger, 13205 or 13212? Reply with that number only.
+  rule:
+    type: exact
+    answer: '13212'
+  id: qa-en-15
+  group: qa-larger
+- kind: format
+  language: en
+  prompt: 'Return JSON only: the key "count" with the integer value 1003.'
+  rule:
+    type: json
+    answer:
+      count: 1003
+  id: fmt-en-00
+  group: fmt-json_int
+- kind: format
+  language: en
+  prompt: 'Return JSON only: the key "label" with the string value "bronze1001".'
+  rule:
+    type: json
+    answer:
+      label: bronze1001
+  id: fmt-en-01
+  group: fmt-json_str
+- kind: format
+  language: en
+  prompt: 'Join these numbers with commas and nothing else: 1003 1006 1011'
+  rule:
+    type: exact
+    answer: 1003,1006,1011
+  id: fmt-en-02
+  group: fmt-csv_join
+- kind: format
+  language: en
+  prompt: 'Return JSON only: the key "count" with the integer value 1006.'
+  rule:
+    type: json
+    answer:
+      count: 1006
+  id: fmt-en-03
+  group: fmt-json_int
+- kind: format
+  language: en
+  prompt: 'Return JSON only: the key "label" with the string value "granite1004".'
+  rule:
+    type: json
+    answer:
+      label: granite1004
+  id: fmt-en-04
+  group: fmt-json_str
+- kind: format
+  language: en
+  prompt: 'Join these numbers with commas and nothing else: 1006 1009 1014'
+  rule:
+    type: exact
+    answer: 1006,1009,1014
+  id: fmt-en-05
+  group: fmt-csv_join
+- kind: format
+  language: en
+  prompt: 'Return JSON only: the key "count" with the integer value 1009.'
+  rule:
+    type: json
+    answer:
+      count: 1009
+  id: fmt-en-06
+  group: fmt-json_int
+- kind: format
+  language: en
+  prompt: 'Return JSON only: the key "label" with the string value "birch1007".'
+  rule:
+    type: json
+    answer:
+      label: birch1007
+  id: fmt-en-07
+  group: fmt-json_str
+- kind: format
+  language: en
+  prompt: 'Join these numbers with commas and nothing else: 1009 1012 1017'
+  rule:
+    type: exact
+    answer: 1009,1012,1017
+  id: fmt-en-08
+  group: fmt-csv_join
+- kind: format
+  language: en
+  prompt: 'Return JSON only: the key "count" with the integer value 1012.'
+  rule:
+    type: json
+    answer:
+      count: 1012
+  id: fmt-en-09
+  group: fmt-json_int
+- kind: format
+  language: en
+  prompt: 'Return JSON only: the key "label" with the string value "marble1010".'
+  rule:
+    type: json
+    answer:
+      label: marble1010
+  id: fmt-en-10
+  group: fmt-json_str
+- kind: format
+  language: en
+  prompt: 'Join these numbers with commas and nothing else: 1012 1015 1020'
+  rule:
+    type: exact
+    answer: 1012,1015,1020
+  id: fmt-en-11
+  group: fmt-csv_join
+- id: dialog-en-00
+  group: dialog-0
+  language: en
+  kind: multiturn
+  turns:
+  - prompt: Remember the code word ivory1000. Reply only OK.
+    rule:
+      type: exact
+      answer: OK
+  - prompt: What was the code word? Reply with that word only.
+    rule:
+      type: exact
+      answer: ivory1000
+  - prompt: Say the same code word again, nothing else.
+    rule:
+      type: exact
+      answer: ivory1000
+- id: dialog-en-01
+  group: dialog-1
+  language: en
+  kind: multiturn
+  turns:
+  - prompt: Remember the code word bronze1001. Reply only OK.
+    rule:
+      type: exact
+      answer: OK
+  - prompt: What was the code word? Reply with that word only.
+    rule:
+      type: exact
+      answer: bronze1001
+  - prompt: Say the same code word again, nothing else.
+    rule:
+      type: exact
+      answer: bronze1001
+- id: dialog-en-02
+  group: dialog-2
+  language: en
+  kind: multiturn
+  turns:
+  - prompt: Remember the code word crystal1002. Reply only OK.
+    rule:
+      type: exact
+      answer: OK
+  - prompt: What was the code word? Reply with that word only.
+    rule:
+      type: exact
+      answer: crystal1002
+  - prompt: Say the same code word again, nothing else.
+    rule:
+      type: exact
+      answer: crystal1002
+- id: dialog-en-03
+  group: dialog-3
+  language: en
+  kind: multiturn
+  turns:
+  - prompt: Remember the code word willow1003. Reply only OK.
+    rule:
+      type: exact
+      answer: OK
+  - prompt: What was the code word? Reply with that word only.
+    rule:
+      type: exact
+      answer: willow1003
+  - prompt: Say the same code word again, nothing else.
+    rule:
+      type: exact
+      answer: willow1003
+- id: pref-en-00
+  group: pref-arith
+  language: en
+  kind: preference
+  prompt: Compute 1011 * 6. Reply with the integer only.
+  chosen: '6066'
+  rejected: '6060'
+- id: pref-en-01
+  group: pref-digit
+  language: en
+  kind: preference
+  prompt: 'Copy the number below exactly: 813313'
+  chosen: '813313'
+  rejected: '813314'
+- id: pref-en-02
+  group: pref-json
+  language: en
+  kind: preference
+  prompt: 'Return JSON only: {"count": 1006}'
+  chosen: '{"count":1006}'
+  rejected: '{"count":1007}'
+- id: pref-en-03
+  group: pref-unit
+  language: en
+  kind: preference
+  prompt: Please convert 3 meters into centimeters. Integer only.
+  chosen: '300'
+  rejected: '30'
+- id: pref-en-04
+  group: pref-arith
+  language: en
+  kind: preference
+  prompt: Compute 1015 * 10. Reply with the integer only.
+  chosen: '10150'
+  rejected: '10140'
+- id: pref-en-05
+  group: pref-digit
+  language: en
+  kind: preference
+  prompt: 'Copy the number below exactly: 814565'
+  chosen: '814565'
+  rejected: '814566'
+- id: pref-en-06
+  group: pref-json
+  language: en
+  kind: preference
+  prompt: 'Return JSON only: {"count": 1010}'
+  chosen: '{"count":1010}'
+  rejected: '{"count":1011}'
+- id: pref-en-07
+  group: pref-unit
+  language: en
+  kind: preference
+  prompt: Please convert 7 meters into centimeters. Integer only.
+  chosen: '700'
+  rejected: '70'
+- id: pref-en-08
+  group: pref-arith
+  language: en
+  kind: preference
+  prompt: Compute 1019 * 9. Reply with the integer only.
+  chosen: '9171'
+  rejected: '9162'
+- id: pref-en-09
+  group: pref-digit
+  language: en
+  kind: preference
+  prompt: 'Copy the number below exactly: 815817'
+  chosen: '815817'
+  rejected: '815818'
+- id: pref-en-10
+  group: pref-json
+  language: en
+  kind: preference
+  prompt: 'Return JSON only: {"count": 1014}'
+  chosen: '{"count":1014}'
+  rejected: '{"count":1015}'
+- id: pref-en-11
+  group: pref-unit
+  language: en
+  kind: preference
+  prompt: Please convert 5 meters into centimeters. Integer only.
+  chosen: '500'
+  rejected: '50'
+- id: pref-en-12
+  group: pref-arith
+  language: en
+  kind: preference
+  prompt: Compute 1023 * 8. Reply with the integer only.
+  chosen: '8184'
+  rejected: '8176'
+- id: pref-en-13
+  group: pref-digit
+  language: en
+  kind: preference
+  prompt: 'Copy the number below exactly: 817069'
+  chosen: '817069'
+  rejected: '817060'
+- id: pref-en-14
+  group: pref-json
+  language: en
+  kind: preference
+  prompt: 'Return JSON only: {"count": 1018}'
+  chosen: '{"count":1018}'
+  rejected: '{"count":1019}'
+- id: pref-en-15
+  group: pref-unit
+  language: en
+  kind: preference
+  prompt: Please convert 3 meters into centimeters. Integer only.
+  chosen: '300'
+  rejected: '30'
+- kind: instruction
+  language: zh
+  prompt: 只输出方括号里的内容：[象牙1000]。
+  rule:
+    type: exact
+    answer: 象牙1000
+  id: inst-zh-00
+  group: inst-bracket
+- kind: instruction
+  language: zh
+  prompt: 判断“我讨厌这场演出。 评价编号1001。”的情感。只回答：正面 或 负面。
+  rule:
+    type: exact
+    answer: 负面
+    choices:
+    - 正面
+    - 负面
+  id: inst-zh-01
+  group: inst-sentiment
+- kind: instruction
+  language: zh
+  prompt: 请用阿拉伯数字把这个数写一遍：8034838。
+  rule:
+    type: exact
+    answer: '8034838'
+  id: inst-zh-02
+  group: inst-digit_echo
+- kind: instruction
+  language: zh
+  prompt: 只输出这一个词：垂柳1003，不要其他内容。
+  rule:
+    type: exact
+    answer: 垂柳1003
+  id: inst-zh-03
+  group: inst-word_output
+- kind: instruction
+  language: zh
+  prompt: 只输出方括号里的内容：[花岗岩1004]。
+  rule:
+    type: exact
+    answer: 花岗岩1004
+  id: inst-zh-04
+  group: inst-bracket
+- kind: instruction
+  language: zh
+  prompt: 判断“服务又慢又差。 评价编号1005。”的情感。只回答：正面 或 负面。
+  rule:
+    type: exact
+    answer: 负面
+    choices:
+    - 正面
+    - 负面
+  id: inst-zh-05
+  group: inst-sentiment
+- kind: instruction
+  language: zh
+  prompt: 请用阿拉伯数字把这个数写一遍：8066514。
+  rule:
+    type: exact
+    answer: '8066514'
+  id: inst-zh-06
+  group: inst-digit_echo
+- kind: instruction
+  language: zh
+  prompt: 只输出这一个词：白桦1007，不要其他内容。
+  rule:
+    type: exact
+    answer: 白桦1007
+  id: inst-zh-07
+  group: inst-word_output
+- kind: instruction
+  language: zh
+  prompt: 只输出方括号里的内容：[银白1008]。
+  rule:
+    type: exact
+    answer: 银白1008
+  id: inst-zh-08
+  group: inst-bracket
+- kind: instruction
+  language: zh
+  prompt: 判断“我讨厌这场演出。 评价编号1009。”的情感。只回答：正面 或 负面。
+  rule:
+    type: exact
+    answer: 负面
+    choices:
+    - 正面
+    - 负面
+  id: inst-zh-09
+  group: inst-sentiment
+- kind: instruction
+  language: zh
+  prompt: 请用阿拉伯数字把这个数写一遍：8098190。
+  rule:
+    type: exact
+    answer: '8098190'
+  id: inst-zh-10
+  group: inst-digit_echo
+- kind: instruction
+  language: zh
+  prompt: 只输出这一个词：天鹅绒1011，不要其他内容。
+  rule:
+    type: exact
+    answer: 天鹅绒1011
+  id: inst-zh-11
+  group: inst-word_output
+- kind: instruction
+  language: zh
+  prompt: 只输出方括号里的内容：[琥珀1012]。
+  rule:
+    type: exact
+    answer: 琥珀1012
+  id: inst-zh-12
+  group: inst-bracket
+- kind: instruction
+  language: zh
+  prompt: 判断“服务又慢又差。 评价编号1013。”的情感。只回答：正面 或 负面。
+  rule:
+    type: exact
+    answer: 负面
+    choices:
+    - 正面
+    - 负面
+  id: inst-zh-13
+  group: inst-sentiment
+- kind: instruction
+  language: zh
+  prompt: 请用阿拉伯数字把这个数写一遍：8129866。
+  rule:
+    type: exact
+    answer: '8129866'
+  id: inst-zh-14
+  group: inst-digit_echo
+- kind: instruction
+  language: zh
+  prompt: 只输出这一个词：玄武1015，不要其他内容。
+  rule:
+    type: exact
+    answer: 玄武1015
+  id: inst-zh-15
+  group: inst-word_output
+- kind: qa
+  language: zh
+  prompt: 盒子里有 1002 只杯子，又放进 1 只杯子。现在有几个？用阿拉伯数字回答。
+  rule:
+    type: exact
+    answer: '1003'
+  id: qa-zh-00
+  group: qa-container
+- kind: qa
+  language: zh
+  prompt: 托马斯1001定居的城市是利马1001。是哪座城市？只回答：利马1001 或 伯尔尼。
+  rule:
+    type: exact
+    answer: 利马1001
+    choices:
+    - 利马1001
+    - 伯尔尼
+  id: qa-zh-01
+  group: qa-resident
+- kind: qa
+  language: zh
+  prompt: 这个列表是：水晶、藏红、银白。只说出第一项。
+  rule:
+    type: exact
+    answer: 水晶
+  id: qa-zh-02
+  group: qa-list_first
+- kind: qa
+  language: zh
+  prompt: 13049 和 13056 哪个更大？只回答那个数字。
+  rule:
+    type: exact
+    answer: '13056'
+  id: qa-zh-03
+  group: qa-larger
+- kind: qa
+  language: zh
+  prompt: 盒子里有 1006 张卡片，又放进 1 张卡片。现在有几个？用阿拉伯数字回答。
+  rule:
+    type: exact
+    answer: '1007'
+  id: qa-zh-04
+  group: qa-container
+- kind: qa
+  language: zh
+  prompt: 优素福1005定居的城市是奈良1005。是哪座城市？只回答：奈良1005 或 多哈。
+  rule:
+    type: exact
+    answer: 奈良1005
+    choices:
+    - 奈良1005
+    - 多哈
+  id: qa-zh-05
+  group: qa-resident
+- kind: qa
+  language: zh
+  prompt: 这个列表是：缟玛瑙、铜色、琥珀。只说出第一项。
+  rule:
+    type: exact
+    answer: 缟玛瑙
+  id: qa-zh-06
+  group: qa-list_first
+- kind: qa
+  language: zh
+  prompt: 13101 和 13108 哪个更大？只回答那个数字。
+  rule:
+    type: exact
+    answer: '13108'
+  id: qa-zh-07
+  group: qa-larger
+- kind: qa
+  language: zh
+  prompt: 盒子里有 1010 块石头，又放进 1 块石头。现在有几个？用阿拉伯数字回答。
+  rule:
+    type: exact
+    answer: '1011'
+  id: qa-zh-08
+  group: qa-container
+- kind: qa
+  language: zh
+  prompt: 拉维1009定居的城市是里加1009。是哪座城市？只回答：里加1009 或 奥斯陆。
+  rule:
+    type: exact
+    answer: 里加1009
+    choices:
+    - 里加1009
+    - 奥斯陆
+  id: qa-zh-09
+  group: qa-resident
+- kind: qa
+  language: zh
+  prompt: 这个列表是：大理石、钴蓝、象牙。只说出第一项。
+  rule:
+    type: exact
+    answer: 大理石
+  id: qa-zh-10
+  group: qa-list_first
+- kind: qa
+  language: zh
+  prompt: 13153 和 13160 哪个更大？只回答那个数字。
+  rule:
+    type: exact
+    answer: '13160'
+  id: qa-zh-11
+  group: qa-larger
+- kind: qa
+  language: zh
+  prompt: 盒子里有 1014 枚硬币，又放进 1 枚硬币。现在有几个？用阿拉伯数字回答。
+  rule:
+    type: exact
+    answer: '1015'
+  id: qa-zh-12
+  group: qa-container
+- kind: qa
+  language: zh
+  prompt: 克瓦米1013定居的城市是京都1013。是哪座城市？只回答：京都1013 或 波尔图。
+  rule:
+    type: exact
+    answer: 京都1013
+    choices:
+    - 京都1013
+    - 波尔图
+  id: qa-zh-13
+  group: qa-resident
+- kind: qa
+  language: zh
+  prompt: 这个列表是：雪松、青铜、花岗岩。只说出第一项。
+  rule:
+    type: exact
+    answer: 雪松
+  id: qa-zh-14
+  group: qa-list_first
+- kind: qa
+  language: zh
+  prompt: 13205 和 13212 哪个更大？只回答那个数字。
+  rule:
+    type: exact
+    answer: '13212'
+  id: qa-zh-15
+  group: qa-larger
+- kind: format
+  language: zh
+  prompt: 只输出 JSON：键是 "count"，值是整数 1003。
+  rule:
+    type: json
+    answer:
+      count: 1003
+  id: fmt-zh-00
+  group: fmt-json_int
+- kind: format
+  language: zh
+  prompt: 只输出 JSON：键是 "label"，值是字符串 "青铜1001"。
+  rule:
+    type: json
+    answer:
+      label: 青铜1001
+  id: fmt-zh-01
+  group: fmt-json_str
+- kind: format
+  language: zh
+  prompt: 把这些数字用逗号连起来，不要其他内容：1003 1006 1011
+  rule:
+    type: exact
+    answer: 1003,1006,1011
+  id: fmt-zh-02
+  group: fmt-csv_join
+- kind: format
+  language: zh
+  prompt: 只输出 JSON：键是 "count"，值是整数 1006。
+  rule:
+    type: json
+    answer:
+      count: 1006
+  id: fmt-zh-03
+  group: fmt-json_int
+- kind: format
+  language: zh
+  prompt: 只输出 JSON：键是 "label"，值是字符串 "花岗岩1004"。
+  rule:
+    type: json
+    answer:
+      label: 花岗岩1004
+  id: fmt-zh-04
+  group: fmt-json_str
+- kind: format
+  language: zh
+  prompt: 把这些数字用逗号连起来，不要其他内容：1006 1009 1014
+  rule:
+    type: exact
+    answer: 1006,1009,1014
+  id: fmt-zh-05
+  group: fmt-csv_join
+- kind: format
+  language: zh
+  prompt: 只输出 JSON：键是 "count"，值是整数 1009。
+  rule:
+    type: json
+    answer:
+      count: 1009
+  id: fmt-zh-06
+  group: fmt-json_int
+- kind: format
+  language: zh
+  prompt: 只输出 JSON：键是 "label"，值是字符串 "白桦1007"。
+  rule:
+    type: json
+    answer:
+      label: 白桦1007
+  id: fmt-zh-07
+  group: fmt-json_str
+- kind: format
+  language: zh
+  prompt: 把这些数字用逗号连起来，不要其他内容：1009 1012 1017
+  rule:
+    type: exact
+    answer: 1009,1012,1017
+  id: fmt-zh-08
+  group: fmt-csv_join
+- kind: format
+  language: zh
+  prompt: 只输出 JSON：键是 "count"，值是整数 1012。
+  rule:
+    type: json
+    answer:
+      count: 1012
+  id: fmt-zh-09
+  group: fmt-json_int
+- kind: format
+  language: zh
+  prompt: 只输出 JSON：键是 "label"，值是字符串 "大理石1010"。
+  rule:
+    type: json
+    answer:
+      label: 大理石1010
+  id: fmt-zh-10
+  group: fmt-json_str
+- kind: format
+  language: zh
+  prompt: 把这些数字用逗号连起来，不要其他内容：1012 1015 1020
+  rule:
+    type: exact
+    answer: 1012,1015,1020
+  id: fmt-zh-11
+  group: fmt-csv_join
+- id: dialog-zh-00
+  group: dialog-0
+  language: zh
+  kind: multiturn
+  turns:
+  - prompt: 请记住暗号：象牙1000。只回答：好的
+    rule:
+      type: exact
+      answer: 好的
+  - prompt: 刚才的暗号是什么？只输出暗号。
+    rule:
+      type: exact
+      answer: 象牙1000
+  - prompt: 再重复一次同一个暗号，不要解释。
+    rule:
+      type: exact
+      answer: 象牙1000
+- id: dialog-zh-01
+  group: dialog-1
+  language: zh
+  kind: multiturn
+  turns:
+  - prompt: 请记住暗号：青铜1001。只回答：好的
+    rule:
+      type: exact
+      answer: 好的
+  - prompt: 刚才的暗号是什么？只输出暗号。
+    rule:
+      type: exact
+      answer: 青铜1001
+  - prompt: 再重复一次同一个暗号，不要解释。
+    rule:
+      type: exact
+      answer: 青铜1001
+- id: dialog-zh-02
+  group: dialog-2
+  language: zh
+  kind: multiturn
+  turns:
+  - prompt: 请记住暗号：水晶1002。只回答：好的
+    rule:
+      type: exact
+      answer: 好的
+  - prompt: 刚才的暗号是什么？只输出暗号。
+    rule:
+      type: exact
+      answer: 水晶1002
+  - prompt: 再重复一次同一个暗号，不要解释。
+    rule:
+      type: exact
+      answer: 水晶1002
+- id: dialog-zh-03
+  group: dialog-3
+  language: zh
+  kind: multiturn
+  turns:
+  - prompt: 请记住暗号：垂柳1003。只回答：好的
+    rule:
+      type: exact
+      answer: 好的
+  - prompt: 刚才的暗号是什么？只输出暗号。
+    rule:
+      type: exact
+      answer: 垂柳1003
+  - prompt: 再重复一次同一个暗号，不要解释。
+    rule:
+      type: exact
+      answer: 垂柳1003
+- id: pref-zh-00
+  group: pref-arith
+  language: zh
+  kind: preference
+  prompt: 计算 1011 乘 6。只回答整数。
+  chosen: '6066'
+  rejected: '6060'
+- id: pref-zh-01
+  group: pref-digit
+  language: zh
+  kind: preference
+  prompt: 请准确复制下面的数字：813313
+  chosen: '813313'
+  rejected: '813314'
+- id: pref-zh-02
+  group: pref-json
+  language: zh
+  kind: preference
+  prompt: '只输出 JSON：{"count": 1006}'
+  chosen: '{"count":1006}'
+  rejected: '{"count":1007}'
+- id: pref-zh-03
+  group: pref-unit
+  language: zh
+  kind: preference
+  prompt: 请把 3 米换算成厘米，只回答整数。
+  chosen: '300'
+  rejected: '30'
+- id: pref-zh-04
+  group: pref-arith
+  language: zh
+  kind: preference
+  prompt: 计算 1015 乘 10。只回答整数。
+  chosen: '10150'
+  rejected: '10140'
+- id: pref-zh-05
+  group: pref-digit
+  language: zh
+  kind: preference
+  prompt: 请准确复制下面的数字：814565
+  chosen: '814565'
+  rejected: '814566'
+- id: pref-zh-06
+  group: pref-json
+  language: zh
+  kind: preference
+  prompt: '只输出 JSON：{"count": 1010}'
+  chosen: '{"count":1010}'
+  rejected: '{"count":1011}'
+- id: pref-zh-07
+  group: pref-unit
+  language: zh
+  kind: preference
+  prompt: 请把 7 米换算成厘米，只回答整数。
+  chosen: '700'
+  rejected: '70'
+- id: pref-zh-08
+  group: pref-arith
+  language: zh
+  kind: preference
+  prompt: 计算 1019 乘 9。只回答整数。
+  chosen: '9171'
+  rejected: '9162'
+- id: pref-zh-09
+  group: pref-digit
+  language: zh
+  kind: preference
+  prompt: 请准确复制下面的数字：815817
+  chosen: '815817'
+  rejected: '815818'
+- id: pref-zh-10
+  group: pref-json
+  language: zh
+  kind: preference
+  prompt: '只输出 JSON：{"count": 1014}'
+  chosen: '{"count":1014}'
+  rejected: '{"count":1015}'
+- id: pref-zh-11
+  group: pref-unit
+  language: zh
+  kind: preference
+  prompt: 请把 5 米换算成厘米，只回答整数。
+  chosen: '500'
+  rejected: '50'
+- id: pref-zh-12
+  group: pref-arith
+  language: zh
+  kind: preference
+  prompt: 计算 1023 乘 8。只回答整数。
+  chosen: '8184'
+  rejected: '8176'
+- id: pref-zh-13
+  group: pref-digit
+  language: zh
+  kind: preference
+  prompt: 请准确复制下面的数字：817069
+  chosen: '817069'
+  rejected: '817060'
+- id: pref-zh-14
+  group: pref-json
+  language: zh
+  kind: preference
+  prompt: '只输出 JSON：{"count": 1018}'
+  chosen: '{"count":1018}'
+  rejected: '{"count":1019}'
+- id: pref-zh-15
+  group: pref-unit
+  language: zh
+  kind: preference
+  prompt: 请把 3 米换算成厘米，只回答整数。
+  chosen: '300'
+  rejected: '30'
