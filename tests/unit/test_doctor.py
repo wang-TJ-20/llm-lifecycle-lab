@@ -4,19 +4,93 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
-from llm_lifecycle_lab.contracts import (
-    ModelRoute,
-    RunConfig,
-    RunProfile,
-    Stage,
-)
+from llm_lifecycle_lab.contracts import ModelRoute, RunConfig, RunProfile, Stage
 from llm_lifecycle_lab.data import prepare_dataset
 from llm_lifecycle_lab.doctor import profile_for_config, run_doctor
+from llm_lifecycle_lab.doctor.hardware import _cuda_check
 from llm_lifecycle_lab.doctor.result import CheckStatus
 
 
 class DoctorTests(unittest.TestCase):
+    def test_a10_profile_preserves_generic_capacity_threshold(self) -> None:
+        properties = SimpleNamespace(name="NVIDIA A10", total_memory=23609475072)
+        torch_stub = SimpleNamespace(
+            __version__="test",
+            cuda=SimpleNamespace(
+                is_available=lambda: True,
+                device_count=lambda: 1,
+                get_device_properties=lambda _: properties,
+            ),
+        )
+        config = RunConfig(
+            model_route=ModelRoute.NATIVE,
+            run_profile=RunProfile.REPRODUCE,
+            stage=Stage.PRETRAIN,
+            model={"provider": "native", "model_id": "tiny-60m"},
+            training={"device": "cuda", "dtype": "bfloat16"},
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            with patch.dict("sys.modules", {"torch": torch_stub}):
+                report = run_doctor(
+                    profile="tiny-60m-a10", config=config, workdir=temporary
+                )
+            checks = {check.name: check for check in report.checks}
+            for name in ("profile-config-match", "device", "a10-accelerator"):
+                self.assertIs(checks[name].status, CheckStatus.PASS)
+            self.assertIn("21.988 GiB", checks["device"].message)
+            generic = _cuda_check(torch_stub, require_cuda=True, minimum_cuda_gib=22)
+            self.assertIs(generic.status, CheckStatus.FAIL)
+            properties.total_memory = 21 * 1024**3
+            too_small = _cuda_check(
+                torch_stub, require_cuda=True, minimum_cuda_gib=21.9
+            )
+            self.assertIs(too_small.status, CheckStatus.FAIL)
+
+    def test_a10_profile_rejects_other_or_multiple_accelerators(self) -> None:
+        for names in (["NVIDIA GeForce RTX 4090"], ["NVIDIA A10", "NVIDIA A10"]):
+            with self.subTest(names=names):
+                devices = [
+                    SimpleNamespace(name=name, total_memory=24 * 1024**3)
+                    for name in names
+                ]
+                torch_stub = SimpleNamespace(
+                    __version__="test",
+                    cuda=SimpleNamespace(
+                        is_available=lambda: True,
+                        device_count=lambda devices=devices: len(devices),
+                        get_device_properties=lambda index, devices=devices: devices[
+                            index
+                        ],
+                    ),
+                )
+                with (
+                    tempfile.TemporaryDirectory() as temporary,
+                    patch.dict("sys.modules", {"torch": torch_stub}),
+                ):
+                    report = run_doctor(profile="tiny-60m-a10", workdir=temporary)
+                check = next(
+                    row for row in report.checks if row.name == "a10-accelerator"
+                )
+                self.assertIs(check.status, CheckStatus.FAIL)
+
+    def test_a10_profile_rejects_non_bf16_config(self) -> None:
+        config = RunConfig(
+            model_route=ModelRoute.NATIVE,
+            run_profile=RunProfile.REPRODUCE,
+            stage=Stage.PRETRAIN,
+            model={"provider": "native", "model_id": "tiny-60m"},
+            training={"device": "cuda", "dtype": "float32"},
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            report = run_doctor(
+                profile="tiny-60m-a10", config=config, workdir=temporary
+            )
+        check = next(row for row in report.checks if row.name == "profile-config-match")
+        self.assertIs(check.status, CheckStatus.FAIL)
+
     def test_profile_is_derived_from_model_route_and_run_profile(self) -> None:
         qwen = RunConfig(
             model_route=ModelRoute.QWEN3_TRANSFER,
@@ -48,7 +122,6 @@ class DoctorTests(unittest.TestCase):
             stage=Stage.PRETRAIN,
             model={"provider": "native", "model_id": "tiny-60m"},
         )
-
         self.assertEqual(profile_for_config(qwen), "qwen3-0.6b-base")
         self.assertEqual(profile_for_config(smoke), "smoke-10m")
         self.assertEqual(profile_for_config(local_60m), "tiny-60m-local")
@@ -61,15 +134,10 @@ class DoctorTests(unittest.TestCase):
             stage=Stage.PRETRAIN,
             model={"provider": "native", "model_id": "smoke-10m"},
         )
-
-        report = run_doctor(
-            profile="base",
-            config=config,
-        )
+        report = run_doctor(profile="base", config=config)
         result = next(
             check for check in report.checks if check.name == "profile-config-match"
         )
-
         self.assertIs(result.status, CheckStatus.FAIL)
 
     def test_prepared_data_manifest_is_verified(self) -> None:
@@ -106,12 +174,10 @@ class DoctorTests(unittest.TestCase):
                 output_dir=str(root / "runs"),
                 data={"manifest": str(prepared / "data_manifest.json")},
             )
-
             report = run_doctor(config=config, workdir=root)
             result = next(
                 check for check in report.checks if check.name == "data-manifest"
             )
-
             self.assertIs(result.status, CheckStatus.PASS)
 
 

@@ -68,6 +68,14 @@ _PROFILES = {
         minimum_disk_gib=20,
         require_linux=True,
     ),
+    "tiny-60m-a10": ProfileRequirements(
+        require_torch=True,
+        require_cuda=True,
+        # Driver reservations leave this A10 with 21.988 GiB visible to CUDA.
+        minimum_cuda_gib=21.9,
+        minimum_disk_gib=20,
+        require_linux=True,
+    ),
     "qwen3-0.6b-base": ProfileRequirements(
         require_torch=True,
         require_cuda=True,
@@ -154,6 +162,21 @@ def run_doctor(
     )
     checks.extend((torch_check, device_check))
 
+    if selected_profile == "tiny-60m-a10":
+        devices = device_check.details.get("devices", [])
+        matches_a10 = (
+            device_check.details.get("device") == "cuda"
+            and len(devices) == 1
+            and devices[0]["name"] == "NVIDIA A10"
+        )
+        checks.append(
+            CheckResult(
+                name="a10-accelerator",
+                status=CheckStatus.PASS if matches_a10 else CheckStatus.FAIL,
+                message="A10 profile requires exactly one NVIDIA A10",
+            )
+        )
+
     if requirements.require_transformers:
         exact_version = None
         if config is not None and config.model.get("transformers_version"):
@@ -177,12 +200,21 @@ def _check_profile_matches_config(
     config: RunConfig,
 ) -> CheckResult:
     expected = profile_for_config(config)
-    matches = selected_profile == expected
+    a10_base = (
+        selected_profile == "tiny-60m-a10"
+        and expected == "tiny-60m"
+        and config.model_route is ModelRoute.NATIVE
+        and config.stage is Stage.PRETRAIN
+        and config.model.get("model_id") == "tiny-60m"
+        and config.training.get("device") == "cuda"
+        and config.training.get("dtype") == "bfloat16"
+    )
+    matches = selected_profile == expected or a10_base
     return CheckResult(
         name="profile-config-match",
         status=CheckStatus.PASS if matches else CheckStatus.FAIL,
         message=(
-            f"profile matches config run profile: {expected}"
+            f"profile matches config run profile: {selected_profile}"
             if matches
             else f"profile {selected_profile} conflicts with config run profile; "
             f"expected {expected}"

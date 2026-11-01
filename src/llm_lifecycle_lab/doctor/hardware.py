@@ -92,8 +92,9 @@ def _cuda_check(
         name="device",
         status=status,
         message=(
-            f"CUDA is available; largest device has {largest_gib:.1f} GiB "
-            f"(profile minimum {minimum_cuda_gib:.1f} GiB)"
+            f"CUDA is available; largest device has {largest_gib:.3f} GiB "
+            "CUDA-visible memory "
+            f"(profile minimum {minimum_cuda_gib:.3f} GiB)"
         ),
         details={
             "device": "cuda",

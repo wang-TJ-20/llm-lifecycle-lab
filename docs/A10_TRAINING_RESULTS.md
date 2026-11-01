@@ -10,6 +10,7 @@
 | 项目 | 本轮结果 |
 | --- | --- |
 | GPU | 单张 NVIDIA A10，23,028 MiB |
+| CUDA 可见容量 | 21.988 GiB；驱动保留后低于 nvidia-smi 报告值 |
 | 驱动 | 535.161.08 |
 | Python | 3.11.2 |
 | Torch / CUDA wheel | 2.7.1+cu126 / 12.6 |
@@ -18,6 +19,7 @@
 | pip check | 通过 |
 | 原有完整 Python 测试 | 独立环境 187 passed，145.91 秒 |
 | 新门禁与更新后完整测试 | 202 passed，151.13 秒；ruff check/format 通过 |
+| A10 Doctor 修正后完整测试 | 205 passed，151.24 秒 |
 | 中英文源数据 | 100,000 条故事 + 126,000 条百科，固定来源 hash 通过 |
 | 混合数据 | 226,000 条，重新 round-robin 物化 |
 | 分组切分 | 按 source_id；train/dev/test = 180,657 / 22,853 / 22,490 |
@@ -46,6 +48,12 @@ manifest 包含本轮 ID、路径和时间，不能直接沿用历史 manifest h
 不能把 CPU 测试、旧 Worker 的合成输入探测或 4090 历史训练当成本轮训练通过。
 开发 smoke/pilot 如使用未提交工作树，必须记录 dirty；
 正式 Base 需要 clean-tree，不能继承历史 dirty 例外。
+
+启动前 Doctor 的历史通用 `tiny-60m` profile 要求至少 22 GiB，
+因此本卡 21.988 GiB 被拒绝，虽然真实批次前后向通过。
+已新增限定单卡 A10/CUDA BF16 的 `tiny-60m-a10` profile，最低 CUDA 可见
+容量为 21.9 GiB；原通用门槛、训练配方和质量门禁不变。
+
 ## 短训练实测
 
 | 指标 | smoke | pilot |

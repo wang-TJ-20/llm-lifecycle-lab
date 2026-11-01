@@ -87,6 +87,9 @@ step 吞吐不包含全部评测和保存时间。
 
 正式前还要受控中断恢复验证、干净提交和完整依赖/数据检查。
 不回退覆盖已完成 run，不改变预算后复用 run ID，不承诺跨硬件逐位一致。
+正式 Doctor 显式使用 `tiny-60m-a10`：要求单张 NVIDIA A10、CUDA BF16
+以及至少 21.9 GiB CUDA 可见容量。本卡驱动保留内存后为 21.988 GiB，
+低于历史通用 profile 的 22 GiB；通用与历史门槛保持不变。
 
 ```bash
 .venv-a10/bin/python scripts/a10_resume_experiment.py \
@@ -146,6 +149,7 @@ unset CUBLAS_WORKSPACE_CONFIG
 ```bash
 test -z "$(git status --porcelain=v1)"
 .venv-a10/bin/python scripts/doctor.py \
+  --profile tiny-60m-a10 \
   --config configs/pipelines/native-60m-a10-base-v1.yaml
 .venv-a10/bin/python -u scripts/train_pretrain.py \
   --config configs/pipelines/native-60m-a10-base-v1.yaml \
