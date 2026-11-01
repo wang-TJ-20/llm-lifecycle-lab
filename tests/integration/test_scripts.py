@@ -11,6 +11,7 @@ import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_NAMES = (
+    "a10_resume_experiment",
     "data",
     "doctor",
     "eval_pretrain",
@@ -25,6 +26,7 @@ SCRIPT_NAMES = (
     "train_sft",
     "train_tokenizer",
     "validate_config",
+    "verify_a10_base",
     "verify_reference",
     "verify_sft_data",
     "verify_sft_init",

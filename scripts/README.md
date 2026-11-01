@@ -24,6 +24,8 @@
 | 离线预训练、评测与恢复对照 | `pretrain_experiment.py` | 临时双语数据与真实 `run_native_pretraining` / `evaluate_native_pretraining` |
 | 训练模型 | `train_pretrain.py` | `src/llm_lifecycle_lab/training/pretrain.py` |
 | 评测模型 | `eval_pretrain.py` | `evaluate_native_pretraining` |
+| A10 Base 开发验收 | `verify_a10_base.py` | 单卡身份、完成预算、有限指标、dev 改善与 checkpoint |
+| A10 恢复对照 | `a10_resume_experiment.py` | 独立中断 run、原预算恢复、完整状态逐位比较 |
 | 冻结基线与验收 | `verify_reference.py` | `src/llm_lifecycle_lab/reference.py` |
 | 校验 SFT Base 初始化 | `verify_sft_init.py` | `src/llm_lifecycle_lab/sft_initialization.py` |
 | 校验 SFT 数据 | `verify_sft_data.py` | `src/llm_lifecycle_lab/sft_data_gate.py` |
@@ -56,6 +58,13 @@ python scripts/pretrain_experiment.py --mode resume
 实验用于机制检查，不代表真实双语模型能力或完整 CUDA 验证。
 
 ## 60M 基线入口
+
+当前硬件实践入口为 [A10 从零重跑手册](../docs/A10_TRAINING_GUIDE.md)。
+`verify_a10_base.py --phase smoke|pilot|base --run <路径>` 检查新 A10 配置和
+开发结果，原子保存 `a10-development-gate.json`；不读取 test，不替代 SFT 门禁。
+`a10_resume_experiment.py` 在第 5 步受控中断并恢复第 4 步 checkpoint；
+严格 CUDA 逐位对照须对 baseline 和恢复同时启用手册中的确定性设置。
+历史 MPS/4090 与 SFT-v1 配置继续归档，不能直接改旧门禁的哈希来接入新 Base。
 
 `verify_reference.py` 的三种模式互斥，必须选择其中一种：
 

@@ -1,0 +1,10 @@
+# A10 CUDA runtime. Install torch==2.7.1 from the cu126 wheel index first.
+# This profile is independent of the historical uv.lock environment.
+PyYAML==6.0.3
+numpy==2.3.2
+torch==2.7.1
+tokenizers==0.21.4
+huggingface-hub==0.36.2
+pyarrow==25.0.1
+pytest==8.4.2
+ruff==0.17.3

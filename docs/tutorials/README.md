@@ -21,8 +21,10 @@
 
 第一篇不下载语料、不训练 Tokenizer，也不要求 GPU。
 后面的两步 Smoke 用来验证完整链路；60M 教学训练的目标环境是
-Linux + 单张 24GB NVIDIA GPU。CPU 实验通过不代表已经完成 CUDA 训练验证；
-本项目发布的 Base-v1 已独立完成该 CUDA 训练与评测。
+Linux + 单张 A10。CPU 实验通过不代表已经完成 A10 训练验证；
+本项目发布的 Base-v1 是历史 RTX 4090 结果，仍保留追溯。
+当前从零重跑按 [A10 全链路手册](../A10_TRAINING_GUIDE.md)执行，
+数据、Tokenizer、Base 和后续 SFT 使用独立身份。
 
 ## 主线目录
 

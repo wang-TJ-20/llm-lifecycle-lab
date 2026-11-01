@@ -1,5 +1,10 @@
 # Native-60M SFT 训练手册
 
+本文保留历史 SFT-v1 冻结路线，绑定 RTX 4090 训练的已发布 Base-v1。
+当前 [A10 从零重跑](./A10_TRAINING_GUIDE.md)须先完成新 Base，再冻结独立 SFT 门禁；
+不要将新权重替换进本页的旧配置。本页“已通过”的数据和 smoke 为历史记录，
+不表示新 A10 工作目录已经准备好。
+
 本文是 Native-60M SFT-v1 的**唯一执行入口**。远端 Linux/CUDA 训练、恢复、
 开发集验收、能力对照、一次性 sealed test 和产物回传均以本文命令为准。
 [SFT 初始化门禁](./SFT_INITIALIZATION_GATE.md)与

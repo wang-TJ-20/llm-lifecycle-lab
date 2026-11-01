@@ -6,6 +6,11 @@
 而是从随机初始化的权重出发，把文本、Tokenizer、Transformer 和训练循环接在一起，
 再用实验判断模型是否真的学到了东西。
 
+当前硬件操作入口为 [单卡 A10 从零重跑手册](./A10_TRAINING_GUIDE.md)：
+从数据、Tokenizer、随机权重 Base 到新 SFT 全链路重做。
+CPU 机制实验保留；旧 MPS/4090 操作路线移出主线，历史权重与证据继续归档。
+实际进度见 [A10 执行记录](./A10_TRAINING_RESULTS.md)，不提前声明正式训练完成。
+
 ## 从前四篇开始
 
 **第一篇 · [从一次参数更新开始](./tutorials/01-first-parameter-update.md)**
@@ -70,7 +75,8 @@ provenance 和 SHA-256 清单。它从随机初始化训练 45,191 steps，共�
 指令微调或安全对齐的聊天模型。
 
 - 下载、校验和加载：[发布模型卡](../models/base-v1-final/README.md)
-- 从零训练配方：[Base 从零训练手册](./BASE_TRAINING_GUIDE.md)
+- 当前从零训练：[A10 全链路手册](./A10_TRAINING_GUIDE.md)
+- 历史配方：[Base-v1 历史训练手册](./BASE_TRAINING_GUIDE.md)
 - 完整结果与偏离记录：[Base-v1 执行结果](./BASE_TRAINING_RESULTS.md)
 - SFT 唯一执行入口：[Native-60M SFT 训练手册](./SFT_TRAINING_GUIDE.md)
 - SFT 唯一允许的初始化输入：[SFT 初始化门禁](./SFT_INITIALIZATION_GATE.md)
@@ -84,8 +90,9 @@ provenance 和 SHA-256 清单。它从随机初始化训练 45,191 steps，共�
 [环境准备](./NATIVE_PRETRAIN_GUIDE.md#2-环境准备)。
 
 10M Smoke 用来验证链路，不代表语言能力。
-60M 教学训练的目标环境为 Linux 和单张 24GB NVIDIA GPU；
-Base-v1 已在 RTX 4090 上完成并发布。复现训练仍需准备冻结数据与对应硬件；
+60M 当前教学训练环境为 Linux 和单张 A10，CUDA BF16；
+Base-v1 已在 RTX 4090 上完成并发布，但不作为本轮初始化或 A10 实测。
+重跑训练仍需准备冻结来源的独立数据与对应硬件；
 只想检查权重时可直接下载发布包并在 CPU 上加载。
 
 ## 按需查阅
@@ -95,7 +102,9 @@ Base-v1 已在 RTX 4090 上完成并发布。复现训练仍需准备冻结数�
 | 数据从哪里来，怎样下载、切分和打包？ | [数据介绍与准备](./DATA_GUIDE.md) |
 | 模型各层怎样连接，张量形状是什么？ | [自有模型介绍](./NATIVE_MODEL_GUIDE.md) |
 | 怎样下载和加载已发布的 Base？ | [Native-60M Base-v1 模型卡](../models/base-v1-final/README.md) |
-| 怎样从随机初始化复现 Base？ | [Native-60M Base 从零训练手册](./BASE_TRAINING_GUIDE.md) |
+| 怎样在 A10 从随机初始化重跑？ | [A10 全链路手册](./A10_TRAINING_GUIDE.md) |
+| A10 当前完成了哪些验证？ | [A10 执行记录](./A10_TRAINING_RESULTS.md) |
+| 历史 Base-v1 使用什么配方？ | [历史训练手册](./BASE_TRAINING_GUIDE.md) |
 | Base-v1 最终结果和证据在哪里？ | [Base-v1 执行结果](./BASE_TRAINING_RESULTS.md) |
 | 怎样在远端训练、恢复和验收 SFT？ | [Native-60M SFT 训练手册](./SFT_TRAINING_GUIDE.md) |
 | SFT 必须从哪个 Base 开始？ | [SFT 初始化门禁](./SFT_INITIALIZATION_GATE.md) |

@@ -698,11 +698,13 @@ python scripts/verify_reference.py \
 和 [恢复工具](https://github.com/jingyaogong/minimind/blob/6fc918beb68a0d8c40452338df6319fe168014ba/trainer/trainer_utils.py)，
 后续优先顺序为：
 
-1. 补齐 FP16 GradScaler/MPS RNG 恢复，并用连续训练对中断恢复检验。
-2. 明确不同有效 token 数下的梯度累积归一化：当前 micro batch 均值等权，
-   不一定等于全 token 均值，虽然日志是 token 加权；改动须独立验证训练语义。
+1. 已保存并恢复 FP16 GradScaler/MPS RNG；补齐 CUDA/MPS 连续训练与中断恢复对照，
+   不把现有 CPU 精确恢复测试扩大为所有设备的保证。
+2. 当前梯度累积已按有效监督 token 总数归一化，与 token 加权日志一致；
+   在真实 A10 batch、padding 和尾批下继续验证数值与吞吐。
 3. 分离稳定数据内容身份与时间/路径来源，完善跨机器 Reference。
-4. 完成固定 60M CUDA 实验后，再评估 SDPA 快速路径、预取、compile 和可视化。
+4. 先完成 [A10 从零重跑](./A10_TRAINING_GUIDE.md)，再独立评估 SDPA 快速路径、
+   预取、compile 和可视化；历史 4090 配方与结果不作为 A10 实测。
 
 MiniMind 的 scaler、workers、pin memory 与可选 SwanLab 可供借鉴，但不能因此移除
 本项目现有 hash、baseline、双语评测和不可覆盖 checkpoint，也不能把未验证优化计为收益。

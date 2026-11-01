@@ -93,30 +93,36 @@ T_{\mathrm{targets/step}} &= BA(L-1)
 
 ### 梯度累积不总是严格等于一个大 batch
 
-当前实现对每个 micro-batch 的平均 loss 除以累积次数：
+当前实现先把每个 micro-batch 的平均 loss 还原为有效监督 token 的总 loss，
+累积反向后，再用该 step 的有效监督 token 总数归一化梯度：
 
 ```python
-scaled_loss = output.loss / self.config.gradient_accumulation_steps
-scaled_loss.backward()
+token_loss = output.loss * supervised_tokens
+scaler.scale(token_loss).backward()
+
+# 所有 micro-batch 反向完成后，先撤销 AMP 缩放，再做 token 归一化。
+scaler.unscale_(optimizer)
+for parameter in model.parameters():
+    if parameter.grad is not None:
+        parameter.grad.mul_(1.0 / tokens_this_step)
 ```
 
-这是 float32 情况下的核心意思；实际循环通过 GradScaler 接口调用 backward。
-在关闭 dropout 等随机扰动、前向条件相同、每个 micro-batch 的有效 token 数相同时，
-这种平均与把它们放在一起求 token 平均在数学上对应，
-浮点数归约顺序仍可能带来微小差异。
+这是训练循环的核心顺序；之后才进行梯度裁剪和 optimizer step。
+GradScaler 只在 CUDA float16 时启用，float32/BF16 使用同一接口但不缩放。
+在关闭 dropout 等随机扰动、前向条件相同时，
+这种归一化与把所有有效 token 放在一起求平均在数学上对应，
+即使 micro-batch 的有效 token 数不同也不会变成等权平均 micro-batch。
 
-**有效 token 数不同时，两者不再相同。** 假设两个 micro-batch 分别有
+假设两个 micro-batch 分别有
 15 和 5 个目标，平均 loss 为 2 和 4：
 
 ```text
-当前反向目标：(2 + 4) / 2 = 3
-全部 token 平均：(15×2 + 5×4) / 20 = 2.5
+错误的 micro-batch 等权平均：(2 + 4) / 2 = 3
+当前反向目标与日志：(15×2 + 5×4) / 20 = 2.5
 ```
 
-目前日志中的 `train_loss` 使用后一种 token 加权方式，
-反向累积却平均 micro-batch loss。这是当前实现的边界，
-不能因为日志采用 token 加权就声称梯度也一定完全等价。
-比较 batch 设置时应特别关注尾批和 PAD，不能只改 `B/A` 后宣称对照完全一致。
+浮点数归约顺序和随机层仍可能带来差异。比较 batch 设置时应特别关注尾批、
+PAD 与每次更新实际覆盖的 token，不能只改 `B/A` 后宣称对照逐位一致。
 
 累积通常能降低一次前向所需的激活内存，但不会缩小模型权重、
 优化器状态，也不能让本来放不下的单个窗口自动放得下。
@@ -374,10 +380,11 @@ loss 不应照抄本篇微型模型数值，数据、规模和设备均不同。
 两步 Smoke 能证明数据被读取、loss 和梯度可算、产物能够保存。
 它不能证明语料足够、模型已收敛或具备通用双语能力。
 
-60M 教学训练使用 [`native-v1.yaml`](../../configs/pipelines/native-v1.yaml)，
-目标为 Linux + 单张 24GB NVIDIA GPU；正式冻结 Reference 则使用独立配置与规范，
-不能把两者混称为同一个已验收实验。
-完整 CUDA 参考实验目前尚未完成。
+当前 60M 从零重跑主线使用 [A10 全链路手册](../A10_TRAINING_GUIDE.md)：
+在同一张 A10 上依次完成 BF16 smoke、pilot 与正式 Base。
+已发布 Base-v1 的 RTX 4090 结果保留为历史证据，不计作 A10 验证。
+独立的结构消融 Reference 仍使用自己的配置与规范，尚未完成；
+不能把历史 Base 或新的 A10 smoke 混称为该 Reference 已验收。
 
 推进到效果研究之前，至少要固定：
 

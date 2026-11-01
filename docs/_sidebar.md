@@ -1,6 +1,8 @@
 - **从这里开始**
   - [学习路线](/)
   - [实践系列导读](/tutorials/)
+  - [A10 从零重跑手册](/A10_TRAINING_GUIDE)
+  - [A10 执行记录](/A10_TRAINING_RESULTS)
 
 - **预训练 · 实践篇**
   - [01 从一次参数更新开始](/tutorials/01-first-parameter-update)
@@ -12,15 +14,17 @@
   - [07 让实验可以恢复和比较](/tutorials/07-resume-and-compare)
 
 - **操作与原理参考**
-  - [公开 Native-60M Base](https://modelscope.cn/models/wzt777/native-60m-base-v1)
-  - [Base 从零训练手册](/BASE_TRAINING_GUIDE)
-  - [Base-v1 执行结果](/BASE_TRAINING_RESULTS)
-  - [SFT 训练手册](/SFT_TRAINING_GUIDE)
-  - [SFT 初始化门禁](/SFT_INITIALIZATION_GATE)
-  - [SFT 数据门禁](/SFT_DATA_GATE)
   - [数据介绍与准备](/DATA_GUIDE)
   - [自有模型介绍](/NATIVE_MODEL_GUIDE)
   - [Pretrain 训练文档](/NATIVE_PRETRAIN_GUIDE)
+
+- **历史冻结路线**
+  - [公开 Native-60M Base](https://modelscope.cn/models/wzt777/native-60m-base-v1)
+  - [Base-v1 历史训练手册](/BASE_TRAINING_GUIDE)
+  - [Base-v1 执行结果](/BASE_TRAINING_RESULTS)
+  - [历史 SFT-v1 训练手册](/SFT_TRAINING_GUIDE)
+  - [SFT 初始化门禁](/SFT_INITIALIZATION_GATE)
+  - [SFT 数据门禁](/SFT_DATA_GATE)
 
 - **维护**
   - [文档站维护](/SITE_GUIDE)

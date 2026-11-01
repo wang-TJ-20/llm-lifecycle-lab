@@ -1,7 +1,8 @@
-# Native-60M Base 从零训练手册
+# Native-60M Base-v1 历史训练手册
 
-本文保留 Native-60M Base-v1 的冻结训练路线和验收门禁。旧 Base 实验结果以及
-SFT、DPO、GRPO 路线已从工作树移除；归档只用于追溯，不作为本轮输入。
+当前默认执行入口是 [单卡 A10 从零重跑手册](./A10_TRAINING_GUIDE.md)。
+本文保留 Native-60M Base-v1 历史 MPS/4090 冻结训练路线和验收门禁，
+不作为新的 A10 默认步骤。历史发布权重和结果不删除、不覆盖。
 该路线现已执行完成，最终权重、Tokenizer 与 provenance 位于
 [`models/base-v1-final/`](../models/base-v1-final/)，完整结果见
 [`BASE_TRAINING_RESULTS.md`](./BASE_TRAINING_RESULTS.md)。

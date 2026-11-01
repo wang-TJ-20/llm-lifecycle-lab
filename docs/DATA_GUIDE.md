@@ -5,6 +5,10 @@
 [自有模型介绍](./NATIVE_MODEL_GUIDE.md)，环境安装和训练见
 [Pretrain 训练文档](./NATIVE_PRETRAIN_GUIDE.md)。
 
+当前 A10 从零重跑使用相同来源 recipe，但采用独立 `bilingual-60m-a10-v1`
+prepared/Tokenizer/Packing 目录，避免与历史产物混用；
+对应路径和执行顺序见 [A10 手册](./A10_TRAINING_GUIDE.md)。
+
 ## 1. 先了解数据流
 
 ```text

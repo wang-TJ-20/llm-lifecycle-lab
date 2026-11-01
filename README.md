@@ -34,8 +34,10 @@ loss 下降能说明什么？进程中断后，怎样继续同一次实验？
 - **读懂训练结果**：区分 step、监督 token 和预算，结合双语指标与生成解释模型表现。
 - **做可比较的实验**：固定输入和配置，检查 checkpoint、数据位置与中断恢复。
 
-> 七篇预训练主线、Native-60M Base-v1 的 8-epoch CUDA 训练及发布均已完成；
-> SFT 数据、训练、恢复和评测链路已冻结，正式 SFT-v1 尚未运行。
+> 当前硬件教程主线为 [单卡 A10 从零重跑](./docs/A10_TRAINING_GUIDE.md)：
+> 重新准备数据、训练 Tokenizer、预训练 Base，再冻结新 SFT 门禁。
+> 已发布 Base-v1 的 RTX 4090 训练保留为历史证据，不计作 A10 实测；
+> 历史 SFT-v1 的代码与门禁已冻结，正式训练尚未运行。
 > 权重与 Tokenizer 可从 [ModelScope](https://modelscope.cn/models/wzt777/native-60m-base-v1)
 > 下载，也保存在 `models/base-v1-final/`。它是 Base 模型，不是指令微调后的聊天模型。
 
@@ -46,8 +48,8 @@ loss 下降能说明什么？进程中断后，怎样继续同一次实验？
 | 离线机制实验 | CPU；安装依赖后无需下载语料 | 观察参数更新，验证微型训练、评测和恢复 |
 | 10M 双语 Smoke | CPU / Apple Silicon MPS / CUDA；需准备公共语料 | 跑通真实数据上的两步训练与评测 |
 | 已发布 Native-60M Base | CPU 可加载；CUDA 可加速生成；约 252 MB | 下载权重、校验来源并观察 Base 续写 |
-| 60M 训练复现与 Reference | 目标为 Linux + 单张 24GB NVIDIA GPU；需配套数据 | 从零复现训练、结构对照与固定基线验收 |
-| Native-60M SFT-v1 | 本地 MPS 门禁 + 远端 Linux/CUDA；需冻结 SFT 数据 | 从已发布 Base 进行指令微调、恢复与同协议评测 |
+| 60M A10 从零重跑 | Linux + 单张 A10，CUDA BF16；需配套数据 | 同卡 smoke、pilot、正式 Base，建立新训练证据 |
+| A10 Base → SFT | 新 A10 Base 验收后冻结独立输入和门禁 | 重新进行指令微调、恢复与同协议评测 |
 
 **第一次接触，先看第一篇并运行离线实验。**
 10M 用于快速验证，60M 是效果研究的主基线；无需先购买 GPU 才开始学习。
@@ -193,8 +195,9 @@ python scripts/eval_pretrain.py \
 已有同名 run 时换新 ID，不要删除旧记录来绕开覆盖保护。
 恢复只用于完成原预算，不能给已经结束的两步 Smoke 直接追加训练。
 
-60M 当前采用“本地 MPS smoke → 本地 MPS pilot → 远端 CUDA Base”三级门禁，执行入口见
-[Native-60M Base 从零训练手册](./docs/BASE_TRAINING_GUIDE.md)。
+60M 当前采用“A10 BF16 smoke → A10 pilot → A10 正式 Base”路线，执行入口见
+[A10 从零重跑手册](./docs/A10_TRAINING_GUIDE.md)。
+旧 MPS/4090 配置只保留历史追溯，不再作为默认操作步骤。
 
 ## 模型与数据
 
@@ -264,16 +267,18 @@ flowchart TD
 | 已发布 | Native-60M Base-v1；CUDA 训练门禁、独立 test、发布包与 ModelScope 回拉验证均通过 |
 | 已冻结 | SFT Base、公开数据、assistant-only Trainer、quota sampler、评测协议与正式 run 门禁 |
 | 已验证 | SFT 数据 14/14 门禁、本地 8-step smoke、精确恢复和完整命令链 |
-| 当前准备 | 本地 100-step pilot 后，在远端执行 8M-token SFT-v1 |
+| 当前重做 | 单卡 A10：数据与 Tokenizer 重做、Base smoke/pilot、正式 Base，再冻结新 SFT |
 | 后续方向，尚未实现 | DPO、GRPO、Hugging Face 导出与模型服务 |
 
-Base-v1 从随机权重开始，只使用
+历史 Base-v1 从随机权重开始，只使用
 [`native-60m-base-local-smoke.yaml`](./configs/pipelines/native-60m-base-local-smoke.yaml)、
 [`native-60m-base-local-pilot100.yaml`](./configs/pipelines/native-60m-base-local-pilot100.yaml)
 和 [`native-60m-base-v1.yaml`](./configs/pipelines/native-60m-base-v1.yaml)。
-固定边界与复现命令见 [Base 从零训练手册](./docs/BASE_TRAINING_GUIDE.md)，
+历史固定边界见 [Base-v1 历史训练手册](./docs/BASE_TRAINING_GUIDE.md)，
 实测结果与已知 provenance 偏离见
 [Base-v1 执行结果](./docs/BASE_TRAINING_RESULTS.md)。
+当前 A10 配置、目录和停止条件见 [A10 手册](./docs/A10_TRAINING_GUIDE.md)，
+实际进度见 [A10 执行记录](./docs/A10_TRAINING_RESULTS.md)。
 
 当前精确恢复对照覆盖 CPU；不承诺所有设备和精度逐位一致。
 评测受配置中的样本预算限制，不默认代表全量 dev/test。
@@ -285,7 +290,9 @@ Base-v1 从随机权重开始，只使用
 | --- | --- |
 | [数据介绍与准备](./docs/DATA_GUIDE.md) | 来源、许可、公开/自有数据、切分、Tokenizer、Packing 与迁移 |
 | [自有模型介绍](./docs/NATIVE_MODEL_GUIDE.md) | 模型结构、参数预算、前向、生成与结构消融 |
-| [Base 从零训练手册](./docs/BASE_TRAINING_GUIDE.md) | Base-v1 的本地门禁、远端 CUDA 配方与复现步骤 |
+| [A10 从零重跑手册](./docs/A10_TRAINING_GUIDE.md) | 当前默认硬件路线、独立数据、Base 与新 SFT 顺序 |
+| [A10 执行记录](./docs/A10_TRAINING_RESULTS.md) | 新 A10 环境、短验证与真实训练进度 |
+| [历史 Base-v1 训练手册](./docs/BASE_TRAINING_GUIDE.md) | 历史 MPS/4090 配方与冻结边界，不是 A10 主线 |
 | [Base-v1 执行结果](./docs/BASE_TRAINING_RESULTS.md) | 最终指标、训练证据、发布包与已知限制 |
 | [SFT 训练手册](./docs/SFT_TRAINING_GUIDE.md) | 数据物化、本地门禁、远端训练/恢复、dev、sealed test 与归档 |
 | [SFT 初始化门禁](./docs/SFT_INITIALIZATION_GATE.md) | 冻结 Base-v1 初始化身份、质量证据与 clean-run 要求 |

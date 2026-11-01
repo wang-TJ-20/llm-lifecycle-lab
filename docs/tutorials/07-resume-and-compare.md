@@ -270,9 +270,10 @@ python scripts/train_pretrain.py \
 ## 6. 当前“精确恢复”保证到哪里
 
 本篇证明的是同一环境下的 CPU float32 对照，不是所有训练条件逐位可复现。
-目前保存了 Torch CPU/CUDA RNG，却没有保存 Python/NumPy RNG 或 MPS RNG；
-FP16 GradScaler 状态也尚未纳入 checkpoint。
-本实验使用的路径没有依赖这些遗漏状态，不应借此承诺其它路径等价。
+目前保存并恢复 Torch CPU/CUDA/MPS RNG、FP16 GradScaler 和数据流状态；
+Python/NumPy RNG 没有纳入 checkpoint。
+本实验没有验证 CUDA/MPS 或 FP16 恢复，也没有依赖 Python/NumPy 的随机路径，
+不应借此承诺其它路径等价。A10 的真实恢复验证必须另行记录。
 
 CUDA 内核、PyTorch 版本、低精度归约和硬件变化都可能带来差异。
 同 seed 不是跨环境数值一致的充分条件；
@@ -361,8 +362,11 @@ python scripts/verify_reference.py \
 7. Checkpoint 与实验条件让过程能够恢复和比较。
 
 这还不是一个训练完成的通用助手。Native-60M Base-v1 已完成并公开发布，
-下一阶段应先冻结 SFT 数据、初始化约束与评测门禁；独立 Reference 和结构消融
-仍按各自规范执行，不能由 Base-v1 的一次训练结果替代。
+历史 SFT-v1 的数据、初始化约束与评测门禁已冻结，但正式训练尚未完成。
+当前 [A10 全链路](../A10_TRAINING_GUIDE.md)重新从随机权重训练 Base，
+新 Base 验收后必须冻结独立 SFT 门禁，不能替换历史 Base 的哈希来放行。
+独立 Reference 和结构消融仍按各自规范执行，
+不能由 Base-v1 的一次训练结果替代。
 新增功能时延续同一标准：**实现、最小验证和解释对应起来，结论不超过证据。**
 
 [返回系列目录](./README.md) | [上一篇：判断模型到底学到了什么](./06-evaluating-a-model.md)
