@@ -1,0 +1,58 @@
+schema_version: '1.0'
+gate_id: native-60m-a10-sft-v1-run
+locks:
+  pipeline_config: configs/pipelines/native-60m-a10-sft-v1.yaml
+  pipeline_file_sha256: 9776fa2f9065eaef74a6895852e0abc2896600b8ca4b4133620241c884c5dc51
+  pipeline_config_sha256: 10c4f94f90ea42e811bbc46d9b60a8f1b19597fb93c98cade08be24cda579b07
+  base_gate: configs/gates/native-60m-a10-sft-v1-base-init.yaml
+  base_gate_sha256: ca303eeb3aaf5c1f0fd21afda48ef96a794093b537cadf1e2e66fca37fcc5cfd
+  data_gate: configs/gates/native-60m-a10-sft-v1-data.yaml
+  data_gate_sha256: 600c5daec24fbf9cd450a5a0e4a44ab58ff63152fc6ae886b62741d290f29be6
+  evaluation_suite: configs/evaluation/lifecycle-v4.yaml
+  evaluation_suite_file_sha256: cbc4c6e0216ac6186a607f9de9c2081b86ff0e347deac21d71f74203e9dd72e5
+  evaluation_suite_sha256: 35fd17acbb9ed14aef7bfbe89b10b5c2ee0586cf2c378f102c268532f65fb2be
+identity:
+  model_route: native
+  run_profile: reproduce
+  stage: sft
+  parent_run_id: native-60m-a10-base-v1-s42
+  parent_checkpoint_step: 45191
+  parent_weights_sha256: 0c3290d6c76bbf775aba20c1d543a062e26aafb987a7d15bde1b652e4dbbb46c
+  parent_model_config_sha256: 64cfc541595cfd1e18fcada7cee887e0a0647a2309744b0da7e55f5e785a01a0
+  tokenizer_sha256: 7455ac1168f36a3d7dca03fee28784f97899fe233f496484a11e5da2e44a2f32
+  data_manifest_sha256: a55b806eefa6859de694cef33974bd2b35ca671f78b8706c349d71aeb6013624
+training:
+  budget_mode: max_train_tokens
+  global_step: 9379
+  target_train_tokens: 1000000
+  expected_tokens_seen: 1000421
+  minimum_target_token_coverage: 0.99
+  maximum_target_token_coverage: 1.01
+  required_training_metric_keys:
+  - train_loss
+  - gradient_norm
+  - eval_loss
+  - eval_en_loss
+  - eval_zh_loss
+  - eval_tokens
+  - eval_en_tokens
+  - eval_zh_tokens
+evaluation:
+  dev_suite: sft-dev
+  dev_examples: 1434
+  test_suite: sft-test
+  test_examples: 1503
+  required_metric_keys:
+  - eval_loss
+  - eval_perplexity
+  - eval_tokens
+  - eval_en_loss
+  - eval_zh_loss
+  - eval_en_perplexity
+  - eval_zh_perplexity
+  - eval_en_tokens
+  - eval_zh_tokens
+runtime:
+  platform_system: Linux
+  accelerator_type: cuda
+  require_clean_source: true

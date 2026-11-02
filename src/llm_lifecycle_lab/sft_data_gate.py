@@ -191,6 +191,8 @@ class _SFTDataRecipe:
     output_sha256: str
     preparation: _RecipePreparation
     reserved: Mapping[str, Mapping[str, str]]
+    output_tokenizer_sha256: str | None
+    output_max_sequence_length: int | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -380,6 +382,14 @@ def _recipe_identity_check(spec: _SFTDataSpec) -> CheckResult:
         and recipe.output_record_kind == identity.record_kind == RecordKind.SFT.value
         and recipe.output_records == identity.source_records
         and recipe.output_sha256 == identity.source_sha256
+        and (
+            recipe.output_tokenizer_sha256 is None
+            or (
+                recipe.output_tokenizer_sha256 == identity.tokenizer_sha256
+                and recipe.output_max_sequence_length
+                == spec.quality.max_sequence_length
+            )
+        )
         and recipe.preparation.dataset_id == identity.dataset_id
         and recipe.preparation.split_seed == preparation.split_seed
         and recipe.preparation.group_by == preparation.group_by
@@ -1184,7 +1194,10 @@ def _load_recipe(path: Path) -> _SFTDataRecipe:
         _load_recipe_source(item, index) for index, item in enumerate(raw_sources)
     )
     output = _required_mapping(value["output"], "recipe.output")
-    _exact_keys(output, {"record_kind", "records", "sha256"}, "recipe.output")
+    output_keys = {"record_kind", "records", "sha256"}
+    if "tokenizer_sha256" in output or "max_sequence_length" in output:
+        output_keys |= {"tokenizer_sha256", "max_sequence_length"}
+    _exact_keys(output, output_keys, "recipe.output")
     preparation = _required_mapping(value["preparation"], "recipe.preparation")
     _exact_keys(
         preparation,
@@ -1214,6 +1227,20 @@ def _load_recipe(path: Path) -> _SFTDataRecipe:
         output_record_kind=_text(output["record_kind"], "recipe.output.record_kind"),
         output_records=_integer(output["records"], "recipe.output.records", minimum=1),
         output_sha256=_sha256(output["sha256"], "recipe.output.sha256"),
+        output_tokenizer_sha256=(
+            _sha256(output["tokenizer_sha256"], "recipe.output.tokenizer_sha256")
+            if "tokenizer_sha256" in output
+            else None
+        ),
+        output_max_sequence_length=(
+            _integer(
+                output["max_sequence_length"],
+                "recipe.output.max_sequence_length",
+                minimum=2,
+            )
+            if "max_sequence_length" in output
+            else None
+        ),
         preparation=_RecipePreparation(
             dataset_id=_text(
                 preparation["dataset_id"], "recipe.preparation.dataset_id"

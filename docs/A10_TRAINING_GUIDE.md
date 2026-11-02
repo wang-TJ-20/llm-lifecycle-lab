@@ -164,7 +164,9 @@ final 相对 best 回退不超过 2%。通过后才用 eval_pretrain 对最终 c
 评测仍受 eval_batches=1024 限制，不称作全量 test。
 
 归档环境、源码、配置、数据身份、预算、指标、checkpoint、门禁和 dev/test。
-新 Base 验收后冻结独立 A10 SFT Base/data/run 门禁，重新编码公开 SFT 数据、
-统计 assistant token 和长度，再做 smoke/pilot、恢复、正式 SFT 和同协议能力对照。
+新 Base 的独立 A10 SFT Base/data/run 门禁和公开指令数据已冻结，
+首轮采用 1M assistant token 预算。SFT 训练尚未启动，
+按 [A10 SFT 手册](./A10_SFT_GUIDE.md) 由用户执行 smoke、恢复、pilot、
+正式训练和同协议能力对照。
 
 当前实测进度见 [A10 执行记录](./A10_TRAINING_RESULTS.md)。

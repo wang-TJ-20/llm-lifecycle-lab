@@ -1,0 +1,95 @@
+schema_version: '1.0'
+gate_id: native-60m-a10-sft-v1-base-init
+paths:
+  base_package: models/a10-base-v1-initialization
+  source_evidence: models/a10-base-v1-initialization/source_evidence
+  source_pipeline: configs/pipelines/native-60m-a10-base-v1.yaml
+  source_model_config: configs/models/tiny-60m.yaml
+  release_manifest: models/a10-base-v1-initialization/SHA256SUMS
+package_artifacts:
+  LICENSE_MODEL:
+    sha256: c0df9ec57044e9af1eab2dbcf58b14b479b78a41288b8ecd1a5ab5f86f8758de
+    size_bytes: 381
+  config.json:
+    sha256: 64cfc541595cfd1e18fcada7cee887e0a0647a2309744b0da7e55f5e785a01a0
+    size_bytes: 370
+  model.pt:
+    sha256: 0c3290d6c76bbf775aba20c1d543a062e26aafb987a7d15bde1b652e4dbbb46c
+    size_bytes: 251740405
+  provenance.json:
+    sha256: 5f2432c459f7ff53dca26d5405418649383f694a8904c4ea92a76fcb70cb08e6
+    size_bytes: 1469
+  tokenizer.json:
+    sha256: 7455ac1168f36a3d7dca03fee28784f97899fe233f496484a11e5da2e44a2f32
+    size_bytes: 1265376
+  tokenizer_manifest.json:
+    sha256: 8dc4a48be70cd1492148a9ab7b3f73bd81b986c72a8e5e2d62bf544eaf5997d5
+    size_bytes: 1268
+evidence_artifacts:
+  checkpoint_metadata.json:
+    sha256: 9e27348598a758ed3600c52b2e0a9ae18ac944d67fa4a940d470b1b186e9cf3a
+    size_bytes: 397
+  final-test.json:
+    sha256: 9bc44ed212e89b866d842b009fba382ee604eadb98c5cfabb2decbfc12867a35
+    size_bytes: 826
+  metrics.jsonl:
+    sha256: eed73ae8f9246f28f82a05b42b22f9a45b1ff13a7aec8b61da9fe4e2f9a80d13
+    size_bytes: 2353459
+  model_manifest.json:
+    sha256: f769b61945a161081cd6d883c2cda6ea51e5e2b34dff881a74537534ed854e43
+    size_bytes: 639
+  resolved_config.yaml:
+    sha256: ad84ed3a8281f853f7468a734de85f17f0c64c45c4206e53db1fbaa6dc68d9b4
+    size_bytes: 790
+  run_manifest.json:
+    sha256: 251ede2da9a948c05bb1e53bdc9b6118742195cc2e224a415fb43debfcf79f29
+    size_bytes: 309
+  tokenizer_manifest.json:
+    sha256: 8dc4a48be70cd1492148a9ab7b3f73bd81b986c72a8e5e2d62bf544eaf5997d5
+    size_bytes: 1268
+  training_budget.json:
+    sha256: b35e60f1a54848ec3bbdab5631a2f419214e36e68458505c65702ddc936eee0f
+    size_bytes: 426
+  training_result.json:
+    sha256: 53515be43e77e7a808d38150a6150249b21cdee917c4d367e9fa18f000b0b7cd
+    size_bytes: 443
+identity:
+  model_route: native
+  model_id: tiny-60m
+  architecture: dense-decoder
+  source_stage: pretrain
+  source_run_id: native-60m-a10-base-v1-s42
+  source_run_profile: reproduce
+  source_seed: 42
+  source_git_commit: f7021451919f86d5de4d197dbe4fcf01ad2ef42b
+  source_sha256: c673fc7c1509c03962e6f65099215fbe034df25c941164fdd9f0ccc80efbe6cf
+  source_run_config_sha256: 51abeeeb06fd32e86c1cb6b9c8f40d2833a5395111c7cef12efefd4af54b5b43
+  source_pipeline_file_sha256: f56396e1963953129f3bc279af7c1221778bd48072264e8273bb6b54ece9e463
+  source_model_config_sha256: 16321b31f1dfbbc7bfc9ede632dd664ddb41b1f6dcf824945a50d48a6fa46f1d
+  weights_sha256: 0c3290d6c76bbf775aba20c1d543a062e26aafb987a7d15bde1b652e4dbbb46c
+  tokenizer_sha256: 7455ac1168f36a3d7dca03fee28784f97899fe233f496484a11e5da2e44a2f32
+  tokenizer_manifest_sha256: 8dc4a48be70cd1492148a9ab7b3f73bd81b986c72a8e5e2d62bf544eaf5997d5
+  tokenizer_id: bilingual-60m-a10-v1
+  chat_template_version: native-chat-v1
+  parameter_count: 62927616
+  vocab_size: 16384
+  max_sequence_length: 512
+  checkpoint_step: 45191
+  license: CC-BY-SA-3.0 AND MIT
+quality:
+  expected_source_status: completed
+  expected_global_step: 45191
+  expected_target_train_tokens: 369476240
+  minimum_target_token_coverage: 1.0
+  maximum_target_token_coverage: 1.01
+  maximum_final_to_baseline_loss_ratio: 0.5
+  maximum_final_to_best_loss_ratio: 1.02
+  require_final_language_improvement: true
+  expected_test_split: test
+policy:
+  initialization_mode: weights-only-new-stage
+  inherit_optimizer_state: false
+  initial_global_step: 0
+  require_clean_git: true
+  accepted_source_dirty: false
+  require_source_deviation_record: false

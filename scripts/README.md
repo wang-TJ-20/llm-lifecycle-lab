@@ -65,8 +65,16 @@ python scripts/pretrain_experiment.py --mode resume
 `a10_resume_experiment.py` 在第 5 步受控中断并恢复第 4 步 checkpoint；
 严格 CUDA 逐位对照须对 baseline 和恢复同时启用手册中的确定性设置。
 
-## SFT 入口（待冻结）
+## A10 SFT 入口
 
-A10 Base 验收通过后，将冻结独立的 SFT Base/data/run 门禁。
-`verify_sft_init.py`、`verify_sft_data.py`、`verify_sft_run.py` 的通用机制
-已实现，但具体配置路径待 A10 SFT 阶段确定。
+A10 Base/data/run 门禁、14,799 条指令数据和首轮 1M 监督 token 预算已冻结。
+训练尚未启动，完整命令与停止条件见 [A10 SFT 手册](../docs/A10_SFT_GUIDE.md)。
+
+- `prepare_a10_sft.py`：从已验收 Base 归档重建初始化包，物化并冻结公共数据，
+  保存内容锁；只准备和校验，不训练。
+- `train_a10_sft.py --check-only`：检查 clean-tree、单卡 A10 BF16 和独立门禁，
+  不创建训练 run；去掉该参数才开始用户选择的 smoke/pilot100/formal 阶段。
+- `a10_sft_resume_experiment.py`：用户执行的同卡精确恢复对照。
+- `eval_a10_sft.py`：全量 dev；`--sealed-test` 仅在 dev 验收通过后授权一次 test。
+- `verify_sft_init.py`、`verify_sft_data.py`、`verify_sft_run.py`：独立初始化、
+  数据和正式 run 验收。

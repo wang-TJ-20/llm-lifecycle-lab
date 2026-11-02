@@ -59,7 +59,8 @@ flowchart TD
 七篇主线已完整。当前代码已经实现 Native 模型、BPE Tokenizer、磁盘 Packing、
 Pretrain、恢复和评测，可以先沿操作指南进行实践。
 A10 Base 已完成 8-epoch 训练并通过质量验收；
-SFT 待冻结独立 Base/data/run 三层门禁后启动。
+SFT 的独立 Base/data/run 门禁、数据和 1M 预算已冻结，训练尚未启动。
+手动执行顺序见 [A10 SFT 手册](./A10_SFT_GUIDE.md)。
 DPO、GRPO 等后续训练阶段尚未实现。
 
 ## A10 Base 结果
@@ -93,6 +94,7 @@ A10 Smoke 用来验证链路，不代表语言能力。
 | 数据从哪里来，怎样下载、切分和打包？ | [数据介绍与准备](./DATA_GUIDE.md) |
 | 模型各层怎样连接，张量形状是什么？ | [自有模型介绍](./NATIVE_MODEL_GUIDE.md) |
 | 怎样在 A10 从随机初始化重跑？ | [A10 全链路手册](./A10_TRAINING_GUIDE.md) |
+| 怎样从已验收 Base 开始 SFT？ | [A10 SFT 手册](./A10_SFT_GUIDE.md) |
 | A10 当前完成了哪些验证？ | [A10 执行记录](./A10_TRAINING_RESULTS.md) |
 | A10 Base 最终结果和证据在哪里？ | [A10 执行记录](./A10_TRAINING_RESULTS.md) |
 | 怎样训练、恢复、评测与排错？ | [Pretrain 训练文档](./NATIVE_PRETRAIN_GUIDE.md) |

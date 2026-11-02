@@ -36,7 +36,8 @@ loss 下降能说明什么？进程中断后，怎样继续同一次实验？
 
 > 当前硬件教程主线为 [单卡 A10 从零重跑](./docs/A10_TRAINING_GUIDE.md)：
 > 重新准备数据、训练 Tokenizer、预训练 Base，再冻结新 SFT 门禁。
-> A10 Base 已完成 8-epoch 正式训练并通过验收，后续进入 SFT 阶段。
+> A10 Base 已完成 8-epoch 正式训练并通过验收。
+> [A10 SFT](./docs/A10_SFT_GUIDE.md) 输入和门禁已冻结，训练由用户手动启动。
 
 ## 选择你的起点
 
@@ -209,7 +210,7 @@ flowchart TD
 | 已完成 | 七篇中文教程、Docsify 在线阅读站与 CPU 离线实验 |
 | 已实现 | Native-60M、双语 BPE、磁盘 Packing、Pretrain、评测与 checkpoint 恢复 |
 | 已完成 | A10 Base 8-epoch 正式训练与质量验收通过 |
-| 当前阶段 | A10 SFT：待冻结独立 Base/data/run 门禁后启动 |
+| 当前阶段 | A10 SFT：数据、Base/data/run 门禁和 1M 预算已冻结；训练未启动 |
 | 后续方向，尚未实现 | DPO、GRPO、Hugging Face 导出与模型服务 |
 
 当前 A10 配置、目录和停止条件见 [A10 手册](./docs/A10_TRAINING_GUIDE.md)，
@@ -227,6 +228,7 @@ flowchart TD
 | [自有模型介绍](./docs/NATIVE_MODEL_GUIDE.md) | 模型结构、参数预算、前向、生成与结构消融 |
 | [A10 从零重跑手册](./docs/A10_TRAINING_GUIDE.md) | 当前默认硬件路线、独立数据、Base 与新 SFT 顺序 |
 | [A10 执行记录](./docs/A10_TRAINING_RESULTS.md) | A10 环境、短验证与真实训练进度 |
+| [A10 SFT 手册](./docs/A10_SFT_GUIDE.md) | 固定 Base 初始化、数据、1M 预算与用户手动启动 |
 | [Pretrain 训练文档](./docs/NATIVE_PRETRAIN_GUIDE.md) | 环境、训练、评测、恢复与排错 |
 | [脚本阅读指南](./scripts/README.md) | 从每个脚本的 `main()` 进入核心实现 |
 | [文档站维护](./docs/SITE_GUIDE.md) | 本地预览、GitHub Pages 发布与新增章节 |

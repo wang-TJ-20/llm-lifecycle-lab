@@ -399,7 +399,7 @@ def _training_budget_check(
     return _check(
         "training-budget",
         matches,
-        "resolved optimizer steps and 8M supervised-token target match",
+        "resolved optimizer steps and supervised-token target match",
         "training budget, completed step or token target differs",
         {
             "mode": budget.get("mode"),

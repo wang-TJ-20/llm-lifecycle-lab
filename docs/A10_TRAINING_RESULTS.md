@@ -42,7 +42,10 @@ manifest 包含本轮 ID、路径和时间，不能直接沿用历史 manifest h
 | A10 受控中断恢复 | 确定性 CUDA 对照逐位通过；普通路径不保证逐位一致 |
 | 正式 8-epoch A10 Base | 已完成，commit `f702145` |
 | 新 Base 质量验收 | 已通过 |
-| A10 SFT Base/data/run 门禁 | 待冻结；下阶段启动 |
+| A10 SFT Base/data/run 门禁 | 已冻结；Base 和数据 inputs-only 校验通过 |
+| A10 SFT 数据与预算 | 14,799 条对话；首轮 1M 监督 token，9,379 steps |
+| A10 SFT smoke/pilot/恢复 | 未启动，待用户手动执行 |
+| SFT 启动硬件 preflight | 当前准备会话 CUDA 设备数为 0；须在绑定 A10 的 GPU 终端检查 |
 | 正式 A10 SFT | 未启动 |
 
 不能把 CPU 测试或合成输入探测当成本轮训练通过。
@@ -118,7 +121,7 @@ Base 或 SFT 的承诺。短 dev 评测只覆盖 16 个窗口，不代表模型�
 
 证据归档在 `results/native-60m-a10-base-v1-s42/`，包含 28 个校验文件及 SHA-256 校验单。
 验收报告为 [a10-acceptance.json](file:///mnt/bn/smart-customer-service/users/zitong/project/llm-lifecycle-lab/results/native-60m-a10-base-v1-s42/a10-acceptance.json)。
-本轮 Base 独立于任何历史产物，后续 SFT 也将冻结独立门禁。
+本轮 Base 独立于任何历史产物，SFT 使用独立冻结的初始化、数据与 run 门禁。
 
 归档维护说明：2026-11-02 按用户要求移除了历史硬件对照字段，并同步更新
 `SHA256SUMS` 与 `checksums.json`。A10 训练指标、评测、权重和验收结论未改变；
@@ -131,6 +134,9 @@ Base 或 SFT 的承诺。短 dev 评测只覆盖 16 个窗口，不代表模型�
 
 ## 下一步
 
-1. 冻结新的 A10 SFT Base/data/run 门禁；
-2. 物化 A10 SFT 数据并重新做 smoke/pilot；
-3. 通过独立 gate 后启动正式 A10 SFT。
+1. 检查并提交已准备的 SFT 代码、配置、文档和测试；
+2. 用户手动运行 SFT smoke、同卡精确恢复验证与 pilot；
+3. 检查结果后，用户手动启动 1M 预算的正式 A10 SFT。
+
+独立操作手册见 [A10 SFT 准备与手动训练](./A10_SFT_GUIDE.md)。
+本次只完成数据、初始化和预算校验，未启动任何 A10 SFT 训练。

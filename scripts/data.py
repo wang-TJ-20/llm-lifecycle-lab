@@ -67,6 +67,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     fetch_sft.add_argument("--recipe", type=Path, required=True)
     fetch_sft.add_argument("--output", type=Path, required=True)
+    fetch_sft.add_argument("--tokenizer", type=Path)
     fetch_sft.add_argument(
         "--accept-license",
         action="append",
@@ -163,6 +164,7 @@ def fetch_sft_source(args: argparse.Namespace) -> int:
         args.recipe,
         args.output,
         accepted_licenses=args.accept_license,
+        tokenizer_dir=args.tokenizer,
     )
     print(f"Materialized public SFT recipe {manifest.recipe_id}")
     print(f"  path: {args.output / manifest.source_file}")

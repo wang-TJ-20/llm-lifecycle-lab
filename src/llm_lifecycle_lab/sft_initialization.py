@@ -225,8 +225,7 @@ def _policy_check(policy: _Policy) -> CheckResult:
         and policy.inherit_optimizer_state is False
         and policy.initial_global_step == 0
         and policy.require_clean_git is True
-        and policy.accepted_source_dirty is True
-        and policy.require_source_deviation_record is True
+        and policy.require_source_deviation_record is policy.accepted_source_dirty
     )
     return _check(
         "initialization-policy",
@@ -409,7 +408,7 @@ def _provenance_check(spec: _SFTInitializationSpec) -> CheckResult:
     return _check(
         "base-provenance",
         matches,
-        "Base provenance matches the frozen source run and accepted deviation",
+        "Base provenance matches the frozen source run and deviation policy",
         "Base provenance does not match the frozen source run",
         details,
     )

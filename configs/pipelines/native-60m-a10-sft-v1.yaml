@@ -1,0 +1,48 @@
+schema_version: '1.0'
+model_route: native
+run_profile: reproduce
+stage: sft
+seed: 42
+output_dir: runs
+model:
+  provider: native
+  model_id: tiny-60m
+  architecture: dense-decoder
+  base_package: models/a10-base-v1-initialization
+  tokenizer: models/a10-base-v1-initialization
+data:
+  manifest: data/prepared/sft-public-a10-v1/data_manifest.json
+  base_gate: configs/gates/native-60m-a10-sft-v1-base-init.yaml
+  data_gate: configs/gates/native-60m-a10-sft-v1-data.yaml
+  evaluation_suite: configs/evaluation/lifecycle-v4.yaml
+  evaluation_suite_sha256: cbc4c6e0216ac6186a607f9de9c2081b86ff0e347deac21d71f74203e9dd72e5
+  sampling:
+    strategy: supervised-token-quota
+    weights:
+      classification.en: 0.1
+      general.en: 0.1
+      general.zh: 0.125
+      numeric.en: 0.1
+      numeric.zh: 0.125
+      short_qa.en: 0.1
+      short_qa.zh: 0.125
+      structured.en: 0.1
+      structured.zh: 0.125
+training:
+  device: cuda
+  dtype: bfloat16
+  sequence_length: 512
+  micro_batch_size: 1
+  gradient_accumulation_steps: 16
+  max_train_tokens: 1000000
+  learning_rate: 0.0001
+  weight_decay: 0.01
+  beta1: 0.9
+  beta2: 0.95
+  warmup_steps: 50
+  min_lr_ratio: 0.1
+  gradient_clipping: 1.0
+  checkpoint_interval: 1000
+  eval_interval: 500
+  eval_batches: 1434
+  log_interval: 10

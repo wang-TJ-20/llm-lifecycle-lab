@@ -14,7 +14,7 @@ from llm_lifecycle_lab.data.sft_public import (
     load_public_sft_source_manifest,
     materialize_public_sft,
 )
-from llm_lifecycle_lab.exceptions import DataValidationError
+from llm_lifecycle_lab.exceptions import ContractError, DataValidationError
 
 
 def _record() -> dict[str, Any]:
@@ -186,3 +186,70 @@ def test_manifest_loader_detects_source_tampering(
 
     with pytest.raises(DataValidationError, match="source hash mismatch"):
         load_public_sft_source_manifest(output / "source.jsonl")
+
+
+def test_selection_deduplicates_normalized_chats_stably() -> None:
+    first = _record()
+    first["id"] = "a"
+    duplicate = _record()
+    duplicate["id"] = "b"
+    duplicate["messages"][0]["content"] = (
+        "\uff31\uff55\uff45\uff53\uff54\uff49\uff4f\uff4e\uff1f"
+    )
+    synthetic = _record()
+    synthetic["id"] = "c"
+    synthetic["metadata"]["synthetic"] = True
+    selected, stats = sft_public.select_public_sft_records(
+        [duplicate, synthetic, first]
+    )
+    assert [row["id"] for row in selected] == ["a"]
+    assert stats["normalized_duplicates"] == 1
+    assert stats["rejected_protocol_or_length_or_synthetic"] == 1
+
+
+def test_selection_rejects_overlength_without_truncation(monkeypatch) -> None:
+    import llm_lifecycle_lab.data.sft as encoding
+
+    short = _record()
+    short["id"] = "a"
+    long = _record()
+    long["id"] = "b"
+    long["messages"][1]["content"] = "x" * 513
+
+    def encode(messages, *, tokenizer, sequence_length, language):
+        if len(messages[-1]["content"]) > sequence_length:
+            raise ContractError("overlength")
+
+    monkeypatch.setattr(encoding, "encode_sft_example", encode)
+    selected, stats = sft_public.select_public_sft_records(
+        [long, short], tokenizer=object()
+    )
+    assert selected == [short]
+    assert len(long["messages"][1]["content"]) == 513
+    assert stats["rejected_protocol_or_length_or_synthetic"] == 1
+
+
+def test_token_bounded_recipe_requires_matching_tokenizer(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    from llm_lifecycle_lab.tokenizer import NativeTokenizer
+
+    recipe = _recipe(tmp_path)
+    value = yaml.safe_load(recipe.read_text())
+    value["output"].update(tokenizer_sha256="a" * 64, max_sequence_length=512)
+    recipe.write_text(yaml.safe_dump(value))
+    monkeypatch.setattr(
+        NativeTokenizer,
+        "from_directory",
+        lambda _path: SimpleNamespace(
+            manifest=SimpleNamespace(content_sha256="b" * 64)
+        ),
+    )
+    with pytest.raises(DataValidationError, match="tokenizer hash mismatch"):
+        materialize_public_sft(
+            recipe,
+            tmp_path / "output",
+            accepted_licenses=["Apache-2.0"],
+            tokenizer_dir=tmp_path,
+        )
+    assert not (tmp_path / "output").exists()

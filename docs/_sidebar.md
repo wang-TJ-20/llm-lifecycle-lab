@@ -3,6 +3,7 @@
   - [实践系列导读](/tutorials/)
   - [A10 从零重跑手册](/A10_TRAINING_GUIDE)
   - [A10 执行记录](/A10_TRAINING_RESULTS)
+  - [A10 SFT 手动训练](/A10_SFT_GUIDE)
 
 - **预训练 · 实践篇**
   - [01 从一次参数更新开始](/tutorials/01-first-parameter-update)

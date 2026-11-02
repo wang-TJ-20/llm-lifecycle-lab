@@ -9,7 +9,7 @@ import tempfile
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from llm_lifecycle_lab.config import load_mapping
 from llm_lifecycle_lab.contracts import (
@@ -22,6 +22,7 @@ from llm_lifecycle_lab.data.fingerprint import sha256_file
 from llm_lifecycle_lab.data.posttraining import (
     PublicPosttrainingRecipe,
     _download_sources,
+    _normalize,
     _read_source_rows,
     _transform_source,
     _write_jsonl,
@@ -30,7 +31,10 @@ from llm_lifecycle_lab.data.schemas import (
     format_validation_failure,
     validate_jsonl,
 )
-from llm_lifecycle_lab.exceptions import ConfigError, DataValidationError
+from llm_lifecycle_lab.exceptions import ConfigError, ContractError, DataValidationError
+
+if TYPE_CHECKING:
+    from llm_lifecycle_lab.tokenizer import NativeTokenizer
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,6 +47,7 @@ class PublicSFTSourceManifest(JsonContract):
     license: str
     licenses: tuple[str, ...]
     loader_versions: Mapping[str, str]
+    processing: Mapping[str, Any] = field(default_factory=dict)
     created_at: str = field(default_factory=utc_now)
     schema_version: str = SCHEMA_VERSION
 
@@ -63,6 +68,7 @@ class PublicSFTSourceManifest(JsonContract):
                     "loader_versions",
                 ).items()
             },
+            processing=dict(value.get("processing", {})),
             created_at=str(value["created_at"]),
             schema_version=str(value["schema_version"]),
         )
@@ -73,6 +79,7 @@ def materialize_public_sft(
     output_dir: str | Path,
     *,
     accepted_licenses: Sequence[str],
+    tokenizer_dir: str | Path | None = None,
 ) -> PublicSFTSourceManifest:
     """Download pinned public inputs and build only the frozen SFT source."""
 
@@ -92,6 +99,19 @@ def materialize_public_sft(
             f"recipe {recipe_id} requires exactly these --accept-license values: "
             f"{expected}"
         )
+
+    tokenizer = None
+    limit = output.get("max_sequence_length")
+    if "tokenizer_sha256" in output or limit is not None:
+        from llm_lifecycle_lab.tokenizer import NativeTokenizer
+
+        if tokenizer_dir is None or limit != 512:
+            raise ConfigError(
+                "token-bounded SFT recipes require --tokenizer and seq512"
+            )
+        tokenizer = NativeTokenizer.from_directory(tokenizer_dir)
+        if tokenizer.manifest.content_sha256 != output.get("tokenizer_sha256"):
+            raise DataValidationError("SFT recipe tokenizer hash mismatch")
 
     target = Path(output_dir)
     if target.exists():
@@ -113,7 +133,9 @@ def materialize_public_sft(
             rows = _read_source_rows(source_paths[source.source_id], source)
             transformed = _transform_source(rows, recipe, source)
             records.extend(transformed.get(RecordKind.SFT, ()))
-        records.sort(key=lambda row: row["id"])
+        records, processing = select_public_sft_records(
+            records, tokenizer=tokenizer, sequence_length=limit or 512
+        )
         if len(records) != expected_records:
             raise DataValidationError(
                 f"public SFT materialization produced {len(records)} records; "
@@ -141,6 +163,7 @@ def materialize_public_sft(
             license=" AND ".join(sorted(required.values())),
             licenses=tuple(dict.fromkeys(source.license for source in recipe.sources)),
             loader_versions=loader_versions,
+            processing=processing,
         )
         (temporary / "sft_source_manifest.json").write_text(
             manifest.to_json() + "\n",
@@ -151,6 +174,57 @@ def materialize_public_sft(
         shutil.rmtree(temporary, ignore_errors=True)
         raise
     return manifest
+
+
+def select_public_sft_records(
+    records: Sequence[dict[str, Any]],
+    *,
+    tokenizer: NativeTokenizer | None = None,
+    sequence_length: int = 512,
+) -> tuple[list[dict[str, Any]], dict[str, int | str]]:
+    """Keep a stable representative and reject, rather than truncate, invalid chats."""
+    if tokenizer is not None:
+        from llm_lifecycle_lab.data.sft import encode_sft_example
+
+    selected = []
+    identities: set[str] = set()
+    rejected = duplicates = 0
+    for record in sorted(records, key=lambda row: row["id"]):
+        metadata = record.get("metadata") or {}
+        if record.get("synthetic") or metadata.get("synthetic"):
+            rejected += 1
+            continue
+        if tokenizer is not None:
+            try:
+                encode_sft_example(
+                    record["messages"],
+                    tokenizer=tokenizer,
+                    sequence_length=sequence_length,
+                    language=record["language"],
+                )
+            except ContractError:
+                rejected += 1
+                continue
+        identity = json.dumps(
+            [
+                {"role": m["role"], "content": _normalize(m["content"])}
+                for m in record["messages"]
+            ],
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+        if identity in identities:
+            duplicates += 1
+            continue
+        identities.add(identity)
+        selected.append(record)
+    return selected, {
+        "candidates": len(records),
+        "kept": len(selected),
+        "rejected_protocol_or_length_or_synthetic": rejected,
+        "normalized_duplicates": duplicates,
+        "normalization": "NFKC-whitespace-collapse-v1",
+    }
 
 
 def load_public_sft_source_manifest(

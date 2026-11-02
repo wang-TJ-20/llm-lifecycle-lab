@@ -15,6 +15,7 @@ build/
 /runs/
 /checkpoints/
 /wandb/
+/models/a10-base-v1-initialization/
 *.pt
 *.pth
 *.safetensors

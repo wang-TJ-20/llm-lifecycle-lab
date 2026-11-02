@@ -1,0 +1,26 @@
+{
+  "created_at": "2026-11-02T07:26:24+00:00",
+  "license": "Apache-2.0 AND CC-BY-SA-3.0 AND CC-BY-SA-4.0",
+  "licenses": [
+    "Apache-2.0",
+    "CC-BY-SA-3.0",
+    "CC-BY-SA-4.0"
+  ],
+  "loader_versions": {
+    "huggingface_hub": "0.36.2",
+    "pyarrow": "25.0.1"
+  },
+  "processing": {
+    "candidates": 14800,
+    "kept": 14799,
+    "normalization": "NFKC-whitespace-collapse-v1",
+    "normalized_duplicates": 1,
+    "rejected_protocol_or_length_or_synthetic": 0
+  },
+  "recipe_id": "sft-public-a10-v1",
+  "records": 14799,
+  "schema_version": "1.0",
+  "selection_namespace": "a10-sft-public-v1",
+  "source_file": "source.jsonl",
+  "source_sha256": "be5fcceb3d01c6015686bdcb85c2ae14a5380cf75e3e40326c4d8737080170aa"
+}
