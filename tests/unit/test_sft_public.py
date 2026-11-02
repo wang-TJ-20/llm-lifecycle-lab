@@ -16,9 +16,6 @@ from llm_lifecycle_lab.data.sft_public import (
 )
 from llm_lifecycle_lab.exceptions import DataValidationError
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-RECIPE = PROJECT_ROOT / "configs/data/sft-public-balanced-v1.yaml"
-
 
 def _record() -> dict[str, Any]:
     return {
@@ -50,41 +47,53 @@ def _record_sha256(record: dict[str, Any]) -> str:
 
 
 def _recipe(tmp_path: Path) -> Path:
-    value = yaml.safe_load(RECIPE.read_text(encoding="utf-8"))
-    value["recipe_id"] = "sft-public-fixture"
-    value["selection_namespace"] = "fixture-v1"
-    value["sources"] = [value["sources"][0]]
-    value["output"] = {
-        "record_kind": "sft",
-        "records": 1,
-        "sha256": _record_sha256(_record()),
+    value = {
+        "schema_version": "1.0",
+        "recipe_id": "sft-public-fixture",
+        "description": "Synthetic source for materializer tests.",
+        "selection_namespace": "fixture-v1",
+        "sources": [
+            {
+                "source_id": "oasst1",
+                "provider": "huggingface",
+                "repository": "fixture/source",
+                "revision": "1" * 40,
+                "file": "fixture.jsonl",
+                "file_sha256": "2" * 64,
+                "format": "jsonl",
+                "split": "train",
+                "license": "Apache-2.0",
+                "transform": "oasst-ranked-conversation-v1",
+                "selection": {
+                    "strategy": "stable-hash-rank",
+                    "records_per_language": 1,
+                    "max_messages": 2,
+                    "max_characters": 1000,
+                    "require_all_assistant_rank_zero": True,
+                },
+            }
+        ],
+        "output": {
+            "record_kind": "sft",
+            "records": 1,
+            "sha256": _record_sha256(_record()),
+        },
     }
-    value.pop("preparation")
-    value.pop("reserved")
     path = tmp_path / "recipe.yaml"
     path.write_text(yaml.safe_dump(value, sort_keys=False), encoding="utf-8")
     return path
 
 
-def test_repository_recipe_adapts_only_frozen_sft_sources() -> None:
-    raw = yaml.safe_load(RECIPE.read_text(encoding="utf-8"))
+def test_recipe_adapter_preserves_sft_source_contract(tmp_path: Path) -> None:
+    raw = yaml.safe_load(_recipe(tmp_path).read_text(encoding="utf-8"))
 
     adapted = sft_public._legacy_transform_recipe(raw)
 
-    assert adapted.recipe_id == "public-60m-v3"
-    assert [source.source_id for source in adapted.sources] == [
-        "oasst1",
-        "dolly",
-        "hc3-chinese",
-        "squad",
-        "cmrc2018",
-        "msvamp",
-    ]
-    assert adapted.expected_records["sft"] == 14_799
-    assert (
-        adapted.expected_source_sha256["sft"]
-        == "9ba984310ef0996237908b5843c67d869796fef37e312d2b811f23a647fa772b"
-    )
+    assert adapted.recipe_id == "fixture-v1"
+    assert [source.source_id for source in adapted.sources] == ["oasst1"]
+    assert adapted.sources[0].stages == ("sft",)
+    assert adapted.expected_records["sft"] == 1
+    assert adapted.expected_source_sha256["sft"] == _record_sha256(_record())
 
 
 def test_materializer_writes_verifiable_sft_manifest(

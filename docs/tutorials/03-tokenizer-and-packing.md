@@ -216,8 +216,8 @@ trainer = BpeTrainer(
 但这不是免费的收益。
 
 回到 `V × d` 的 Embedding 表：增加词表也会增加参数。
-以 10M 配置的 `d=320` 为例，将 `V` 从 16,384 扩到 32,768，
-仅这张表就增加 `16,384 × 320 = 5,242,880` 个参数。
+以 60M 配置的 `d=768` 为例，将 `V` 从 16,384 扩到 32,768，
+仅这张表就增加 `16,384 × 768 = 12,582,912` 个参数。
 本项目输入 Embedding 与输出 LM head 权重绑定，因此共享参数只算一次；
 但输出仍需对整个词表计算 logits，词表投影和概率计算的成本也会变化。
 
@@ -607,7 +607,7 @@ round_trip_and_packing_checks: PASS
 ## 8. 把第二篇的真实数据接到这里
 
 理解机制之后，再对第二篇得到的 `bilingual-smoke-v1` 产物操作。
-不要将上面的微型 Tokenizer 接到默认 10M/60M 模型上；
+不要将上面的微型 Tokenizer 接到默认 60M 模型上；
 项目配置使用 16,384 词表，临时实验的实际词表大小并不匹配。
 
 已经有 prepared、Tokenizer 或 Packing 时，按
@@ -656,10 +656,11 @@ python scripts/data.py pack \
 
 完整产物字段、Smoke 各 split 计数见
 [Packing 到底保存了什么](../DATA_GUIDE.md#7-packing-到底保存了什么)。
-最后执行配置化检查：
+上述小规模数据用于理解数据链；当前真实训练使用独立的 A10 seq512 产物。
+按 [A10 数据准备](../A10_TRAINING_GUIDE.md#数据)完成配套数据后，再执行：
 
 ```bash
-python scripts/doctor.py --config configs/pipelines/native-smoke.yaml
+python scripts/doctor.py --config configs/pipelines/native-60m-a10-base-smoke.yaml
 ```
 
 Doctor 会检查数据、Tokenizer、Packing 和模型配置是否配套；

@@ -488,49 +488,19 @@ class NativeModelTests(unittest.TestCase):
             with self.assertRaisesRegex(ArtifactError, "num_hidden_layers"):
                 model.load(checkpoint)
 
-    def test_profile_parameter_counts_match_names(self) -> None:
+    def test_a10_model_parameter_budget(self) -> None:
         project_root = Path(__file__).resolve().parents[2]
-        smoke = load_native_model_config(project_root / "configs/models/smoke-10m.yaml")
-        learn = load_native_model_config(project_root / "configs/models/tiny-60m.yaml")
-        qk_norm = load_native_model_config(
-            project_root / "configs/models/tiny-60m-qk-norm.yaml"
-        )
-        deep_narrow = load_native_model_config(
-            project_root / "configs/models/tiny-60m-deep-narrow.yaml"
-        )
-        deep_narrow_qk = load_native_model_config(
-            project_root / "configs/models/tiny-60m-deep-narrow-qk-norm.yaml"
-        )
-
-        self.assertGreaterEqual(smoke.estimated_parameter_count, 9_000_000)
-        self.assertLess(smoke.estimated_parameter_count, 11_000_000)
-        self.assertGreaterEqual(learn.estimated_parameter_count, 55_000_000)
-        self.assertLess(learn.estimated_parameter_count, 70_000_000)
-        self.assertGreater(
-            smoke.token_parameter_share_for_vocab_size(smoke.vocab_size),
-            0.5,
-        )
+        config = load_native_model_config(project_root / "configs/models/tiny-60m.yaml")
+        self.assertEqual(config.estimated_parameter_count, 62_927_616)
+        self.assertEqual(config.model_id, "tiny-60m")
+        self.assertFalse(config.qk_norm)
         self.assertLess(
-            learn.token_parameter_share_for_vocab_size(learn.vocab_size),
+            config.token_parameter_share_for_vocab_size(config.vocab_size),
             0.21,
         )
         self.assertEqual(
-            smoke.parameter_count_for_vocab_size(8_192),
-            smoke.estimated_parameter_count - 8_192 * smoke.hidden_size,
-        )
-        self.assertEqual(
-            qk_norm.estimated_parameter_count - learn.estimated_parameter_count,
-            learn.num_hidden_layers * 2 * learn.head_dim,
-        )
-        self.assertLess(
-            abs(deep_narrow.estimated_parameter_count - learn.estimated_parameter_count)
-            / learn.estimated_parameter_count,
-            0.01,
-        )
-        self.assertEqual(
-            deep_narrow_qk.estimated_parameter_count
-            - deep_narrow.estimated_parameter_count,
-            deep_narrow.num_hidden_layers * 2 * deep_narrow.head_dim,
+            config.parameter_count_for_vocab_size(8_192),
+            config.estimated_parameter_count - 8_192 * config.hidden_size,
         )
 
 

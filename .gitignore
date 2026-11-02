@@ -19,5 +19,5 @@ build/
 *.pth
 *.safetensors
 
-# LFS 跟踪的最终 base 模型权重（覆盖上面的 *.pt 忽略）
-!models/base-v1-final/model.pt
+# Track only the archived final A10 weights through Git LFS.
+!/results/native-60m-a10-base-v1-s42/final_checkpoint/model/model.pt

@@ -128,24 +128,43 @@ def test_script_error_codes_and_nested_help(tmp_path: Path) -> None:
 @pytest.fixture
 def mismatched_reference(tmp_path: Path) -> Path:
     pipeline = yaml.safe_load(
-        (PROJECT_ROOT / "configs/pipelines/native-60m-reference.yaml").read_text(
+        (PROJECT_ROOT / "configs/pipelines/native-60m-a10-base-smoke.yaml").read_text(
             encoding="utf-8"
         )
     )
     pipeline["model"]["config"] = str(PROJECT_ROOT / "configs/models/tiny-60m.yaml")
     (tmp_path / "pipeline.yaml").write_text(yaml.safe_dump(pipeline), encoding="utf-8")
-    spec = yaml.safe_load(
-        (PROJECT_ROOT / "configs/reference/native-60m-pretrain-v1.yaml").read_text(
-            encoding="utf-8"
-        )
-    )
-    spec["pipeline_config"] = "pipeline.yaml"
-    spec["freeze"] = {
-        "execution_sha256": "0" * 64,
-        "source_sha256": "0" * 64,
-        "packed_manifest_sha256": "0" * 64,
-        "python_major_minor": "3.11",
-        "packages": {"tokenizers": "0.21.4"},
+    spec = {
+        "schema_version": "1.0",
+        "reference_id": "test-reference",
+        "pipeline_config": "pipeline.yaml",
+        "requirements": {
+            "expected_data_manifest_sha256": "0" * 64,
+            "expected_tokenizer_sha256": "0" * 64,
+            "expected_model_config_sha256": "0" * 64,
+            "expected_packed_sequence_length": 512,
+            "expected_packed_array_sha256": {"tokens.npy": "0" * 64},
+            "expected_budget_mode": "num_epochs",
+            "expected_global_step": 8,
+            "expected_target_train_tokens": 1000,
+            "minimum_target_token_coverage": 0.9,
+            "maximum_target_token_coverage": 1.1,
+            "required_training_metric_keys": ["loss"],
+            "required_evaluation_metric_keys": ["loss"],
+            "evaluation_suites": ["configs/evaluation/lifecycle-v4.yaml"],
+            "platform_system": "Linux",
+            "device_type": "cuda",
+            "minimum_device_memory_gib": 1.0,
+            "require_clean_git": False,
+            "require_eval_improvement": False,
+        },
+        "freeze": {
+            "execution_sha256": "0" * 64,
+            "source_sha256": "0" * 64,
+            "packed_manifest_sha256": "0" * 64,
+            "python_major_minor": "3.11",
+            "packages": {"tokenizers": "0.21.4"},
+        },
     }
     path = tmp_path / "reference.yaml"
     path.write_text(yaml.safe_dump(spec), encoding="utf-8")
@@ -190,40 +209,6 @@ def test_reference_script_requires_exactly_one_mode(
     )
 
 
-def test_sft_initialization_script_verifies_frozen_base() -> None:
-    result = run_script(
-        "verify_sft_init",
-        "--spec",
-        "configs/gates/native-60m-sft-v1-base-init.yaml",
-        "--inputs-only",
-        "--json",
-        cwd=PROJECT_ROOT,
-    )
-
-    report = json.loads(result.stdout)
-    assert report["gate_id"] == "native-60m-sft-v1-base-init"
-    assert report["scope"] == "inputs-only"
-    assert report["ok"] is True
-    assert report["counts"] == {"fail": 0, "pass": 10, "warn": 0}
-
-
-def test_sft_data_script_verifies_frozen_contract_without_local_data() -> None:
-    result = run_script(
-        "verify_sft_data",
-        "--spec",
-        "configs/gates/native-60m-sft-v1-data.yaml",
-        "--contract-only",
-        "--json",
-        cwd=PROJECT_ROOT,
-    )
-
-    report = json.loads(result.stdout)
-    assert report["gate_id"] == "native-60m-sft-v1-data"
-    assert report["scope"] == "contract-only"
-    assert report["ok"] is True
-    assert report["counts"] == {"fail": 0, "pass": 5, "warn": 0}
-
-
 @pytest.mark.parametrize(
     "arguments",
     [
@@ -244,29 +229,6 @@ def test_sft_data_script_requires_exactly_one_mode(
         cwd=tmp_path,
         expected_code=2,
     )
-
-
-def test_sft_run_script_reports_missing_completed_run() -> None:
-    result = run_script(
-        "verify_sft_run",
-        "--spec",
-        "configs/gates/native-60m-sft-v1-run.yaml",
-        "--run",
-        "runs/missing",
-        "--dev",
-        "--json",
-        cwd=PROJECT_ROOT,
-        expected_code=1,
-    )
-
-    report = json.loads(result.stdout)
-    assert report["gate_id"] == "native-60m-sft-v1-run"
-    assert report["scope"] == "development"
-    assert report["ok"] is False
-    assert report["checks"][0]["name"] == "execution-lock"
-    assert report["checks"][0]["status"] == "pass"
-    assert report["checks"][1]["name"] == "required-artifacts"
-    assert report["checks"][1]["status"] == "fail"
 
 
 @pytest.mark.parametrize(

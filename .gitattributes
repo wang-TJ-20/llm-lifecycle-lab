@@ -1,1 +1,1 @@
-models/base-v1-final/model.pt filter=lfs diff=lfs merge=lfs -text
+results/native-60m-a10-base-v1-s42/final_checkpoint/model/model.pt filter=lfs diff=lfs merge=lfs -text

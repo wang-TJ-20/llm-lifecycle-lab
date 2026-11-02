@@ -34,7 +34,7 @@ def build_parser() -> argparse.ArgumentParser:
         description="Run one CPU learning step and check model mechanics.",
     )
     parser.add_argument(
-        "--config", type=Path, default=Path("configs/models/smoke-10m.yaml")
+        "--config", type=Path, default=Path("configs/models/tiny-60m.yaml")
     )
     parser.add_argument("--batch-size", type=int, default=2)
     parser.add_argument("--sequence-length", type=int, default=16)

@@ -1,7 +1,7 @@
 # A10 从零重跑执行记录
 
-本记录与历史 RTX 4090 的 Base-v1 分开。历史权重、结果和冻结配置保留归档，
-本轮 Base 不从它们初始化。当前操作入口见 [A10 手册](./A10_TRAINING_GUIDE.md)。
+本记录为单卡 A10 从零重跑的完整执行证据。
+当前操作入口见 [A10 手册](./A10_TRAINING_GUIDE.md)。
 
 ## 环境与数据
 
@@ -40,12 +40,12 @@ manifest 包含本轮 ID、路径和时间，不能直接沿用历史 manifest h
 | 8-step A10 BF16 smoke | 已完成，开发门禁通过 |
 | 100-step A10 BF16 pilot | 已完成，开发门禁通过 |
 | A10 受控中断恢复 | 确定性 CUDA 对照逐位通过；普通路径不保证逐位一致 |
-| 正式 8-epoch A10 Base | 未启动；需要前序验证和干净提交 |
-| 新 Base 发布包与质量验收 | 未完成 |
-| A10 SFT Base/data/run 门禁 | 新 Base 完成后独立冻结 |
+| 正式 8-epoch A10 Base | 已完成，commit `f702145` |
+| 新 Base 质量验收 | 已通过 |
+| A10 SFT Base/data/run 门禁 | 待冻结；下阶段启动 |
 | 正式 A10 SFT | 未启动 |
 
-不能把 CPU 测试、旧 Worker 的合成输入探测或 4090 历史训练当成本轮训练通过。
+不能把 CPU 测试或合成输入探测当成本轮训练通过。
 开发 smoke/pilot 如使用未提交工作树，必须记录 dirty；
 正式 Base 需要 clean-tree，不能继承历史 dirty 例外。
 
@@ -70,7 +70,7 @@ Pilot 的日志峰值分配显存约 1.35 GiB，记录 step 的平均吞吐约 2
 监督 token/秒。耗时不包含此前数据准备和训练入口检查；显存/吞吐不是正式
 Base 或 SFT 的承诺。短 dev 评测只覆盖 16 个窗口，不代表模型语言能力已完成。
 本轮 8-epoch 预算重新换算为 369,476,240 目标监督 token 和 45,191 steps，
-目前没有启动正式 run，也没有读取 test 评分。
+正式 run 已完成，test 固定子集评测结果见下节。
 
 普通恢复实验保留在 `runs/native-60m-a10-base-resume-s42`。
 数据位置和 token 数一致，但独立连续 run 与中断 run 在中断前就出现数值差异，
@@ -85,3 +85,52 @@ Base 或 SFT 的承诺。短 dev 评测只覆盖 16 个窗口，不代表模型�
 权重、optimizer/scheduler/RNG、trainer/数据流三项均逐位一致。
 该设置只用于本次恢复对照，没有悄悄改变普通 smoke/pilot 的执行条件。
 正式 run 是否启用确定性算法必须在启动前记录，不承诺跨硬件/依赖等价。
+
+## 正式 Base 结果
+
+正式 8-epoch Base 于 2026-11-02 在 Worker `1158961` 完成并通过验收。
+
+| 指标 | 值 |
+| --- | ---: |
+| run ID | `native-60m-a10-base-v1-s42` |
+| 训练提交 | `f7021451919f86d5de4d197dbe4fcf01ad2ef42b` |
+| steps | 45,191 |
+| 监督 token | 369,480,328 |
+| token coverage | 100.0011% |
+| 训练耗时 | 4 小时 39 分钟 |
+| baseline dev loss | 9.859973 |
+| final dev loss | 2.755610 |
+| best dev loss | 2.708168 @ step 33,000 |
+| final English dev loss | 1.955765 |
+| final Chinese dev loss | 3.490631 |
+| final/best 回退 | 1.75% |
+| fixed-subset test loss | 2.732666 |
+| fixed-subset English test loss | 1.954598 |
+| fixed-subset Chinese test loss | 3.421753 |
+| final weights SHA-256 | `0c3290d6c76bbf775aba20c1d543a062e26aafb987a7d15bde1b652e4dbbb46c` |
+
+验收检查全部通过：
+- 源码干净性、配置身份、数据/Packing/Tokenizer hash 一致；
+- train/dev/test 按 source_id 分组无重叠；
+- 最终 checkpoint 架构、长度 512、绑定权重和有限值校验通过；
+- 重载最终 checkpoint 的 dev 指标与训练最终记录完全一致；
+- test 仅评测一次，固定 1024 个分层窗口，不代表全量 test 能力结论。
+
+证据归档在 `results/native-60m-a10-base-v1-s42/`，包含 28 个校验文件及 SHA-256 校验单。
+验收报告为 [a10-acceptance.json](file:///mnt/bn/smart-customer-service/users/zitong/project/llm-lifecycle-lab/results/native-60m-a10-base-v1-s42/a10-acceptance.json)。
+本轮 Base 独立于任何历史产物，后续 SFT 也将冻结独立门禁。
+
+归档维护说明：2026-11-02 按用户要求移除了历史硬件对照字段，并同步更新
+`SHA256SUMS` 与 `checksums.json`。A10 训练指标、评测、权重和验收结论未改变；
+`accepted_at` 仍表示原始验收时间，校验清单对应维护后的归档。
+
+最终权重已复制到
+[final_checkpoint/model/model.pt](file:///mnt/bn/smart-customer-service/users/zitong/project/llm-lifecycle-lab/results/native-60m-a10-base-v1-s42/final_checkpoint/model/model.pt)，
+并加入两份校验清单。该文件配置为 Git LFS 跟踪；这表示已准备好提交，不表示已经上传。
+训练目录和其他权重仍保持忽略，原始 A10 checkpoint、指标和验收结论未改变。
+
+## 下一步
+
+1. 冻结新的 A10 SFT Base/data/run 门禁；
+2. 物化 A10 SFT 数据并重新做 smoke/pilot；
+3. 通过独立 gate 后启动正式 A10 SFT。

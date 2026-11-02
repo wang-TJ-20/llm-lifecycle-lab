@@ -18,28 +18,31 @@ class ConfigTests(unittest.TestCase):
                 config = load_run_config(path)
                 self.assertEqual(config_sha256(config), config_sha256(config))
 
-    def test_native_60m_ablations_change_only_model_variant(self) -> None:
+    def test_a10_pipelines_share_model_and_data_contracts(self) -> None:
         project_root = Path(__file__).resolve().parents[2]
         pipeline_root = project_root / "configs/pipelines"
-        baseline = load_run_config(pipeline_root / "native-v1.yaml").to_dict()
-        variants = (
-            "native-60m-qk-norm.yaml",
-            "native-60m-deep-narrow.yaml",
-            "native-60m-deep-narrow-qk-norm.yaml",
+        baseline = load_run_config(
+            pipeline_root / "native-60m-a10-base-v1.yaml"
+        ).to_dict()
+        development = (
+            "native-60m-a10-base-smoke.yaml",
+            "native-60m-a10-base-pilot100.yaml",
         )
 
-        for name in variants:
+        for name in development:
             with self.subTest(name=name):
-                variant = load_run_config(pipeline_root / name).to_dict()
-                baseline_model = dict(baseline["model"])
-                variant_model = dict(variant["model"])
-                baseline_model.pop("model_id")
-                baseline_model.pop("config")
-                variant_model.pop("model_id")
-                variant_model.pop("config")
-                self.assertEqual(variant_model, baseline_model)
-                variant["model"] = baseline["model"]
-                self.assertEqual(variant, baseline)
+                config = load_run_config(pipeline_root / name).to_dict()
+                self.assertEqual(config["model"], baseline["model"])
+                self.assertEqual(config["data"], baseline["data"])
+                self.assertEqual(config["seed"], baseline["seed"])
+                for key in (
+                    "device",
+                    "dtype",
+                    "sequence_length",
+                    "micro_batch_size",
+                    "gradient_accumulation_steps",
+                ):
+                    self.assertEqual(config["training"][key], baseline["training"][key])
 
     def test_unknown_yaml_field_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -53,7 +56,7 @@ class ConfigTests(unittest.TestCase):
                         "stage: pretrain",
                         "model:",
                         "  provider: native",
-                        "  model_id: smoke-10m",
+                        "  model_id: test-micro",
                         "unknown_field: true",
                     )
                 ),

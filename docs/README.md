@@ -8,8 +8,8 @@
 
 当前硬件操作入口为 [单卡 A10 从零重跑手册](./A10_TRAINING_GUIDE.md)：
 从数据、Tokenizer、随机权重 Base 到新 SFT 全链路重做。
-CPU 机制实验保留；旧 MPS/4090 操作路线移出主线，历史权重与证据继续归档。
-实际进度见 [A10 执行记录](./A10_TRAINING_RESULTS.md)，不提前声明正式训练完成。
+A10 Base 已完成 8-epoch 正式训练并通过验收。
+实际进度见 [A10 执行记录](./A10_TRAINING_RESULTS.md)。
 
 ## 从前四篇开始
 
@@ -58,29 +58,22 @@ flowchart TD
 
 七篇主线已完整。当前代码已经实现 Native 模型、BPE Tokenizer、磁盘 Packing、
 Pretrain、恢复和评测，可以先沿操作指南进行实践。
-Native-60M Base-v1 也已完成 8-epoch CUDA 训练并公开发布；
-SFT 已完成 Base/data/run 三层门禁、真实数据物化、assistant-only Trainer、
-quota sampler、恢复与同协议能力评测，本地 smoke 已通过，正式 SFT-v1 尚未运行。
+A10 Base 已完成 8-epoch 训练并通过质量验收；
+SFT 待冻结独立 Base/data/run 三层门禁后启动。
 DPO、GRPO 等后续训练阶段尚未实现。
 
-## 已发布 Base-v1
+## A10 Base 结果
 
-[`wzt777/native-60m-base-v1`](https://modelscope.cn/models/wzt777/native-60m-base-v1)
-包含 62,927,616 参数的 Native Base 权重、16,384 词表 Tokenizer、模型配置、
-provenance 和 SHA-256 清单。它从随机初始化训练 45,191 steps，共处理
+Native-60M Base 在单卡 A10 上从随机初始化训练 45,191 steps，共处理
 369,480,328 个监督 token。
 
-固定 1,024-window test 评测结果为：总体 loss 2.731877、英文 loss 1.955555、
-中文 loss 3.419416。中文仍明显弱于英文；该版本是可复现实验基线，不是经过
+固定 1,024-window test 评测结果为：总体 loss 2.732666、英文 loss 1.954598、
+中文 loss 3.421753。中文仍明显弱于英文；该版本是可复现实验基线，不是经过
 指令微调或安全对齐的聊天模型。
 
-- 下载、校验和加载：[发布模型卡](../models/base-v1-final/README.md)
+- 训练证据归档：[results/native-60m-a10-base-v1-s42/](../results/native-60m-a10-base-v1-s42/)
 - 当前从零训练：[A10 全链路手册](./A10_TRAINING_GUIDE.md)
-- 历史配方：[Base-v1 历史训练手册](./BASE_TRAINING_GUIDE.md)
-- 完整结果与偏离记录：[Base-v1 执行结果](./BASE_TRAINING_RESULTS.md)
-- SFT 唯一执行入口：[Native-60M SFT 训练手册](./SFT_TRAINING_GUIDE.md)
-- SFT 唯一允许的初始化输入：[SFT 初始化门禁](./SFT_INITIALIZATION_GATE.md)
-- SFT 唯一允许的公开数据契约：[SFT 数据门禁](./SFT_DATA_GATE.md)
+- 完整结果：[A10 执行记录](./A10_TRAINING_RESULTS.md)
 - 评测方法与实测解读：[第六篇](./tutorials/06-evaluating-a-model.md)
 
 ## 开始前
@@ -89,11 +82,9 @@ provenance 和 SHA-256 清单。它从随机初始化训练 45,191 steps，共�
 七篇的离线微型实验不要求 GPU；真实数据与 60M 训练另有前提。首次安装参考
 [环境准备](./NATIVE_PRETRAIN_GUIDE.md#2-环境准备)。
 
-10M Smoke 用来验证链路，不代表语言能力。
-60M 当前教学训练环境为 Linux 和单张 A10，CUDA BF16；
-Base-v1 已在 RTX 4090 上完成并发布，但不作为本轮初始化或 A10 实测。
-重跑训练仍需准备冻结来源的独立数据与对应硬件；
-只想检查权重时可直接下载发布包并在 CPU 上加载。
+A10 Smoke 用来验证链路，不代表语言能力。
+60M 当前教学训练环境为 Linux 和单张 A10，CUDA BF16。
+重跑训练仍需准备冻结来源的独立数据与对应硬件。
 
 ## 按需查阅
 
@@ -101,14 +92,9 @@ Base-v1 已在 RTX 4090 上完成并发布，但不作为本轮初始化或 A10 
 | --- | --- |
 | 数据从哪里来，怎样下载、切分和打包？ | [数据介绍与准备](./DATA_GUIDE.md) |
 | 模型各层怎样连接，张量形状是什么？ | [自有模型介绍](./NATIVE_MODEL_GUIDE.md) |
-| 怎样下载和加载已发布的 Base？ | [Native-60M Base-v1 模型卡](../models/base-v1-final/README.md) |
 | 怎样在 A10 从随机初始化重跑？ | [A10 全链路手册](./A10_TRAINING_GUIDE.md) |
 | A10 当前完成了哪些验证？ | [A10 执行记录](./A10_TRAINING_RESULTS.md) |
-| 历史 Base-v1 使用什么配方？ | [历史训练手册](./BASE_TRAINING_GUIDE.md) |
-| Base-v1 最终结果和证据在哪里？ | [Base-v1 执行结果](./BASE_TRAINING_RESULTS.md) |
-| 怎样在远端训练、恢复和验收 SFT？ | [Native-60M SFT 训练手册](./SFT_TRAINING_GUIDE.md) |
-| SFT 必须从哪个 Base 开始？ | [SFT 初始化门禁](./SFT_INITIALIZATION_GATE.md) |
-| SFT 允许哪些数据，如何验收？ | [SFT 数据门禁](./SFT_DATA_GATE.md) |
+| A10 Base 最终结果和证据在哪里？ | [A10 执行记录](./A10_TRAINING_RESULTS.md) |
 | 怎样训练、恢复、评测与排错？ | [Pretrain 训练文档](./NATIVE_PRETRAIN_GUIDE.md) |
 
 完整的章节安排与写作约定见 [实践系列导读](./tutorials/README.md)。

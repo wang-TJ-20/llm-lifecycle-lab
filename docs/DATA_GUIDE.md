@@ -50,7 +50,7 @@ prepared/Tokenizer/Packing 目录，避免与历史产物混用；
 
 | 用途 | 英文记录 | 中文记录 | 总记录 | 混合文本约占用 |
 | --- | ---: | ---: | ---: | ---: |
-| 10M Smoke | 10,000 | 10,000 | 20,000 | 27 MB |
+| 小规模数据练习 | 10,000 | 10,000 | 20,000 | 27 MB |
 | 60M 教学预训练 | 100,000 | 126,000 | 226,000 | 278 MB |
 
 60M 不按记录数 1:1 配比。使用当前 16K BPE 后，train 英文/中文 token 占比约
@@ -95,9 +95,10 @@ python scripts/data.py recipes
 标准 [requirements.txt](../requirements.txt) 已包含训练及公开数据依赖。
 它只安装第三方依赖；各 `scripts/*.py` 会直接加载仓库的 `src/`，不需要安装本项目。
 
-## 4. 第一次实践：10M 双语 Smoke
+## 4. 第一次实践：小规模双语数据
 
-以下六步按顺序执行。没有运行过训练也能完成它们，Tokenizer 和 packing 主要在 CPU 上处理。
+以下步骤用于理解数据准备，Tokenizer 和 packing 主要在 CPU 上处理。
+当前训练主线使用独立的 A10 seq512 产物，第六步说明衔接边界。
 
 ### 步骤 1：获取两种语言
 
@@ -211,15 +212,19 @@ python scripts/data.py pack \
 **检查结果**：输出路径为 `packed_manifest.json`，train 为 36,407 个样本、
 4,623,620 个监督 token。三个 split 的二进制数组合计约 53 MiB。
 
-### 步骤 6：验证整条数据链
+### 步骤 6：衔接 A10 训练数据
+
+上述小规模产物用于理解数据准备。当前真实训练使用独立的 A10 数据、Tokenizer
+和 seq512 Packing，不能直接把 seq128 产物接入 A10 Pipeline。
+先按 [A10 数据准备](./A10_TRAINING_GUIDE.md#数据)完成配套产物，再运行：
 
 ```bash
-python scripts/doctor.py --config configs/pipelines/native-smoke.yaml
+python scripts/doctor.py --config configs/pipelines/native-60m-a10-base-smoke.yaml
 ```
 
 应看到 `data-manifest`、`packed-data` 和 `real-batch` 均为 `PASS`，最后 `0 failed`。
 Doctor 会校验 hash，并使用真实样本执行 forward/backward；不会保存训练 checkpoint。
-全部通过后，进入 [Pretrain 的 Smoke 训练](./NATIVE_PRETRAIN_GUIDE.md#4-运行两步-smoke)。
+全部通过后，进入 [Pretrain 的 A10 Smoke 训练](./NATIVE_PRETRAIN_GUIDE.md#4-运行-a10-smoke)。
 
 ## 5. 切换为 60M 双语数据
 
@@ -289,8 +294,9 @@ python scripts/data.py pack \
 7455ac1168f36a3d7dca03fee28784f97899fe233f496484a11e5da2e44a2f32
 ```
 
-准备数据不要求 CUDA，但 `native-v1.yaml` 的完整 Doctor/训练要求 Linux + CUDA。
-没有 GPU 时可完成本节，到训练前再迁移产物和环境。
+准备数据不要求 CUDA，A10 Pipeline 的 Doctor/训练要求 Linux + A10 CUDA BF16。
+正式运行还需按 [A10 数据准备](./A10_TRAINING_GUIDE.md#数据)使用独立路径物化，
+不能直接使用本节的教学目录。没有 GPU 时可先准备数据，再迁移配套产物和环境。
 
 ## 6. 接入自己的数据
 

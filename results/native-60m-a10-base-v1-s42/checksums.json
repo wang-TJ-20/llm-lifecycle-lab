@@ -1,0 +1,33 @@
+{
+  "algorithm": "sha256",
+  "files": {
+    "a10-acceptance.json": "cd7a75283a405a75d63bea35cfcf05120b51de667b534a4a881500952f9ffa6a",
+    "a10-dev-reload-check.json": "f44012fde702812b5bed9ae13b8ed90789579c65d7635b3912f6b54873a71dd9",
+    "a10-development-gate.json": "91ebb4d0836b7b0db4c30e4be153cb8a02dbf65720e23eed76d75a07894919c9",
+    "a10-integrity-check.json": "a199425c18935c663375e4e3822703d6ee7f73f8f86deb66a532cbbe7f3cf3e3",
+    "data_snapshot.json": "96281bee74c9003f77e6d0a3c833d5617a62d46205bf92e8bc1fe1b0a9dacb8c",
+    "evaluations/pretrain-dev-step-00045191.json": "a231228b7f49615a88d1975b3932af4d5d42cff698b2875e0f9af63cef7ddd2a",
+    "evaluations/pretrain-test-step-00045191.json": "713c4e6e05c4ea006e65b9247d0f24953819842cfdab52729eba321c22407340",
+    "final-dev.json": "b6cdd3e69454924c44671b684deba1df9559fe745df710632a3c28fb2f82189e",
+    "final-test.json": "9bc44ed212e89b866d842b009fba382ee604eadb98c5cfabb2decbfc12867a35",
+    "final_checkpoint/checkpoint_metadata.json": "9e27348598a758ed3600c52b2e0a9ae18ac944d67fa4a940d470b1b186e9cf3a",
+    "final_checkpoint/model/config.json": "64cfc541595cfd1e18fcada7cee887e0a0647a2309744b0da7e55f5e785a01a0",
+    "final_checkpoint/model/model.pt": "0c3290d6c76bbf775aba20c1d543a062e26aafb987a7d15bde1b652e4dbbb46c",
+    "final_checkpoint/trainer_state.json": "91c6aa0759f8348ccdf53664a2077f9f52a55dd87da3f4d4c551243b97bd8e18",
+    "latest_checkpoint.json": "62dc02dea911aa31cd1f2f1b4b54092c709332331500bd4e5625cd03d1c57a5d",
+    "metrics.jsonl": "eed73ae8f9246f28f82a05b42b22f9a45b1ff13a7aec8b61da9fe4e2f9a80d13",
+    "model_config.json": "64cfc541595cfd1e18fcada7cee887e0a0647a2309744b0da7e55f5e785a01a0",
+    "model_manifest.json": "f769b61945a161081cd6d883c2cda6ea51e5e2b34dff881a74537534ed854e43",
+    "packed_data_snapshot.json": "9e49ad18706eaa44ab75859be3f430e3ef5d80dbc17fdc8e85b8db65f440c9a7",
+    "requirements-a10.txt": "05da424e59dd8f5feb737ffb8d754b60b86bb23a59ef9815a2568957dd25ff5b",
+    "resolved_config.yaml": "ad84ed3a8281f853f7468a734de85f17f0c64c45c4206e53db1fbaa6dc68d9b4",
+    "run_manifest.json": "251ede2da9a948c05bb1e53bdc9b6118742195cc2e224a415fb43debfcf79f29",
+    "runtime_environment.json": "c8c548d9f0990320b1d60c7d655568ef83c4d53797c95f561292b3af7dfd6dfc",
+    "source_archive.json": "0c534edb79b7809da11df1c038339f35330ce40324a2de869bb7ec7724c7f199",
+    "test-once/protocol.json": "3444dfa4c4f6060bf959f75b8a9bd99a583658a4db255330e9144d629a1418ef",
+    "tokenizer/tokenizer.json": "7455ac1168f36a3d7dca03fee28784f97899fe233f496484a11e5da2e44a2f32",
+    "tokenizer_manifest.json": "8dc4a48be70cd1492148a9ab7b3f73bd81b986c72a8e5e2d62bf544eaf5997d5",
+    "training_budget.json": "b35e60f1a54848ec3bbdab5631a2f419214e36e68458505c65702ddc936eee0f",
+    "training_result.json": "53515be43e77e7a808d38150a6150249b21cdee917c4d367e9fa18f000b0b7cd"
+  }
+}

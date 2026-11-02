@@ -20,9 +20,8 @@
 除非另有说明，文章里的命令都从仓库根目录执行。
 
 第一篇不下载语料、不训练 Tokenizer，也不要求 GPU。
-后面的两步 Smoke 用来验证完整链路；60M 教学训练的目标环境是
-Linux + 单张 A10。CPU 实验通过不代表已经完成 A10 训练验证；
-本项目发布的 Base-v1 是历史 RTX 4090 结果，仍保留追溯。
+后面的 A10 Smoke 用来验证完整链路；60M 教学训练的目标环境是
+Linux + 单张 A10。CPU 实验通过不代表已经完成 A10 训练验证。
 当前从零重跑按 [A10 全链路手册](../A10_TRAINING_GUIDE.md)执行，
 数据、Tokenizer、Base 和后续 SFT 使用独立身份。
 
@@ -43,11 +42,10 @@ Linux + 单张 A10。CPU 实验通过不代表已经完成 A10 训练验证；
 第五至七篇使用 `scripts/pretrain_experiment.py` 的临时双语微型实验，
 不下载数据、不覆盖已有产物；真实 Smoke 与 60M 操作另有明确前提。
 
-主线中的概念与门禁已经落到公开的
-[`Native-60M Base-v1`](https://modelscope.cn/models/wzt777/native-60m-base-v1)：
+主线中的概念与门禁已经落到 A10 Base 训练结果：
 8 epochs、45,191 optimizer steps、369,480,328 个监督 token。完成第六篇后，
-可以用同一套“固定条件、总体与分语言指标、生成边界”的方法复核真实权重；
-具体命令和结果见第六篇的“公开 Base-v1”一节。
+可以用同一套"固定条件、总体与分语言指标、生成边界"的方法复核真实权重；
+具体命令和结果见 [A10 执行记录](../A10_TRAINING_RESULTS.md)。
 
 ## 文章与指南的分工
 
@@ -63,8 +61,7 @@ Linux + 单张 A10。CPU 实验通过不代表已经完成 A10 训练验证；
 | 理解训练预算、累积和日志，跑通微型预训练 | [第五篇](./05-first-pretraining.md) |
 | 理解指标聚合、双语覆盖和生成检查 | [第六篇](./06-evaluating-a-model.md) |
 | 验证中断恢复，固定实验条件与验收边界 | [第七篇](./07-resume-and-compare.md) |
-| 下载、校验并加载公开 Base-v1 | [第六篇：复核公开 Base-v1](./06-evaluating-a-model.md#7-复核公开的-base-v1) |
-| 查看 Base-v1 的完整训练证据与限制 | [Base-v1 执行结果](../BASE_TRAINING_RESULTS.md) |
+| 查看 A10 Base 的完整训练证据与限制 | [A10 执行记录](../A10_TRAINING_RESULTS.md) |
 | 下载或接入自己的数据，训练 Tokenizer，生成 Packing | [数据介绍与准备](../DATA_GUIDE.md) |
 | 查模型结构、参数预算和张量形状 | [自有模型介绍](../NATIVE_MODEL_GUIDE.md) |
 | 安装环境，运行训练、恢复和评测，定位报错 | [Pretrain 训练文档](../NATIVE_PRETRAIN_GUIDE.md) |
@@ -86,9 +83,9 @@ Linux + 单张 A10。CPU 实验通过不代表已经完成 A10 训练验证；
 文档站预览、图解与公式写法见 [文档站维护](../SITE_GUIDE.md)。
 
 当前项目已实现 Native 模型、BPE Tokenizer、磁盘 Packing、Pretrain、恢复和评测，
-并发布了通过既定 Base 门禁的 Native-60M Base-v1 权重与 Tokenizer。
+并归档了通过既定门禁的 A10 Base 权重与 Tokenizer。
 它不等于完成独立的结构消融 Reference，也不具备未经验证的指令跟随能力；
-文章不会把两步 Smoke、随机 token 实验或一次 Base 训练扩大为这些结论。
+文章不会把 Smoke、随机 token 实验或一次 Base 训练扩大为这些结论。
 
 ## 后续如何继续
 

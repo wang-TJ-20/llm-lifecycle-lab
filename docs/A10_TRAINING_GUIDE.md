@@ -1,8 +1,7 @@
 # 单卡 A10 从零重跑手册
 
 当前硬件实践主线为 A10：重新物化双语数据、训练 Tokenizer、从随机权重预训练
-Native-60M，再冻结新的 SFT 输入。CPU 实验用于理解机制；旧 MPS/4090 路线保留归档，
-不删除已发布权重和历史结果，也不将它们计作 A10 实测。
+Native-60M，再冻结新的 SFT 输入。CPU 实验用于理解机制。
 
 ## 固定边界
 
@@ -165,10 +164,7 @@ final 相对 best 回退不超过 2%。通过后才用 eval_pretrain 对最终 c
 评测仍受 eval_batches=1024 限制，不称作全量 test。
 
 归档环境、源码、配置、数据身份、预算、指标、checkpoint、门禁和 dev/test。
-新发布包不得覆盖 models/base-v1-final，4090 耗时不得改标签作为 A10 耗时。
 新 Base 验收后冻结独立 A10 SFT Base/data/run 门禁，重新编码公开 SFT 数据、
 统计 assistant token 和长度，再做 smoke/pilot、恢复、正式 SFT 和同协议能力对照。
-不要执行历史 native-60m-sft-v1.yaml，它仍绑定旧 Base。
 
 当前实测进度见 [A10 执行记录](./A10_TRAINING_RESULTS.md)。
-历史证据见 [Base-v1 执行记录](./BASE_TRAINING_RESULTS.md)。

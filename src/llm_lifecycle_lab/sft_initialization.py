@@ -1,4 +1,4 @@
-"""Verify the frozen Base-v1 initialization boundary for SFT."""
+"""Verify the frozen Base initialization boundary for SFT."""
 
 from __future__ import annotations
 
@@ -162,7 +162,7 @@ def verify_sft_initialization(
     workdir: str | Path = ".",
     check_git: bool = False,
 ) -> SFTInitializationReport:
-    """Verify Base-v1 inputs; preflight additionally requires a clean worktree."""
+    """Verify Base inputs; preflight additionally requires a clean worktree."""
 
     root = Path(workdir).resolve()
     scope = "preflight" if check_git else "inputs-only"
@@ -278,8 +278,8 @@ def _configuration_check(spec: _SFTInitializationSpec) -> CheckResult:
     return _check(
         "configuration-lock",
         matches,
-        "source pipeline, resolved config and model config match Base-v1",
-        "Base-v1 source or resolved configuration drifted",
+        "source pipeline, resolved config and model config match the frozen Base",
+        "Base source or resolved configuration drifted",
         details,
     )
 
@@ -468,8 +468,8 @@ def _evidence_contract_check(spec: _SFTInitializationSpec) -> CheckResult:
     return _check(
         "source-evidence-contract",
         matches,
-        "run, checkpoint, budget and model evidence agree on Base-v1 identity",
-        "Base-v1 evidence files disagree on run or model identity",
+        "run, checkpoint, budget and model evidence agree on Base identity",
+        "Base evidence files disagree on run or model identity",
         details,
     )
 
@@ -553,8 +553,8 @@ def _quality_check(spec: _SFTInitializationSpec) -> CheckResult:
     return _check(
         "base-quality",
         bool(matches),
-        "Base-v1 completion, bilingual improvement and held-out test are valid",
-        "Base-v1 quality evidence does not satisfy the frozen SFT prerequisite",
+        "Base completion, bilingual improvement and held-out test are valid",
+        "Base quality evidence does not satisfy the frozen SFT prerequisite",
         details,
     )
 

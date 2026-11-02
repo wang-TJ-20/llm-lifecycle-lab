@@ -12,8 +12,8 @@
 训练命令能执行，不代表实验条件已经讲清。
 
 **本篇把“重复更新参数”变成一条有明确输入、预算、日志与结果的流程。**
-先运行不下载数据的微型实验，再衔接项目的双语 10M Smoke。
-两者都只验证机制；60M 才是正式教学与效果研究的基线。
+先运行不下载数据的微型实验，再衔接项目的 A10 双语 Smoke。
+两者都只验证机制；完整 60M Base 训练才用于效果研究。
 
 ## 1. 预训练究竟在重复什么
 
@@ -308,28 +308,28 @@ run = run_native_pretraining(
 
 </details>
 
-## 6. 衔接真实的双语 Smoke
+## 6. 衔接真实的 A10 双语 Smoke
 
-已经完成第二、三篇的数据准备后，使用仓库
-[`native-smoke.yaml`](../../configs/pipelines/native-smoke.yaml)。
-它与微型实验不同：10M 模型、16K 词表、seq128、每步一个窗口、总共两步。
+先按 [A10 数据准备](../A10_TRAINING_GUIDE.md#数据)完成配套数据、Tokenizer 和 Packing，
+再使用仓库
+[`native-60m-a10-base-smoke.yaml`](../../configs/pipelines/native-60m-a10-base-smoke.yaml)。
+它与微型实验不同：60M 模型、16K 词表、seq512、每步累积 16 个窗口、总共 8 步。
 
 先检查，再以未使用过的 run ID 启动：
 
 ```bash
-python scripts/doctor.py --config configs/pipelines/native-smoke.yaml
+python scripts/doctor.py --config configs/pipelines/native-60m-a10-base-smoke.yaml
 python scripts/train_pretrain.py \
-  --config configs/pipelines/native-smoke.yaml \
+  --config configs/pipelines/native-60m-a10-base-smoke.yaml \
   --run-id tutorial-smoke-001
 ```
 
-`device: auto` 会优先 CUDA，其次 MPS，最后 CPU。
-同一个配置文件在不同机器上可能实际选择不同设备，
-因此要查看 `runtime_environment.json`，不要只记录“我用了 auto”。
+配置固定 `device: cuda` 与 `dtype: bfloat16`，要求单卡 A10 与配套 CUDA 环境。
+仍应查看 `runtime_environment.json`，确认实际设备和依赖版本。
 对照实验应在开始前明确设备和精度，而不是训练结束后修改配置文件。
 
 Doctor 包含真实 batch 前向/反向检查，但不执行持久训练，
-不能把它的通过当成完成两步 Smoke。
+不能把它的通过当成完成 8 步 Smoke。
 已有 `tutorial-smoke-001` 时不要覆盖；新试验换新 ID，未完成训练的恢复见第七篇。
 
 ### 成功结束后看哪些文件
@@ -343,7 +343,7 @@ runs/tutorial-smoke-001/
   training_result.json
   run_manifest.json
   latest_checkpoint.json
-  checkpoints/step-00000002/
+  checkpoints/step-00000008/
 ```
 
 `run_manifest.json` 应为 `completed`，`training_result.json` 记录实际步数、
@@ -377,14 +377,11 @@ loss 不应照抄本篇微型模型数值，数据、规模和设备均不同。
 
 ## 7. 从跑通到正式实验，还差什么
 
-两步 Smoke 能证明数据被读取、loss 和梯度可算、产物能够保存。
+Smoke 能证明数据被读取、loss 和梯度可算、产物能够保存。
 它不能证明语料足够、模型已收敛或具备通用双语能力。
 
 当前 60M 从零重跑主线使用 [A10 全链路手册](../A10_TRAINING_GUIDE.md)：
 在同一张 A10 上依次完成 BF16 smoke、pilot 与正式 Base。
-已发布 Base-v1 的 RTX 4090 结果保留为历史证据，不计作 A10 验证。
-独立的结构消融 Reference 仍使用自己的配置与规范，尚未完成；
-不能把历史 Base 或新的 A10 smoke 混称为该 Reference 已验收。
 
 推进到效果研究之前，至少要固定：
 

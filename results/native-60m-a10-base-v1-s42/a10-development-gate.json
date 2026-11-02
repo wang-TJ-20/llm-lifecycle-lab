@@ -1,0 +1,20 @@
+{
+  "baseline": {
+    "eval_en_loss": 9.844626326549974,
+    "eval_loss": 9.859972566366196,
+    "eval_zh_loss": 9.874075181219768
+  },
+  "config_sha256": "51abeeeb06fd32e86c1cb6b9c8f40d2833a5395111c7cef12efefd4af54b5b43",
+  "final": {
+    "eval_en_loss": 1.9557645805204156,
+    "eval_loss": 2.7556101950467564,
+    "eval_zh_loss": 3.4906309284137294
+  },
+  "global_step": 45191,
+  "phase": "base",
+  "run_id": "native-60m-a10-base-v1-s42",
+  "scope": "pretrain-dev-only; not an SFT or test gate",
+  "source_clean": true,
+  "status": "passed",
+  "target_token_coverage": 1.0000110643109283
+}

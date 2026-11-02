@@ -1,24 +1,22 @@
 # 自有模型介绍
 
-本文说明 Native 10M/60M 的结构设计、参数预算、张量形状和代码边界，并给出不需要
+本文说明 Native-60M 的结构设计、参数预算、张量形状和代码边界，并给出不需要
 训练数据就能执行的模型实验。模型是从随机权重开始训练，不是裁剪或微调 Qwen 得到的。
 
 数据来源及 Tokenizer 准备见 [数据介绍与准备](./DATA_GUIDE.md)；环境安装、训练与恢复见
-[Pretrain 训练文档](./NATIVE_PRETRAIN_GUIDE.md)。训练完成的 Native-60M Base-v1
-已发布到 [ModelScope](https://modelscope.cn/models/wzt777/native-60m-base-v1)，
-仓库内的 canonical 发布包位于 [`models/base-v1-final/`](../models/base-v1-final/)。
+[Pretrain 训练文档](./NATIVE_PRETRAIN_GUIDE.md)。A10 Base 训练结果见
+[A10 执行记录](./A10_TRAINING_RESULTS.md)。
 
 ## 1. 设计目标
 
 Native 模型的定位不是追求同参数量下的最佳效果，而是作为一个足够真实、又足够可读的教学模型：
 
 - 结构上接近现代 decoder-only LLM。
-- 10M 和 60M 共用同一份实现，只通过配置缩放。
-- 两档模型统一使用 `model_route: native`；`run_profile: smoke` 表示 10M
-  快速验证，`learn/reproduce` 表示 60M 教学训练或参考验收。
+- 同一份实现支持通过配置缩放；当前保留 A10 使用的 `tiny-60m` 配置。
+- 模型统一使用 `model_route: native`；`run_profile` 表示实践级别，不表示参数量。
 - 代码边界清晰：模型只负责张量级前向、生成和 checkpoint，不负责 stage-specific loss。
 - 能支持真实的 Pretrain 训练、增量生成和 KV Cache。
-- 两档默认词表大小都为 16,384，各自使用对应数据 recipe 训练的双语 Tokenizer。
+- 默认词表大小为 16,384，A10 使用配套数据训练的双语 Tokenizer。
 
 模型结构本身与语言无关。“支持中英文”表示 Byte-level Tokenizer 能编码两种语言，
 且默认训练数据覆盖两种语言。NFKC 会规范化输入，往返还原针对规范化后的文本，不保证
@@ -37,26 +35,24 @@ Native 模型的定位不是追求同参数量下的最佳效果，而是作为�
 先读实验脚本，再读主模型的 `__init__()` 和 `forward()`，最后按需进入 Attention
 和 Block。关键数学实现旁有中英文说明与张量形状，不需要先理解训练框架。
 
-## 2. 两档模型
+## 2. 当前模型配置
 
-两档模型都来自同一个 `NativeTransformer`：
+当前保留的模型由 `NativeTransformer` 实现：
 
 | 配方 | 参数量 | 层数 | Hidden | Q Heads | KV Heads | MLP | Max Seq | 用途 |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| `smoke-10m` | 9,915,200 | 4 | 320 | 5 | 1 | 960 | 256 | CPU/MPS/CUDA smoke |
-| `tiny-60m` | 62,927,616 | 8 | 768 | 12 | 4 | 2048 | 512 | CUDA 教学预训练 |
+| `tiny-60m` | 62,927,616 | 8 | 768 | 12 | 4 | 2048 | 512 | A10 预训练 |
 
 对应配置：
 
-- [configs/models/smoke-10m.yaml](../configs/models/smoke-10m.yaml)
 - [configs/models/tiny-60m.yaml](../configs/models/tiny-60m.yaml)
 
-`model_route` 只选择 Native 实现，不再把 10M 和 60M 当成两个模型类型。Pipeline 中的
+`model_route` 只选择 Native 实现。Pipeline 中的
 `model.config` 明确选择具体结构，`run_profile` 则决定对应的实践规模和 Doctor 资源要求。
 
-模型最大长度与训练长度是两件事：10M 模型支持到 256，但 Smoke pipeline 默认只取 128；
-60M 两者均为 512。改大配置上限不能证明模型学会了更长上下文。
-两档词表大小相同也不代表 token ID 映射相同，不能交换它们的 Tokenizer。
+模型最大长度与训练长度是两件事：A10 配方中两者均为 512。
+改大配置上限不能证明模型学会了更长上下文。
+词表大小相同也不代表 token ID 映射相同，不能交换不同 Tokenizer。
 
 共有默认项：
 
@@ -88,36 +84,22 @@ SFT/DPO/GRPO 不需要扩展 embedding 或改变已有 token ID。
 
 | 配方 | 词表 | Token 参数 | 占总参数 |
 | --- | ---: | ---: | ---: |
-| `smoke-10m` | 16,384 | 5,242,880 | 52.88% |
 | `tiny-60m` | 16,384 | 12,582,912 | 20.00% |
 
-10M 配方超过一半参数位于 embedding，这意味着减小词表会显著改变“模型容量”的含义。
+减小词表会同时改变 embedding 参数预算和文本的 token 数。
 项目保留 16K 作为中英文统一基线，同时通过 `inspect_model.py --compare-vocab-size`
 显式比较 8K/12K/16K，而不是静默更换默认词表。
 
-### 2.2 60M 架构消融
+### 2.2 A10 架构基线
 
-第一份冻结基线选用宽浅、QK-Norm 关闭的 `tiny-60m`，不是先把四臂全部跑一遍。
+冻结基线选用宽浅、QK-Norm 关闭的 `tiny-60m`。
 其 62,927,616 个参数、16K 词表、512 上下文和 `initializer_range=0.02` 保持不变；
-数据、训练预算、源码与验收由
-[`native-60m-baseline-v1.yaml`](../configs/reference/native-60m-baseline-v1.yaml) 固定。
-执行顺序见 [固定 60M 基线](./NATIVE_PRETRAIN_GUIDE.md#92-固定-60m-基线)。
-已发布 Base-v1 完成的是 `native-60m-base-v1.yaml` 的 8-epoch CUDA 配方；
-这里的 `native-60m-baseline-v1` 是另一份 1-epoch Reference 规范，
-不能用 Base-v1 的结果替代其独立验收。
-
-项目提供四个约 60M 配方，组成宽浅/深窄与 QK-Norm 的 2×2 对照：
-
-| 模型 | 层数×Hidden | Heads/KV | MLP | QK-Norm | 参数量 |
-| --- | --- | --- | ---: | --- | ---: |
-| `tiny-60m` | 8×768 | 12/4 | 2048 | 关闭 | 62,927,616 |
-| `tiny-60m-qk-norm` | 8×768 | 12/4 | 2048 | 开启 | 62,928,640 |
-| `tiny-60m-deep-narrow` | 19×512 | 8/4 | 1344 | 关闭 | 62,574,080 |
-| `tiny-60m-deep-narrow-qk-norm` | 19×512 | 8/4 | 1344 | 开启 | 62,576,512 |
-
-深窄组与宽浅基线的参数差小于 0.6%。四条 pipeline 除模型 ID 和模型配置路径外，
-数据、Tokenizer、seed、训练预算、优化器和评测设置完全相同，并有单测防止配置漂移。
-这使两类变量可以分别比较；在完成同预算 CUDA 实验前，不预设哪种结构更好。
+数据、训练预算、源码与验收由 A10 Base 配置
+[`native-60m-a10-base-v1.yaml`](../configs/pipelines/native-60m-a10-base-v1.yaml) 固定。
+执行顺序见 [60M 正式训练](./NATIVE_PRETRAIN_GUIDE.md#9-60m-正式训练)。
+当前没有冻结的结构消融配置。模型实现仍支持 QK-Norm 等显式选项；
+独立对照需新建配置并固定数据、Tokenizer、seed、预算与评测，不能由单次 A10 训练
+推断哪种结构更好。
 
 ## 3. 顶层结构
 
@@ -144,16 +126,16 @@ input_ids
 ### 张量形状
 
 设 B 为 batch size，T 为输入长度，D 为 hidden size，V 为词表大小，Hq/Hkv 为
-Query/KV heads，Dh=D/Hq。10M 的 Dh=64，60M 也为 64。
+Query/KV heads，Dh=D/Hq。60M 的 Dh=64。
 
-| 位置 | 通用形状 | 10M，B=2、T=16 |
+| 位置 | 通用形状 | 60M，B=2、T=16 |
 | --- | --- | --- |
 | `input_ids` | `[B, T]`，整数 | `[2, 16]` |
-| embedding/block 输出 | `[B, T, D]` | `[2, 16, 320]` |
-| Query | `[B, Hq, T, Dh]` | `[2, 5, 16, 64]` |
-| Key/Value，重复前 | `[B, Hkv, T, Dh]` | `[2, 1, 16, 64]` |
+| embedding/block 输出 | `[B, T, D]` | `[2, 16, 768]` |
+| Query | `[B, Hq, T, Dh]` | `[2, 12, 16, 64]` |
+| Key/Value，重复前 | `[B, Hkv, T, Dh]` | `[2, 4, 16, 64]` |
 | LM head 输出 `logits` | `[B, T, V]` | `[2, 16, 16384]` |
-| 每层 KV cache | 两个 `[B, Hkv, past_T, Dh]` | 不保存重复后的 5 份 KV |
+| 每层 KV cache | 两个 `[B, Hkv, past_T, Dh]` | 不保存重复到 12 头后的 KV |
 
 logits 是未归一化分数，不是文字和概率。Pretrain objective 在外部将位置 t 的分数
 与位置 t+1 的标签对齐；训练数据不应提前再做一次标签 shift。
@@ -262,8 +244,7 @@ mask 逻辑见 [build_attention_mask()](../src/llm_lifecycle_lab/model/native/at
 
 - 在 CUDA/MPS 上，如果是完整前缀、无外部 mask、且没有 cache，则让
   `scaled_dot_product_attention(..., is_causal=True)` 走内置 causal 路径。
-- CPU 保留共享的显式 causal mask：本地 10M 短序列微基准中，该路径比内置 causal 模式
-  更快。这不是对所有 CPU、模型规模或序列长度的性能保证。
+- CPU 保留共享的显式 causal mask；具体性能依赖硬件、模型规模和序列长度。
 - `collate_pretraining_batch()` 在 CPU 组 batch 时省略全真的 mask，不需要在 GPU 上
   判断是否全真；存在 padding 时保留原始 mask，不删除样本或改变 labels。
 - 需要显式 mask 时，只在模型前向中构造一次，所有层共享，而非每层重复分配。
@@ -382,21 +363,9 @@ model/
 
 这保证了“模型结构不一致但误用旧 checkpoint”的情况会 fail-fast。
 
-### 9.1 加载已发布的 Base-v1
+### 9.1 加载训练完成的 Base 权重
 
-从 ModelScope 下载完整发布目录：
-
-```bash
-python -m pip install "modelscope-hub==0.1.8"
-ms download wzt777/native-60m-base-v1 \
-  --repo-type model \
-  --local-dir build/native-60m-base-v1
-(cd build/native-60m-base-v1 && shasum -a 256 -c SHA256SUMS)
-```
-
-上面的校验命令适用于 macOS；Linux 将最后一行改为
-`sha256sum -c SHA256SUMS`。加载时不要把 10M/其他 60M 配方的配置或 Tokenizer
-混入同一目录：
+从训练 run 的 checkpoint 目录加载最终权重：
 
 ```python
 from pathlib import Path
@@ -407,18 +376,17 @@ from llm_lifecycle_lab.model.native import (
 )
 from llm_lifecycle_lab.tokenizer import NativeTokenizer
 
-model_dir = Path("build/native-60m-base-v1")
-tokenizer = NativeTokenizer.from_directory(model_dir)
-model = NativeTransformer(load_native_model_config(model_dir / "config.json"))
+model_dir = Path("runs/native-60m-a10-base-v1-s42/checkpoints/step-00045191/model")
+tokenizer = NativeTokenizer.from_directory("data/tokenizers/bilingual-60m-a10-v1")
+model = NativeTransformer(load_native_model_config("configs/models/tiny-60m.yaml"))
 model.load(model_dir)
 model.eval()
 ```
 
-发布包中的 `model.pt` 是严格加载的 `state_dict`，不是 Hugging Face
+Checkpoint 中的 `model.pt` 是严格加载的 `state_dict`，不是 Hugging Face
 `save_pretrained` 目录。它不含 optimizer、scheduler、RNG 或数据流位置，
-不能直接用于原 run 的精确恢复。权重与 Tokenizer 采用 `CC-BY-SA-4.0`；
-模型结构和训练代码仍为 Apache-2.0。完整说明见
-[`models/base-v1-final/README.md`](../models/base-v1-final/README.md)。
+不能直接用于原 run 的精确恢复。完整训练证据见
+[`results/native-60m-a10-base-v1-s42/`](../results/native-60m-a10-base-v1-s42/)。
 
 ## 10. 当前设计取舍
 
@@ -431,7 +399,7 @@ model.eval()
 - QK-Norm 只作为显式消融开关，默认基线关闭
 - 只支持训练当前实现过的 Native Pretrain 路线
 
-这样做的目的，是让 10M/60M 的训练逻辑、mask、cache、恢复和指标都可读、可测、可控。
+这样做的目的，是让训练逻辑、mask、cache、恢复和指标都可读、可测、可控。
 
 ## 11. 逐步验证模型
 
@@ -441,16 +409,15 @@ model.eval()
 ### 步骤 1：检查模型和词表预算
 
 ```bash
-python scripts/inspect_model.py --config configs/models/smoke-10m.yaml
 python scripts/inspect_model.py --config configs/models/tiny-60m.yaml
 python scripts/inspect_model.py \
-  --config configs/models/smoke-10m.yaml \
+  --config configs/models/tiny-60m.yaml \
   --compare-vocab-size 8192 \
   --compare-vocab-size 12288 \
   --compare-vocab-size 16384
 ```
 
-**检查结果**：两档总参数分别为 9,915,200 与 62,927,616。词表比较只是参数估算，
+**检查结果**：总参数为 62,927,616。词表比较只是参数估算，
 不会自动修改模型、生成新的 Tokenizer 或开始训练。
 
 ### 步骤 2：前向、Loss、梯度与参数更新
@@ -461,7 +428,7 @@ python scripts/model_experiment.py
 
 打开 [model_experiment.py](../scripts/model_experiment.py) 的 `main()`，可以按顺序读到：
 
-1. 加载 10M 配置并随机初始化模型，创建 `[2, 16]` 的整数 token。
+1. 加载 60M 配置并随机初始化模型，创建 `[2, 16]` 的整数 token。
 2. 调用 `model(input_ids=...)` 得到 `[2, 16, 16384]` 的 logits。
 3. 使用 `logits[:, :-1]` 预测 `input_ids[:, 1:]`，直接计算交叉熵。
 4. `loss.backward()` 计算梯度，裁剪梯度，然后 `optimizer.step()` 更新参数。
@@ -477,7 +444,7 @@ python scripts/model_experiment.py
 
 - 完整前向与 prefix + cached suffix 的 logits 在容差内一致。
 - 临时保存模型，重新构建并加载后，logits 保持一致。
-- 生成 4 个新 token，默认输出形状为 `[2, 20]`，每层 K 为 `[2, 1, 16, 64]`。
+- 生成 4 个新 token，默认输出形状为 `[2, 20]`，每层 K 为 `[2, 4, 16, 64]`。
 
 结果中的 `cache_matches_full` 和 `checkpoint_matches_full` 应为 `true`；
 对应比较失败会直接报错。临时模型文件会自动删除，不留下训练产物。
@@ -499,7 +466,7 @@ python scripts/model_experiment.py
 消息格式为 `<|im_start|>{role}\n{content}<|im_end|>\n`，system 只能在首条，
 其后 user/assistant 交替；正文不能注入控制 token。
 Pretrain 只训练原始文本延续，不会因为预留 chat token 就自然获得指令跟随能力。
-SFT 之前应使用普通文本续写观察模型，而不是用聊天质量判断两步 Smoke。
+SFT 之前应使用普通文本续写观察模型，而不是用聊天质量判断 Smoke。
 
 代码阅读路径：`NativeModelConfig` -> `NativeTransformer.forward` -> `TransformerBlock`
 -> `CausalSelfAttention` -> `PretrainObjective` ->
@@ -527,8 +494,8 @@ SFT 之前应使用普通文本续写观察模型，而不是用聊天质量判�
 
 - MiniMind 默认 768 hidden 配方的 token embedding 约 4.92M 参数；我们约 12.58M。
   即使总参数都在 60M 附近，注意力 head、MLP 和词表分配也不同，不是权重兼容模型。
-- 我们的“深窄”配置同时改变层数、hidden、MLP 和 GQA 比例。四臂实验能分别检验每种
-  结构内的 QK-Norm 效果，但宽浅对深窄是参数量接近的结构组合对照，不是仅层数变化的纯消融。
+- 若同时改变层数、hidden、MLP 和 GQA 比例，得到的是结构组合对照，
+  不是仅层数变化的纯消融；独立实验应明确各变量。
 - 相同 token 预算不等于相同训练 FLOPs 或时间。需要同时公布中英文 dev/test 指标、
   峰值显存、监督 token/s、总耗时；不同词表还应检查相同文本的 bytes/token 和 bits-per-byte。
 
@@ -540,7 +507,7 @@ SFT 之前应使用普通文本续写观察模型，而不是用聊天质量判�
 4. 在相同数据与预算下做 CUDA profiling，再测量 GQA、优化器或其他性能调整的收益。
 5. 最后做词表与容量实验；比较中英文压缩率和 bits-per-byte，新 Tokenizer 使用新训练路线。
 
-已有四臂配方保留供后续对照；HF 导出和长上下文另行扩展，不预设 MoE 或更深模型更优。
+结构对照需另行冻结新配置；HF 导出和长上下文另行扩展，不预设 MoE 或更深模型更优。
 
 训练侧的恢复、预算和复现缺口见
 [Pretrain 的后续完善](./NATIVE_PRETRAIN_GUIDE.md#11-保留边界与后续完善)。

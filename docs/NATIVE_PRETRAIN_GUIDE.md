@@ -1,23 +1,18 @@
 # Pretrain 训练文档
 
-本文负责安装环境、选择配置、启动训练、读取指标、恢复 checkpoint、独立评测和
-60M Reference 验收。数据下载、切分、Tokenizer 和 Packing 命令集中在
+本文负责安装环境、选择配置、启动训练、读取指标、恢复 checkpoint 和独立评测。
+数据下载、切分、Tokenizer 和 Packing 命令集中在
 [数据介绍与准备](./DATA_GUIDE.md)；模型结构集中在 [自有模型介绍](./NATIVE_MODEL_GUIDE.md)。
+60M 正式训练的实际执行命令、预算和门禁以
+[A10 从零重跑手册](./A10_TRAINING_GUIDE.md)为准。
 
-> 当前 Native-60M 的实际执行命令、预算和门禁只以
-> [Base 从零训练手册](./BASE_TRAINING_GUIDE.md)为准。本文的 Reference 小节只保留
-> 通用机制说明，不得用其中旧 1-epoch 配方启动新 Base。
-> 8-epoch Base-v1 已训练完成并公开发布；下载与加载见
-> [`models/base-v1-final/README.md`](../models/base-v1-final/README.md)，
-> 最终结果见 [`BASE_TRAINING_RESULTS.md`](./BASE_TRAINING_RESULTS.md)。
-
-初次实践顺序：本文第 2 节安装环境 -> 数据文档完成 Smoke 数据准备 -> 本文第 3～5 节
-训练与评测。只有通过 Smoke 后，再进入 60M；不需要一次运行全部消融配置。
+初次实践顺序：本文第 2 节安装环境 -> A10 手册完成数据准备 -> 本文第 3～5 节
+运行 A10 smoke 与开发评测。smoke、pilot 通过后，再进入正式 Base。
 
 ## 1. 当前能力与目录
 
-已实现 Native 10M/60M、BPE、Pretrain、checkpoint 与 dev/test 评测。
-SFT 已由独立的 [Native-60M SFT 训练手册](./SFT_TRAINING_GUIDE.md)维护；
+已实现 Native-60M、BPE、Pretrain、checkpoint 与 dev/test 评测。
+SFT 通用训练和门禁机制已实现，A10 SFT 的配置与门禁尚待独立冻结；
 DPO、GRPO、Qwen 迁移、HF 导出和服务尚未实现。
 
 | 目录 | 职责 | 是否应保留 |
@@ -69,9 +64,9 @@ Python 应为 3.11 或更高，解释器路径应位于该 Conda 环境内。环
 
 | 平台 | 选择 |
 | --- | --- |
-| macOS Apple Silicon | 直接执行下一节 requirements 安装，使用 macOS wheel；Smoke 自动优先 MPS |
-| Linux 仅 CPU | 先按下方命令安装 CPU wheel，适合 Smoke，不适合 60M 正式运行 |
-| Linux NVIDIA GPU | 先检查 `nvidia-smi`，选择与驱动兼容的 CUDA wheel；60M 目标为单张 24GB GPU |
+| macOS Apple Silicon | 可运行不依赖数据的机制实验，不适用 A10 Pipeline |
+| Linux 仅 CPU | 先按下方命令安装 CPU wheel，适合机制实验，不适用 A10 Pipeline |
+| Linux NVIDIA A10 | 先检查 `nvidia-smi`，按 A10 手册安装固定 CUDA 依赖 |
 
 Linux CPU：
 
@@ -147,47 +142,39 @@ python -m ruff format --check src scripts tests
 
 ### 3.1 数据准备到哪一步
 
-首次运行请完整执行 [数据文档第 4 节](./DATA_GUIDE.md#4-第一次实践10m-双语-smoke)。
+首次运行请完整执行 [A10 数据准备](./A10_TRAINING_GUIDE.md#数据)。
 已有数据时不要重复 fetch/prepare/tokenize/pack，先核对下列文件：
 
 ```text
-data/prepared/bilingual-smoke-v1/data_manifest.json
-data/prepared/bilingual-smoke-v1/{train,dev,test}.jsonl
-data/tokenizers/bilingual-smoke-v1/tokenizer.json
-data/tokenizers/bilingual-smoke-v1/tokenizer_manifest.json
-data/packed/bilingual-smoke-v1-seq128/packed_manifest.json
-data/packed/bilingual-smoke-v1-seq128/各 split 的三个二进制数组
+data/prepared/bilingual-60m-a10-v1/data_manifest.json
+data/prepared/bilingual-60m-a10-v1/{train,dev,test}.jsonl
+data/tokenizers/bilingual-60m-a10-v1/tokenizer.json
+data/tokenizers/bilingual-60m-a10-v1/tokenizer_manifest.json
+data/packed/bilingual-60m-a10-v1-seq512/packed_manifest.json
+data/packed/bilingual-60m-a10-v1-seq512/各 split 的三个二进制数组
 ```
 
-60M 使用各自的 `bilingual-60m-v1` 与 `bilingual-60m-v1-seq512`。
+smoke、pilot 和正式 Base 使用同一套 A10 数据与 Tokenizer。
 数据配套关系和迁移说明见 [数据产物复用](./DATA_GUIDE.md#8-产物校验复用与迁移)。
 
 ### 3.2 选择 Pipeline
 
 | Pipeline | 模型/设备 | 预算 | 每次 eval 上限 |
 | --- | --- | --- | ---: |
-| `native-smoke.yaml` | 10M，自动选择 CUDA/MPS/CPU | 2 optimizer steps | 2 batches |
-| `native-v1.yaml` | 60M，CUDA BF16 | 1 epoch | 8 batches |
-| `native-60m-reference.yaml` | 60M，CUDA BF16 | 1 epoch，更严格发布验收 | 64 batches |
-| `native-60m-qk-norm.yaml` | 宽浅 + QK-Norm | 同 60M 基线 | 8 batches |
-| `native-60m-deep-narrow.yaml` | 深窄，无 QK-Norm | 同 60M 基线 | 8 batches |
-| `native-60m-deep-narrow-qk-norm.yaml` | 深窄 + QK-Norm | 同 60M 基线 | 8 batches |
+| `native-60m-a10-base-smoke.yaml` | 60M，A10 CUDA BF16 | 8 optimizer steps | 16 batches |
+| `native-60m-a10-base-pilot100.yaml` | 60M，A10 CUDA BF16 | 100 optimizer steps | 128 batches |
+| `native-60m-a10-base-v1.yaml` | 60M，A10 CUDA BF16 | 8 epochs | 1024 batches |
 
-这些 Pipeline 的 `model_route` 都是 `native`。规模由 `run_profile` 表达：
-`smoke` 对应 10M 快速验证，`learn` 对应 60M 教学训练，`reproduce` 对应 60M
-Reference 验收；具体模型维度仍由 `model.config` 指定。
-
-旧版 `native-smoke` / `native-learn` 配置和 run/checkpoint 契约不再兼容。已有数据、
-Tokenizer 和 Packing 通过 hash 校验后仍可复用；不要手改历史 run 或 checkpoint，
-应使用新配置和新 run ID 重新开始。
-
-首次选择 `configs/pipelines/native-smoke.yaml`。模型详细参数不在本节重复，见模型文档。
+这些 Pipeline 的 `model_route` 都是 `native`，模型结构均由
+`configs/models/tiny-60m.yaml` 指定。`run_profile` 表示实践级别，不表示参数量。
+首次选择 `configs/pipelines/native-60m-a10-base-smoke.yaml`。
+不要修改已经运行过的配置或 checkpoint，应使用新配置和新 run ID 开始实验。
 
 ### 3.3 先验证，再做真实 batch 检查
 
 ```bash
-python scripts/validate_config.py configs/pipelines/native-smoke.yaml
-python scripts/doctor.py --config configs/pipelines/native-smoke.yaml
+python scripts/validate_config.py configs/pipelines/native-60m-a10-base-smoke.yaml
+python scripts/doctor.py --config configs/pipelines/native-60m-a10-base-smoke.yaml
 ```
 
 `validate_config` 只做配置级校验；Doctor 进一步检查：
@@ -203,31 +190,32 @@ python scripts/doctor.py --config configs/pipelines/native-smoke.yaml
 **检查结果**：应有 `real-batch ... passed`，最后 `0 failed`。任何 FAIL 都先解决。
 `WARN` 是需理解的非阻断风险，不等于已完成相应能力验证。Doctor 不进行持久训练或保存 checkpoint。
 
-## 4. 运行两步 Smoke
+## 4. 运行 A10 Smoke
 
 ### 4.1 启动
 
 ```bash
 python scripts/train_pretrain.py \
-  --config configs/pipelines/native-smoke.yaml \
-  --run-id native-smoke-001
+  --config configs/pipelines/native-60m-a10-base-smoke.yaml \
+  --run-id native-60m-a10-tutorial-smoke-001
 ```
 
-`run-id` 对应 `runs/native-smoke-001/`，不能覆盖已有目录。重复实践请使用
-`native-smoke-002` 等新 ID；省略该参数会由项目生成 ID，以终端输出为准。
+`run-id` 对应 `runs/native-60m-a10-tutorial-smoke-001/`，不能覆盖已有目录。
+重复实践请使用新 ID；省略该参数会由项目生成 ID，以终端输出为准。
 
 终端应依次出现：
 
 ```text
-plan mode=max_steps max_steps=2 ...
+plan mode=max_steps max_steps=8 ...
 baseline step=0 eval_loss=...
 step=1 train_loss=... eval_loss=...
-step=2 train_loss=... eval_loss=...
-Completed pretraining run native-smoke-001
+...
+step=8 train_loss=... eval_loss=...
+Completed pretraining run native-60m-a10-tutorial-smoke-001
 ```
 
 这些只是输出结构，loss 数值以实际运行为准。16K 词表的随机初始化 loss 通常接近
-`ln(16384) = 9.70`，两步之后不承诺有语言能力，也不要求每步 loss 单调下降。
+`ln(16384) = 9.70`，smoke 之后不承诺有语言能力，也不要求每步 loss 单调下降。
 
 ### 4.2 检查完成状态
 
@@ -236,7 +224,7 @@ python - <<'PY'
 import json
 from pathlib import Path
 
-run = Path("runs/native-smoke-001")
+run = Path("runs/native-60m-a10-tutorial-smoke-001")
 manifest = json.loads((run / "run_manifest.json").read_text())
 result = json.loads((run / "training_result.json").read_text())
 print("status:", manifest["status"])
@@ -245,12 +233,12 @@ print("tokens:", result["tokens_seen"])
 print("coverage:", result["target_token_coverage"])
 print("checkpoint:", result["final_checkpoint"])
 assert manifest["status"] == "completed"
-assert result["global_step"] == 2
-assert (run / "checkpoints/step-00000002/model/model.pt").is_file()
+assert result["global_step"] == 8
+assert (run / "checkpoints/step-00000008/model/model.pt").is_file()
 PY
 ```
 
-**通过标准**：status=completed，global_step=2，loss/梯度有限，baseline/训练后评测存在，
+**通过标准**：status=completed，global_step=8，loss/梯度有限，baseline/训练后评测存在，
 最终 checkpoint 可加载。它验证的是工程闭环，不是模型质量。
 
 ## 5. 独立评测与指标解读
@@ -259,13 +247,13 @@ PY
 
 ```bash
 python scripts/eval_pretrain.py \
-  --config configs/pipelines/native-smoke.yaml \
-  --checkpoint runs/native-smoke-001/checkpoints/step-00000002 \
+  --config configs/pipelines/native-60m-a10-base-smoke.yaml \
+  --checkpoint runs/native-60m-a10-tutorial-smoke-001/checkpoints/step-00000008 \
   --split dev
 
 python scripts/eval_pretrain.py \
-  --config configs/pipelines/native-smoke.yaml \
-  --checkpoint runs/native-smoke-001/checkpoints/step-00000002 \
+  --config configs/pipelines/native-60m-a10-base-smoke.yaml \
+  --checkpoint runs/native-60m-a10-tutorial-smoke-001/checkpoints/step-00000008 \
   --split test \
   --json
 ```
@@ -276,8 +264,8 @@ checkpoint 参数指向 `step-.../`，不是内部 `model.pt`。命令检查 con
 报告写入：
 
 ```text
-runs/native-smoke-001/evaluations/pretrain-dev-step-00000002.json
-runs/native-smoke-001/evaluations/pretrain-test-step-00000002.json
+runs/native-60m-a10-tutorial-smoke-001/evaluations/pretrain-dev-step-00000008.json
+runs/native-60m-a10-tutorial-smoke-001/evaluations/pretrain-test-step-00000008.json
 ```
 
 **重要范围**：当前 eval 受 `training.eval_batches × micro_batch_size` 限制，
@@ -295,7 +283,7 @@ python - <<'PY'
 import json
 from pathlib import Path
 
-for line in Path("runs/native-smoke-001/metrics.jsonl").read_text().splitlines():
+for line in Path("runs/native-60m-a10-tutorial-smoke-001/metrics.jsonl").read_text().splitlines():
     row = json.loads(line)
     print(row["step"], row.get("event", "train"),
           row.get("train_loss"), row.get("eval_loss"),
@@ -324,14 +312,15 @@ float32 后端允许微小误差。存在未标记 token 时不能只用两桶�
 
 ### 6.1 检查硬件与数据
 
-先完成 [60M 数据准备](./DATA_GUIDE.md#5-切换为-60m-双语数据)，再在 Linux/CUDA 环境执行：
+先完成 [A10 数据与开发门禁](./A10_TRAINING_GUIDE.md)，再在干净提交上执行：
 
 ```bash
-python scripts/validate_config.py configs/pipelines/native-v1.yaml
-python scripts/doctor.py --config configs/pipelines/native-v1.yaml
+python scripts/validate_config.py configs/pipelines/native-60m-a10-base-v1.yaml
+python scripts/doctor.py --profile tiny-60m-a10 \
+  --config configs/pipelines/native-60m-a10-base-v1.yaml
 python scripts/train_pretrain.py \
-  --config configs/pipelines/native-v1.yaml \
-  --run-id native-60m-001
+  --config configs/pipelines/native-60m-a10-base-v1.yaml \
+  --run-id native-60m-a10-base-new-s42
 ```
 
 默认 `micro_batch_size=1`、梯度累积 16、seq512、BF16。
@@ -341,40 +330,39 @@ python scripts/train_pretrain.py \
 train 监督 token:        46,184,530
 train packed 样本:       90,381
 每 epoch micro batches: 90,381
-optimizer steps:        ceil(90,381 / 16) = 5,649
+8 epochs optimizer steps: ceil(90,381 × 8 / 16) = 45,191
 最大监督 token/step:     16 × 511 = 8,176
 ```
 
 最后一个 step 保持完整累积，可能进入下一轮少量数据，预算是估算而非硬截断 token 上限。
 以 `training_budget.json` 和 `training_result.json` 的计划/实际覆盖为准。
-当前约 46.2M token 仅约为每个模型参数 0.73 token，是教学预算，不代表充分预训练。
+本轮 8 epochs 约处理 369.5M 监督 token，仍是有限的预训练预算，不代表通用助手能力。
 
 ### 6.2 训练后的评测
 
-默认最终 checkpoint 为 step 5,649：
+本轮正式预算的最终 checkpoint 为 step 45,191。先验收开发指标，通过后只执行一次 test：
 
 ```bash
 python scripts/eval_pretrain.py \
-  --config configs/pipelines/native-v1.yaml \
-  --checkpoint runs/native-60m-001/checkpoints/step-00005649 \
+  --config configs/pipelines/native-60m-a10-base-v1.yaml \
+  --checkpoint runs/native-60m-a10-base-new-s42/checkpoints/step-00045191 \
   --split dev
 
 python scripts/eval_pretrain.py \
-  --config configs/pipelines/native-v1.yaml \
-  --checkpoint runs/native-60m-001/checkpoints/step-00005649 \
+  --config configs/pipelines/native-60m-a10-base-v1.yaml \
+  --checkpoint runs/native-60m-a10-base-new-s42/checkpoints/step-00045191 \
   --split test
 ```
 
 改变预算后不得照抄上述 step，以训练输出的 `final_checkpoint` 为准。
-本节 `native-v1.yaml` 的旧 1-epoch 教学配方不是已发布的 8-epoch Base-v1，
-也没有完成独立 CUDA Reference 验收；不得把发布结果套用到这份旧配方。
+已有 A10 归档的 test 已执行，不应重复评测或将新实验结果套用到已有归档。
 
 ## 7. 自定义实验配置
 
 ### 7.1 创建独立配置
 
 ```bash
-cp configs/pipelines/native-smoke.yaml configs/pipelines/custom-smoke.yaml
+cp configs/pipelines/native-60m-a10-base-smoke.yaml configs/pipelines/custom-smoke.yaml
 ```
 
 在新文件中修改对应字段，保留其余必需配置。自有 seq128 数据示例：
@@ -382,16 +370,19 @@ cp configs/pipelines/native-smoke.yaml configs/pipelines/custom-smoke.yaml
 ```yaml
 model:
   provider: native
-  model_id: smoke-10m
+  model_id: tiny-60m
   architecture: dense-decoder
-  config: configs/models/smoke-10m.yaml
+  config: configs/models/tiny-60m.yaml
   tokenizer: data/tokenizers/custom-v1
 data:
   manifest: data/prepared/custom-v1/data_manifest.json
   packed_manifest: data/packed/custom-v1-seq128/packed_manifest.json
+training:
+  sequence_length: 128
 ```
 
-这是替换 `model/data` 两段，不是完整 Pipeline。假设 Tokenizer 实际词表为 16,384；
+这是替换 `model/data` 两段并修改 `training.sequence_length`，不是完整 Pipeline。
+保留其他训练字段。假设 Tokenizer 实际词表为 16,384；
 其他词表须同步创建匹配的模型配置和 ID。不要在原 run 开始后编辑其配置。
 
 ### 7.2 常用训练字段
@@ -482,20 +473,20 @@ runs/<run_id>/
 
 ```bash
 python scripts/train_pretrain.py \
-  --config configs/pipelines/native-v1.yaml \
-  --resume-run native-60m-001
+  --config configs/pipelines/native-60m-a10-base-v1.yaml \
+  --resume-run native-60m-a10-base-new-s42
 ```
 
 默认读取 `latest_checkpoint.json`。明确选择 checkpoint 时：
 
 ```bash
 python scripts/train_pretrain.py \
-  --config configs/pipelines/native-v1.yaml \
-  --resume-run native-60m-001 \
-  --resume-checkpoint checkpoints/step-00000500
+  --config configs/pipelines/native-60m-a10-base-v1.yaml \
+  --resume-run native-60m-a10-base-new-s42 \
+  --resume-checkpoint checkpoints/step-00005000
 ```
 
-第二条只适用于 step 500 之后不存在会被覆盖的后续 checkpoint 的情况。
+第二条只适用于 step 5,000 之后不存在会被覆盖的后续 checkpoint 的情况。
 `--resume-checkpoint` 必须配合 `--resume-run`；`--run-id` 与 `--resume-run` 互斥。
 
 恢复前检查：
@@ -505,167 +496,35 @@ python scripts/train_pretrain.py \
 3. 设备与依赖保持一致，尤其不要临时修改 `dtype/device`。
 4. 恢复目标未到预算上限，不会覆盖已有后续 checkpoint。
 
-**已经完成的两步 Smoke 不能再 resume 追加训练**。当前不支持在同一 run 延长预算，
+**已经完成的 Smoke 不能再 resume 追加训练**。当前不支持在同一 run 延长预算，
 也没有从旧 checkpoint 分叉的新 run 命令。新 ID 默认从随机初始化开始，不等于续训。
 改变预算、数据或模型时应明确规划新的实验。
 
 Checkpoint 已保存 FP16 GradScaler 和 MPS RNG；精确恢复等价测试目前仍只覆盖
 CPU 路径，不能据此承诺全部设备和精度逐位一致。
 
-## 9. 结构消融与 Reference 验收
+## 9. 60M 正式训练
 
-### 9.1 四臂结构实验
+60M 正式训练在单卡 A10 上执行，使用
+[`native-60m-a10-base-v1.yaml`](../configs/pipelines/native-60m-a10-base-v1.yaml)。
+完整执行顺序、预算、门禁和验收要求见
+[A10 从零重跑手册](./A10_TRAINING_GUIDE.md)，实际进度见
+[A10 执行记录](./A10_TRAINING_RESULTS.md)。
 
-依次运行第 3 节列出的基线、QK-Norm、深窄、深窄 QK-Norm 四份 pipeline，每份使用
-独立 run ID。数据、Tokenizer、seed、预算和评测保持一致。
-先比较相同结构内的 QK-Norm，再比较相同 QK-Norm 下的宽浅/深窄组合，最后分析交互。
-深窄同时改变 hidden/层数/MLP/GQA，不是只改变一个层数参数。
+正式训练前需完成的门控：
 
-token 预算相同不等于 FLOPs 或耗时相同。应一起比较双语指标、token 吞吐、峰值显存、
-总耗时，不预设更复杂结构一定更好。
+1. **Doctor 预检**：使用 `tiny-60m-a10` profile 检查单卡 A10、CUDA BF16、至少 21.9 GiB 可见显存。
+2. **干净工作树**：正式 Base 必须在无未提交变更的干净提交上执行。
+3. **数据与 Tokenizer**：使用独立的 `bilingual-60m-a10-v1` 数据和 Tokenizer。
+4. **开发门禁**：smoke 和 pilot 通过后才能启动正式 Base。
 
-### 9.2 固定 60M 基线
+训练完成后验收要求：
 
-> 本节是旧 Reference 机制示例，配置中的 1-epoch 预算已废弃。当前训练不得执行
-> 本节命令，统一转到 [Base 从零训练手册](./BASE_TRAINING_GUIDE.md)。
-
-本轮使用
-[`configs/reference/native-60m-baseline-v1.yaml`](../configs/reference/native-60m-baseline-v1.yaml)，
-对应 `configs/pipelines/native-60m-reference.yaml`。历史
-[`native-60m-pretrain-v1.yaml`](../configs/reference/native-60m-pretrain-v1.yaml)
-保留原验收要求；新规范增加独立配置锁、源码锁、环境版本锁和最终双语改善检查。
-不能拿普通 `native-v1.yaml` 的 learn run 冒充正式基线。
-
-| 固定项 | `native-60m-baseline-v1` |
-| --- | --- |
-| 模型 | 62,927,616 参数；8 层、hidden 768、12 Q heads / 4 KV heads、MLP 2048 |
-| 词表与上下文 | 16,384；训练长度 512；embedding/head 绑定 |
-| 初始化与结构 | `initializer_range=0.02`；QK-Norm 关闭；不加入新初始化或结构消融 |
-| 数据 | 英文 SimpleStories 100,000 条、中文 Wikipedia 126,000 条 |
-| Packing | train 90,381 / dev 11,432 / test 11,055 个样本 |
-| 预算 | seed 42；1 epoch；46,184,530 个目标监督 token；5,649 optimizer steps |
-| Batch | micro batch 1、梯度累积 16；完整无 padding 时每步 8,176 个监督 token |
-| 优化器 | AdamW；LR 0.0003；betas 0.9/0.95；weight decay 0.1；clip 1.0 |
-| 调度与评测 | warmup 50；cosine 最低 LR 比例 0.1；每 500 steps 评测和保存；最终步也执行 |
-| 评测范围 | 确定性双语分层抽样，每个 dev/test suite 64 个 packed 样本 |
-| 环境 | Linux、CUDA BF16、首个可见 GPU 不少于 22 GiB、干净 Git commit |
-| Python 与训练依赖 | Python 3.11；NumPy 2.4.6；PyYAML 6.0.3；tokenizers 0.21.4；torch 2.14.0 |
-
-步数按完整梯度累积向上取整，实际 token 可略超 1 epoch；验收覆盖率仍限定在
-`[1.0, 1.01]`。64 batches 在 micro batch 为 1 时等于 64 个样本，不是全量评测，
-也不是每种语言各 64 个样本。
-
-`freeze.execution_sha256` 同时锁住 Pipeline、模型配置及训练器的有效默认值；
-`freeze.source_sha256` 锁住 `src/llm_lifecycle_lab/**/*.py` 的相对路径和文件内容，
-与 checkout 的绝对路径、时间戳无关。文档与脚本不参与该源码摘要。
-不要在原基线上调学习率、初始化或默认值后重算 hash 放行，应另建实验版本。
-当前只是冻结了可执行规范和输入，**尚无通过该规范的完整 CUDA 训练结果**。
-
-### 9.3 输入与环境门控
-
-**不可变输入**：保留以下三个目录的完整字节内容及目录内部相对路径：
-
-```text
-data/prepared/bilingual-60m-v1/
-data/tokenizers/bilingual-60m-v1/
-data/packed/bilingual-60m-v1-seq512/
-```
-
-可以把整套产物复制到另一台机器的相同仓库相对位置，不需要修改 manifest 中作为
-来源记录的旧绝对路径。校验会实际读取三个 prepared split、Tokenizer 和全部九个
-packed 数组，不只比较 manifest 自报的 hash。
-
-Data Manifest 含时间戳和来源绝对路径，重新 prepare 相同文本也可能产生不同 hash。
-没有原配套产物时，新建数据与基线版本，不能修改本规范假装复现；稳定内容身份的
-跨机器重建支持不在本轮范围内。
-
-任何已安装训练依赖的机器都可先检查输入，不会创建 run：
-
-```bash
-python scripts/verify_reference.py \
-  --spec configs/reference/native-60m-baseline-v1.yaml \
-  --inputs-only --json
-```
-
-`scope=inputs-only` 且 `ok=true` **只表示输入冻结通过**，不表示 CUDA 就绪或模型质量合格。
-
-正式环境沿用 `uv.lock` 的 Python 3.11 分支。可以使用第 2 节的 Conda 环境，
-安装以下固定训练依赖；不要安装项目自身：
-
-```bash
-conda create -n llm-60m-baseline python=3.11 pip -y
-conda activate llm-60m-baseline
-python -m pip install "torch==2.14.0"
-python -m pip install "numpy==2.4.6" "PyYAML==6.0.3" "tokenizers==0.21.4"
-python -m pip check
-```
-
-Linux 的 PyTorch wheel 与 NVIDIA 驱动须兼容，按第 2.3 节核对。以上固定了训练直接依赖，
-不是全部传递依赖；完整锁环境可改用已安装的 uv：
-
-```bash
-uv sync --locked --no-install-project --python 3.11 \
-  --extra training --extra public-data --extra dev
-```
-
-使用 uv 时，后续命令的 `python` 替换为 `uv run --no-sync python`。不能通过只安装
-NumPy 2.4.6 到 Python 3.13 来满足 Python 3.11 要求。
-验收比较 PyTorch 发布版本，允许 `+cu...` 后缀；实际 CUDA/cuDNN、GPU 和 Python patch
-记录在 `runtime_environment.json`。这不是跨硬件逐位一致性保证，目标 CUDA 环境仍待实测。
-
-在确认并提交本次代码的干净 checkout 上检查，Git 有任何未提交变更都不能发布正式基线。
-不要为了清空状态删除自己的工作：
-
-```bash
-git status --short
-python scripts/verify_reference.py \
-  --spec configs/reference/native-60m-baseline-v1.yaml \
-  --preflight --json
-python scripts/doctor.py --config configs/pipelines/native-60m-reference.yaml
-```
-
-两个检查都须通过再训练。`--preflight` 检查冻结输入和真实环境；Doctor 额外检查
-资源、输出目录和真实 batch。macOS/无 CUDA/版本不符/dirty Git 的失败是正常门控，
-不得降低规范要求。退出码 `0` 表示该 scope 通过，`1` 表示验收不通过，`2` 表示参数、
-配置或产物读取错误。
-
-### 9.4 正式训练与验收
-
-训练命令必须带 `--reference-spec`，入口会再次门控；失败时不会创建或恢复 run。
-
-```bash
-python scripts/train_pretrain.py \
-  --config configs/pipelines/native-60m-reference.yaml \
-  --reference-spec configs/reference/native-60m-baseline-v1.yaml \
-  --run-id native-60m-baseline-v1
-
-python scripts/eval_pretrain.py \
-  --config configs/pipelines/native-60m-reference.yaml \
-  --checkpoint runs/native-60m-baseline-v1/checkpoints/step-00005649 \
-  --split dev --json
-
-python scripts/eval_pretrain.py \
-  --config configs/pipelines/native-60m-reference.yaml \
-  --checkpoint runs/native-60m-baseline-v1/checkpoints/step-00005649 \
-  --split test --json
-
-python scripts/verify_reference.py \
-  --spec configs/reference/native-60m-baseline-v1.yaml \
-  --run runs/native-60m-baseline-v1 --json
-```
-
-未完成 run 恢复时将 `--run-id` 换成 `--resume-run`，保留 `--reference-spec`，并使用
-同一源码、配置、输入和环境；不要在普通训练命令里绕过门控后宣称符合基线。
-已有完成 run 不覆盖，重复实验使用新的 run ID，最后验收指向实际 run。
-
-最终验收要求：completed 状态、所有冻结项一致、预算完成、指标有限且中英文分桶与
-聚合一致、checkpoint 完整，以及最终 checkpoint 的独立 dev/test 报告各 64 个样本。
-除历史的 best dev 改善外，**最终 dev 聚合、英文、中文 loss 都必须低于 step 0**；
-不能用中途 best 或英文改善掩盖最终中文退化。各语言 loss、perplexity、bits-per-byte
-和 token 数都需保留，不预设一个未经正式训练验证的绝对质量阈值。
-
-实际时间取 `training_result.json`，显存取 `metrics.jsonl`。成本应依据 GPU 计费与
-实际占用时长计算，不引用其他项目的 SFT 耗时作为本项目 Pretrain 成本。
+- token 覆盖率在 `[1.0, 1.01]` 范围内
+- 总体 dev loss 相对 baseline 减半
+- 中英文 dev loss 均改善
+- final dev loss 不超过 best 的 1.02 倍
+- 最终 checkpoint 重载 dev 评测与训练记录一致
 
 ## 10. 故障定位
 
@@ -702,9 +561,8 @@ python scripts/verify_reference.py \
    不把现有 CPU 精确恢复测试扩大为所有设备的保证。
 2. 当前梯度累积已按有效监督 token 总数归一化，与 token 加权日志一致；
    在真实 A10 batch、padding 和尾批下继续验证数值与吞吐。
-3. 分离稳定数据内容身份与时间/路径来源，完善跨机器 Reference。
-4. 先完成 [A10 从零重跑](./A10_TRAINING_GUIDE.md)，再独立评估 SDPA 快速路径、
-   预取、compile 和可视化；历史 4090 配方与结果不作为 A10 实测。
+3. 分离稳定数据内容身份与时间/路径来源，完善跨机器复现。
+4. 独立评估 SDPA 快速路径、预取、compile 和可视化。
 
 MiniMind 的 scaler、workers、pin memory 与可选 SwanLab 可供借鉴，但不能因此移除
 本项目现有 hash、baseline、双语评测和不可覆盖 checkpoint，也不能把未验证优化计为收益。

@@ -368,7 +368,6 @@ GQA 减少 K/V 投影参数和持久 KV Cache 元素数，但要注意本项目�
 
 60M 基线的 `D=768, Hq=12, Hkv=4`，所以 `d_h=64`，
 每 3 个 Query 共享一组 KV。
-10M 的 5 个 Query 共享 1 组 KV，它用于快速验证，不是效果研究的主基线。
 
 ## 6. RoPE 怎样把位置带进匹配分数
 
@@ -710,15 +709,14 @@ python scripts/inspect_model.py --config configs/models/tiny-60m.yaml
 ```
 
 脚本读取配置并实例化随机模型，打印参数量与结构，不下载数据、不做训练，
-但会分配这份模型权重的内存。10M 快速版本可使用
-`configs/models/smoke-10m.yaml`。
+但会分配这份模型权重的内存。当前保留的配置为 `tiny-60m`。
 
-配置字段和四组结构消融见
-[自有模型介绍](../NATIVE_MODEL_GUIDE.md#2-两档模型)。
+配置字段与基线边界见
+[自有模型介绍](../NATIVE_MODEL_GUIDE.md#2-当前模型配置)。
 比较宽浅/深窄或 QK-Norm 时，应固定数据、Tokenizer、训练预算和评测方式，
 不能拿随机初始化输出给哪种结构更好下结论。
-已发布 Base-v1 只完成宽浅、QK-Norm 关闭这一配方的 8-epoch CUDA 训练；
-这里的四臂 Reference 对照尚未完成，不能由单臂结果替代。
+A10 Base 完成了宽浅、QK-Norm 关闭这一配方的 8-epoch CUDA 训练；
+当前没有冻结的结构消融配置，不能由单次训练结果替代独立对照。
 
 </details>
 
@@ -738,7 +736,7 @@ python scripts/inspect_model.py --config configs/models/tiny-60m.yaml
 下一篇把第二篇的数据、第三篇的 Tokenizer/Packing 与本篇模型接入训练循环，
 解释 batch、梯度累积、学习率和训练预算，并跑通一次预训练。
 届时要观察的将不只是结构是否一致，还包括 loss 如何变化，
-以及两步 Smoke 究竟能证明什么、不能证明什么。
+以及 Smoke 究竟能证明什么、不能证明什么。
 
 [返回系列目录](./README.md) | [上一篇：让模型读懂文本的表示](./03-tokenizer-and-packing.md)
 | [下一篇：跑通一次预训练](./05-first-pretraining.md)

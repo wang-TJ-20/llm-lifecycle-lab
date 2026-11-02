@@ -32,7 +32,7 @@
 不等于回到中断时的随机状态。
 而 optimizer 的动量也不可能从权重反推出唯一值。
 
-已发布的 [`Native-60M Base-v1`](../../models/base-v1-final/) 是模型级产物的
+A10 Base 训练的最终 checkpoint 是模型级产物的
 具体例子：它包含 `model.pt`、模型配置、Tokenizer、provenance 和校验清单，
 适合加载推理或作为后续阶段的初始化权重；它不包含 optimizer、scheduler、RNG
 与数据流位置，不能单独恢复原来的预训练 run。可恢复训练仍应使用 run 中的完整
@@ -229,28 +229,28 @@ resumed = run_native_pretraining(
 ## 5. 在真实 run 上恢复的正确边界
 
 恢复的是**原预算尚未完成、且已有完整 checkpoint** 的 run。
-如果第五篇两步 Smoke 已成功结束，就没有剩余 step 可恢复。
+如果第五篇 A10 Smoke 已成功结束，就没有剩余 step 可恢复。
 第七篇的中断演示专门使用三步预算，不能靠修改已完成 Smoke 来代替它。
 
-下面命令是 60M 教学 run 中断后的操作模板，
-前提是它此前就使用该配置启动，run ID 为 `native-60m-001`：
+下面命令是 A10 正式 run 中断后的操作模板，
+前提是它此前就使用该配置启动，run ID 为 `native-60m-a10-base-new-s42`：
 
 ```bash
 python scripts/train_pretrain.py \
-  --config configs/pipelines/native-v1.yaml \
-  --resume-run native-60m-001
+  --config configs/pipelines/native-60m-a10-base-v1.yaml \
+  --resume-run native-60m-a10-base-new-s42
 ```
 
 默认按 latest 指针恢复。确实要指定已有 checkpoint 时：
 
 ```bash
 python scripts/train_pretrain.py \
-  --config configs/pipelines/native-v1.yaml \
-  --resume-run native-60m-001 \
-  --resume-checkpoint checkpoints/step-00000500
+  --config configs/pipelines/native-60m-a10-base-v1.yaml \
+  --resume-run native-60m-a10-base-new-s42 \
+  --resume-checkpoint checkpoints/step-00005000
 ```
 
-第二条要求 step 500 是完整保存点，
+第二条要求 step 5,000 是完整保存点，
 且后面不会遇到已有同名 checkpoint 的覆盖冲突。
 不要对一个已经跑到更后面的 run 随便回退再写。
 当前没有从旧 checkpoint 分叉新 run 的 CLI；
@@ -306,11 +306,10 @@ CUDA 内核、PyTorch 版本、低精度归约和硬件变化都可能带来差�
 FLOPs、运行时间、激活内存也可能不同；
 更换词表会同时改变参数与序列长度，不能继续称为只改变一个数字。
 
-仓库的宽浅/深窄 × QK-Norm 四臂是一个结构化对照：
+若未来设计宽浅/深窄与 QK-Norm 的结构化对照，应先冻结独立配置：
 先比较同结构内的 QK-Norm 开关，再比较同开关下的结构差异。
-深窄配置同时改变层数、hidden、MLP 和头的组合，
-不能用结果声称只证明“层数更多更好”。
-详见 [结构消融](../NATIVE_PRETRAIN_GUIDE.md#91-四臂结构实验)。
+同时改变层数、hidden、MLP 和头的组合，不能用结果声称只证明“层数更多更好”。
+当前基线与对照边界见 [A10 架构基线](../NATIVE_MODEL_GUIDE.md#22-a10-架构基线)。
 
 ### 可记录、可复现、可验收是三个层次
 
@@ -319,33 +318,25 @@ run 中的 snapshot 记录当时使用的产物信息。
 这些文件帮助查明条件，不会把所有数据与环境完整复制到 run。
 迁移时仍需成套保留 prepared、Tokenizer 和 packed 数组。
 
-正式基线
-[`native-60m-baseline-v1.yaml`](../../configs/reference/native-60m-baseline-v1.yaml)
-进一步固定配置及有效默认值、`src/llm_lifecycle_lab/**/*.py` 源码摘要、
+正式 A10 Base 训练进一步固定配置及有效默认值、源码状态、
 输入 hash、平台和依赖版本，并检查最终预算及双语评测。
-文档与操作脚本不在这份源码摘要内，不等于没有版本管理要求。
+文档与操作脚本不在源码摘要内，不等于没有版本管理要求。
 
 <details>
-<summary>查阅：Reference 的三个检查阶段</summary>
+<summary>查阅：A10 Base 的验收流程</summary>
 
 ```bash
-python scripts/verify_reference.py \
-  --spec configs/reference/native-60m-baseline-v1.yaml --inputs-only
-
-python scripts/verify_reference.py \
-  --spec configs/reference/native-60m-baseline-v1.yaml --preflight
+python scripts/verify_a10_base.py --phase base \
+  --run runs/native-60m-a10-base-v1-s42
 ```
 
-第一条核对输入与执行规范，第二条增加正式训练环境检查。
-本机没有对应 CUDA 环境时，preflight 失败是门控生效，不应改 hash 或设备要求来放行。
-这两条都要求相应真实数据存在，临时微型实验不满足该规范。
+该命令核对 run 完成状态、配置身份、单卡 A10 运行环境、干净源码、
+预算完成度、token 覆盖率、双语 dev loss 改善、final 相对 best 回退不超过 2%，
+以及总体 dev loss 相对 baseline 减半。
 
-正式训练还应传 `--reference-spec`，让脚本在创建或恢复 run 前执行门控。
-完成后使用 `verify_reference.py --run <路径>` 验收产物、预算与评测。
-完整启动命令见 [固定 60M 基线](../NATIVE_PRETRAIN_GUIDE.md#92-固定-60m-基线)。
-
-该 Reference 规范已冻结不代表已经获得该规范下验收通过的权重。
-当前完整 CUDA Reference 训练尚未完成，不使用本篇 CPU 恢复实验替代它。
+完整启动与验收命令见 [A10 从零重跑手册](../A10_TRAINING_GUIDE.md)。
+A10 Base 已完成 8-epoch 训练并通过验收，结果见
+[A10 执行记录](../A10_TRAINING_RESULTS.md)。
 
 </details>
 
@@ -361,12 +352,9 @@ python scripts/verify_reference.py \
 6. 固定范围、分语言指标与生成共同支持有限的结论。
 7. Checkpoint 与实验条件让过程能够恢复和比较。
 
-这还不是一个训练完成的通用助手。Native-60M Base-v1 已完成并公开发布，
-历史 SFT-v1 的数据、初始化约束与评测门禁已冻结，但正式训练尚未完成。
-当前 [A10 全链路](../A10_TRAINING_GUIDE.md)重新从随机权重训练 Base，
-新 Base 验收后必须冻结独立 SFT 门禁，不能替换历史 Base 的哈希来放行。
-独立 Reference 和结构消融仍按各自规范执行，
-不能由 Base-v1 的一次训练结果替代。
+这还不是一个训练完成的通用助手。A10 Base 已完成并通过验收，
+后续按 [A10 全链路](../A10_TRAINING_GUIDE.md)冻结独立 SFT 配置与门禁，再启动训练。
+当前没有冻结的独立结构消融配置，不能由一次 A10 Base 训练结果替代对照实验。
 新增功能时延续同一标准：**实现、最小验证和解释对应起来，结论不超过证据。**
 
 [返回系列目录](./README.md) | [上一篇：判断模型到底学到了什么](./06-evaluating-a-model.md)

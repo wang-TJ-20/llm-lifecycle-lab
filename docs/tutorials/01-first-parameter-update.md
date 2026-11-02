@@ -46,15 +46,15 @@ python scripts/model_experiment.py
 下面是一次实际运行的输出。
 
 ```text
-model_id: smoke-10m
-parameters: 9915200
+model_id: tiny-60m
+parameters: 62927616
 input_shape: [2, 16]
 logits_shape: [2, 16, 16384]
 supervised_tokens: 30
-loss: 9.774947166442871
-grad_norm: 9.861780166625977
-weight_update_max: 0.0010004788637161255
-cache_key_shape: [2, 1, 16, 64]
+loss: 9.713034629821777
+grad_norm: 20.9537410736084
+weight_update_max: 0.0010005682706832886
+cache_key_shape: [2, 4, 16, 64]
 cache_matches_full: True
 checkpoint_matches_full: True
 generated_shape: [2, 20]
@@ -91,9 +91,9 @@ optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
 `torch.manual_seed()` 固定后续随机过程的起点，包括模型初始化和输入采样，
 不是赋予模型任何知识。
 
-模型结构来自 [smoke-10m.yaml](../../configs/models/smoke-10m.yaml)：
-词表大小为 16,384，隐藏维度为 320，共 4 层，总参数量为 9,915,200。
-`smoke-10m` 是约数命名，不表示恰好有一千万个参数。
+模型结构来自 [tiny-60m.yaml](../../configs/models/tiny-60m.yaml)：
+词表大小为 16,384，隐藏维度为 768，共 8 层，总参数量为 62,927,616。
+`tiny-60m` 是约数命名，不表示恰好有六千万个参数。
 
 `input_ids` 的形状 `[2, 16]` 表示两条序列，每条 16 个 token。
 ID 的范围是 `0` 到 `16383`；它只是索引，ID 更大不代表含义更强。
@@ -121,7 +121,7 @@ output = model(input_ids=input_ids)
 整数 ID       [B, T]
   -> Embedding
 向量序列      [B, T, D]
-  -> 4 层 Transformer Block
+  -> 8 层 Transformer Block
 上下文表示    [B, T, D]
   -> 最终归一化和词表投影
 logits        [B, T, V]
@@ -212,7 +212,7 @@ loss = 所有有效目标的损失之和 / 有效目标数
 
 一个有用的参照是：假如模型对 16,384 个候选完全平均分配概率，
 那么每个目标的损失都是 `ln(16384)`，约为 `9.704`。
-示例里的初始 loss 约为 `9.775`，处在与均匀预测相近的量级。
+示例里的初始 loss 约为 `9.713`，处在与均匀预测相近的量级。
 随机初始化的输出并不严格均匀，所以这不是必须相等的验收值，
 更不是跨词表、跨数据比较模型能力的通用基线。
 
@@ -256,7 +256,7 @@ grad_norm = torch.nn.utils.clip_grad_norm_(
    遇到非有限梯度就报错，不带着无效数值继续更新。
 
 这里的一个容易误读之处是：`clip_grad_norm_()` 返回的是**裁剪前**的总范数。
-所以输出 `grad_norm: 9.861...` 与设置 `max_norm=1.0` 并不矛盾。
+所以输出 `grad_norm: 20.953...` 与设置 `max_norm=1.0` 并不矛盾。
 
 接着，脚本记录输入里第一个 token 对应的 Embedding 行，然后执行更新：
 
@@ -302,8 +302,8 @@ with torch.no_grad():
 
 KV Cache 保存之前 token 的 Key/Value，避免续写时重复计算这些内容，
 它不是训练数据或模型知识的存储。
-`cache_key_shape: [2, 1, 16, 64]` 对应一个层的 Key：
-2 条序列、1 个 KV head、16 个已处理位置、每个 head 64 维。
+`cache_key_shape: [2, 4, 16, 64]` 对应一个层的 Key：
+2 条序列、4 个 KV head、16 个已处理位置、每个 head 64 维。
 这里的长度来自上述完整输入检查，不是后面生成后的总长度。
 这个例子验证了特定输入下的一致性，不是全部 Cache 边界条件的证明。
 
@@ -360,7 +360,7 @@ logits 为 `[2, 8, 16384]`，生成结果为 `[2, 12]`。
 模型参数量仍然不变：输入变短，不等于创建了一个更小的模型。
 
 本脚本要求 `2 <= sequence_length < max_sequence_length`，
-既保证有 next-token 目标，也为生成保留空间。默认配置允许的输入长度是 2 到 255。
+既保证有 next-token 目标，也为生成保留空间。默认配置允许的输入长度是 2 到 511。
 
 前两个实验改变了样本数或上下文，不是在相同预测任务上比较模型。
 即使其中一个 loss 更低，也不能据此说更小的 batch 或更短的输入提升了模型能力。
@@ -376,9 +376,8 @@ python scripts/model_experiment.py --learning-rate 1e-4 --json
 因此输出的 loss 与裁剪前梯度范数应与基线一致。
 学习率开始影响的是后面的参数更新。
 
-本次验证中，两次 `weight_update_max` 分别约为 `0.00100048` 和 `0.00010005`。
-这说明更新尺度变了，不说明更大的更新更好；
-精确小数不是跨环境的验收条件。
+两次 `weight_update_max` 应分别处于 `1e-3` 和 `1e-4` 的量级。
+这说明更新尺度变了，不说明更大的更新更好；精确小数不是跨环境的验收条件。
 
 三个实验的稳定预期汇总如下：
 
@@ -389,7 +388,7 @@ python scripts/model_experiment.py --learning-rate 1e-4 --json
 | 仅 `--sequence-length 8` | `[2, 8]` | 14 | `[2, 12]` |
 | 仅 `--learning-rate 1e-4` | `[2, 16]` | 30 | `[2, 20]` |
 
-这四次运行的参数量都应为 9,915,200，两个一致性检查都应通过，
+这四次运行的参数量都应为 62,927,616，两个一致性检查都应通过，
 loss、梯度范数和更新量应有限，观察到的更新量应大于零。
 如果出现 `error:`，先处理错误，不把不完整运行当作成功实验。
 

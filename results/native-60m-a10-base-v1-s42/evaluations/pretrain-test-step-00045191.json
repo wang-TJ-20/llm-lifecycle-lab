@@ -1,0 +1,21 @@
+{
+  "created_at": "2026-11-02T02:26:25+00:00",
+  "metrics": {
+    "eval_bits_per_byte": 1.0227541500421957,
+    "eval_en_bits_per_byte": 0.6614791077767673,
+    "eval_en_loss": 1.9545975507088575,
+    "eval_en_perplexity": 7.061076726476049,
+    "eval_en_tokens": 245764.0,
+    "eval_loss": 2.732666279829573,
+    "eval_perplexity": 15.373823336884103,
+    "eval_tokens": 523264.0,
+    "eval_zh_bits_per_byte": 1.4132357276664118,
+    "eval_zh_loss": 3.421752023597663,
+    "eval_zh_perplexity": 30.623020302680864,
+    "eval_zh_tokens": 277500.0
+  },
+  "run_id": "native-60m-a10-base-v1-s42",
+  "sample_count": 1024,
+  "schema_version": "1.0",
+  "suite": "pretrain-test"
+}

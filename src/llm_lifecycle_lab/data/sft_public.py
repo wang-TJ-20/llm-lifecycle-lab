@@ -21,7 +21,6 @@ from llm_lifecycle_lab.contracts import (
 from llm_lifecycle_lab.data.fingerprint import sha256_file
 from llm_lifecycle_lab.data.posttraining import (
     PublicPosttrainingRecipe,
-    _dedupe_sft_conversations,
     _download_sources,
     _read_source_rows,
     _transform_source,
@@ -114,8 +113,6 @@ def materialize_public_sft(
             rows = _read_source_rows(source_paths[source.source_id], source)
             transformed = _transform_source(rows, recipe, source)
             records.extend(transformed.get(RecordKind.SFT, ()))
-        if namespace == "public-60m-v3":
-            records = _dedupe_sft_conversations(records)
         records.sort(key=lambda row: row["id"])
         if len(records) != expected_records:
             raise DataValidationError(

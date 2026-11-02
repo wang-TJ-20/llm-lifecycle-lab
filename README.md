@@ -6,7 +6,7 @@
 
 原生 PyTorch 小模型 · 中英文数据 · 七篇实践教程 · Base → SFT 可复现链路
 
-[在线阅读](https://wang-tj-20.github.io/llm-lifecycle-lab/) · [公开权重](https://modelscope.cn/models/wzt777/native-60m-base-v1) · [教程目录](#教程目录) · [快速开始](#快速开始) · [项目进展](#项目进展)
+[在线阅读](https://wang-tj-20.github.io/llm-lifecycle-lab/) · [教程目录](#教程目录) · [快速开始](#快速开始) · [项目进展](#项目进展)
 
 </div>
 
@@ -36,24 +36,18 @@ loss 下降能说明什么？进程中断后，怎样继续同一次实验？
 
 > 当前硬件教程主线为 [单卡 A10 从零重跑](./docs/A10_TRAINING_GUIDE.md)：
 > 重新准备数据、训练 Tokenizer、预训练 Base，再冻结新 SFT 门禁。
-> 已发布 Base-v1 的 RTX 4090 训练保留为历史证据，不计作 A10 实测；
-> 历史 SFT-v1 的代码与门禁已冻结，正式训练尚未运行。
-> 权重与 Tokenizer 可从 [ModelScope](https://modelscope.cn/models/wzt777/native-60m-base-v1)
-> 下载，也保存在 `models/base-v1-final/`。它是 Base 模型，不是指令微调后的聊天模型。
+> A10 Base 已完成 8-epoch 正式训练并通过验收，后续进入 SFT 阶段。
 
 ## 选择你的起点
 
 | 路径 | 运行条件 | 适合做什么 |
 | --- | --- | --- |
 | 离线机制实验 | CPU；安装依赖后无需下载语料 | 观察参数更新，验证微型训练、评测和恢复 |
-| 10M 双语 Smoke | CPU / Apple Silicon MPS / CUDA；需准备公共语料 | 跑通真实数据上的两步训练与评测 |
-| 已发布 Native-60M Base | CPU 可加载；CUDA 可加速生成；约 252 MB | 下载权重、校验来源并观察 Base 续写 |
 | 60M A10 从零重跑 | Linux + 单张 A10，CUDA BF16；需配套数据 | 同卡 smoke、pilot、正式 Base，建立新训练证据 |
 | A10 Base → SFT | 新 A10 Base 验收后冻结独立输入和门禁 | 重新进行指令微调、恢复与同协议评测 |
 
 **第一次接触，先看第一篇并运行离线实验。**
-10M 用于快速验证，60M 是效果研究的主基线；无需先购买 GPU 才开始学习。
-Reference 比普通教学训练有更严格的输入、环境和结果要求。
+CPU 机制实验不要求 GPU；真实预训练统一使用 A10 上的 60M 配置。
 
 ## 教程目录
 
@@ -71,7 +65,7 @@ Reference 比普通教学训练有更严格的输入、环境和结果要求。
 | [07 让实验可以恢复和比较](./docs/tutorials/07-resume-and-compare.md) | 保存权重为什么不够？比较连续训练与中断恢复的状态。 |
 
 阅读顺序与实验约定见 [实践系列导读](./docs/tutorials/README.md)。
-教程解释“为什么”，操作指南维护完整参数与排错步骤。
+教程解释"为什么"，操作指南维护完整参数与排错步骤。
 
 ## 快速开始
 
@@ -100,58 +94,13 @@ Python 要求为 3.11 或更高。脚本直接加载仓库中的 `src/`，
 **不需要 `pip install -e .` 或手动设置 `PYTHONPATH`**。
 基础 Doctor 不替代真实训练前的配置化检查。
 
-### 2. 下载并验证公开 Base
-
-发布仓库为
-[`wzt777/native-60m-base-v1`](https://modelscope.cn/models/wzt777/native-60m-base-v1)。
-以下命令把权重、Tokenizer、模型配置和 provenance 下载到 Git 忽略的 `build/`：
-
-```bash
-python -m pip install "modelscope-hub==0.1.8"
-ms download wzt777/native-60m-base-v1 \
-  --repo-type model \
-  --local-dir build/native-60m-base-v1
-```
-
-在 macOS 上校验全部发布文件：
-
-```bash
-(cd build/native-60m-base-v1 && shasum -a 256 -c SHA256SUMS)
-```
-
-Linux 使用 `sha256sum -c SHA256SUMS`。加载时必须让模型配置、权重与 Tokenizer
-来自同一发布目录：
-
-```python
-from pathlib import Path
-
-from llm_lifecycle_lab.model.native import (
-    NativeTransformer,
-    load_native_model_config,
-)
-from llm_lifecycle_lab.tokenizer import NativeTokenizer
-
-model_dir = Path("build/native-60m-base-v1")
-tokenizer = NativeTokenizer.from_directory(model_dir)
-model = NativeTransformer(load_native_model_config(model_dir / "config.json"))
-model.load(model_dir)
-model.eval()
-
-print(model.parameter_count)  # 62927616
-print(tokenizer.vocab_size)   # 16384
-```
-
-该包使用项目自有加载器，不兼容 Hugging Face `AutoModelForCausalLM`。
-完整来源、指标、限制与许可见
-[`models/base-v1-final/README.md`](./models/base-v1-final/README.md)。
-
-### 3. 不下载数据，先观察一次参数更新
+### 2. 不下载数据，先观察一次参数更新
 
 ```bash
 python scripts/model_experiment.py
 ```
 
-默认在 CPU 上运行随机初始化的 10M 模型，完成前向、loss、反向和一次参数更新，
+默认在 CPU 上运行随机初始化的 60M 模型，完成前向、loss、反向和一次参数更新，
 再检查 KV Cache 与模型保存加载的一致性。
 输入为 `[2, 16]`，logits 为 `[2, 16, 16384]`，有效预测目标为 30 个。
 
@@ -159,7 +108,7 @@ python scripts/model_experiment.py
 `checkpoint_matches_full=True`。随机 token 的 loss 不用于判断语言能力。
 逐步解释见 [第一篇](./docs/tutorials/01-first-parameter-update.md)。
 
-### 4. 跑通微型训练、评测与恢复
+### 3. 跑通微型训练、评测与恢复
 
 ```bash
 python scripts/pretrain_experiment.py --mode train
@@ -172,36 +121,35 @@ python scripts/pretrain_experiment.py --mode resume
 `resume` 比较连续训练与受控中断恢复的状态。
 
 **这些命令不修改已有 `data/` 或 `runs/`，退出后自动清理临时产物。**
-这里的微型模型不是正式 10M/60M 配方，模板数据也不用于证明语言能力。
+这里的微型模型不是正式 60M 配方，模板数据也不用于证明语言能力。
 完整解读见 [第五至七篇](./docs/tutorials/05-first-pretraining.md)。
 
-### 5. 在真实双语数据上运行 Smoke
+### 4. 在真实双语数据上运行 Smoke
 
 先按 [数据指南](./docs/DATA_GUIDE.md#4-第一次实践10m-双语-smoke)
 确认许可，完成下载、混合、切分、Tokenizer 训练和 Packing，再执行：
 
 ```bash
-python scripts/doctor.py --config configs/pipelines/native-smoke.yaml
+python scripts/doctor.py --config configs/pipelines/native-60m-a10-base-smoke.yaml
 python scripts/train_pretrain.py \
-  --config configs/pipelines/native-smoke.yaml \
-  --run-id native-smoke-001
+  --config configs/pipelines/native-60m-a10-base-smoke.yaml \
+  --run-id native-60m-a10-base-smoke-s42
 python scripts/eval_pretrain.py \
-  --config configs/pipelines/native-smoke.yaml \
-  --checkpoint runs/native-smoke-001/checkpoints/step-00000002 \
+  --config configs/pipelines/native-60m-a10-base-smoke.yaml \
+  --checkpoint runs/native-60m-a10-base-smoke-s42/checkpoints/step-00000008 \
   --split dev
 ```
 
-结果保存在 `runs/native-smoke-001/`，包括配置、预算、环境、指标和 checkpoint。
+结果保存在 `runs/native-60m-a10-base-smoke-s42/`，包括配置、预算、环境、指标和 checkpoint。
 已有同名 run 时换新 ID，不要删除旧记录来绕开覆盖保护。
-恢复只用于完成原预算，不能给已经结束的两步 Smoke 直接追加训练。
+恢复只用于完成原预算，不能给已经结束的 Smoke 直接追加训练。
 
-60M 当前采用“A10 BF16 smoke → A10 pilot → A10 正式 Base”路线，执行入口见
+60M 当前采用"A10 BF16 smoke → A10 pilot → A10 正式 Base"路线，执行入口见
 [A10 从零重跑手册](./docs/A10_TRAINING_GUIDE.md)。
-旧 MPS/4090 配置只保留历史追溯，不再作为默认操作步骤。
 
 ## 模型与数据
 
-### 两档模型，同一份实现
+### 当前模型
 
 Native 是自有的 decoder-only Transformer，从随机权重训练，不是裁剪或微调 Qwen。
 结构采用 RMSNorm、RoPE、SwiGLU、GQA 和权重绑定，支持因果前向与 KV Cache 生成。
@@ -209,28 +157,24 @@ Native 是自有的 decoder-only Transformer，从随机权重训练，不是裁
 
 | 配置 | 参数量 | 层数 × Hidden | Q / KV 头 | 最大长度 |
 | --- | ---: | --- | --- | ---: |
-| [smoke-10m](./configs/models/smoke-10m.yaml) | 9,915,200 | 4 × 320 | 5 / 1 | 256 |
 | [tiny-60m](./configs/models/tiny-60m.yaml) | 62,927,616 | 8 × 768 | 12 / 4 | 512 |
 
-两档默认词表均为 16,384，QK-Norm 关闭，但各自 Tokenizer 的 ID 映射不能互换。
-模型长度上限不等于训练长度：10M Smoke 默认训练 seq128，60M 为 seq512。
-两者共用 `model_route: native`，具体结构由模型配置选择，
-实践级别由 `run_profile` 区分。
+当前保留 `tiny-60m` 配置，词表为 16,384，QK-Norm 关闭，A10 训练长度为 512。
+不同 Tokenizer 的 ID 映射不能互换。模型使用 `model_route: native`，
+具体结构由模型配置选择，实践级别由 `run_profile` 区分。
 
-### 已发布的 Base-v1
+### A10 Base 训练结果
 
-`Native-60M Base v1` 从随机初始化训练 8 epochs，共处理 369,480,328 个监督 token，
-最终 step 为 45,191。固定 1,024-window test 评测得到总体 loss 2.731877、
-英文 loss 1.955555、中文 loss 3.419416。中文指标仍明显弱于英文，因此该版本应作为
+`Native-60M Base` 在单卡 A10 上从随机初始化训练 8 epochs，共处理 369,480,328 个监督 token，
+最终 step 为 45,191。固定 1,024-window test 评测得到总体 loss 2.732666、
+英文 loss 1.954598、中文 loss 3.421753。中文指标仍明显弱于英文，因此该版本应作为
 可复现实验基线，而不是通用双语助手。
 
 | 项目 | 位置 |
 | --- | --- |
-| 公开下载 | [ModelScope: `wzt777/native-60m-base-v1`](https://modelscope.cn/models/wzt777/native-60m-base-v1) |
-| 仓库发布包 | [`models/base-v1-final/`](./models/base-v1-final/) |
-| 完整训练证据 | [`results/native-60m-base-v1-s42/`](./results/native-60m-base-v1-s42/) |
-| 执行结果 | [`docs/BASE_TRAINING_RESULTS.md`](./docs/BASE_TRAINING_RESULTS.md) |
-| 权重 SHA-256 | `4cdbd642cb878c0e7f5de4b7988751e92de533afa1317256ace20aea078f9398` |
+| 训练证据归档 | [`results/native-60m-a10-base-v1-s42/`](./results/native-60m-a10-base-v1-s42/) |
+| 执行记录 | [`docs/A10_TRAINING_RESULTS.md`](./docs/A10_TRAINING_RESULTS.md) |
+| 权重 SHA-256 | `0c3290d6c76bbf775aba20c1d543a062e26aafb987a7d15bde1b652e4dbbb46c` |
 
 ### 默认覆盖中文与英文
 
@@ -263,20 +207,11 @@ flowchart TD
 | 状态 | 内容 |
 | --- | --- |
 | 已完成 | 七篇中文教程、Docsify 在线阅读站与 CPU 离线实验 |
-| 已实现 | Native 10M/60M、双语 BPE、磁盘 Packing、Pretrain、评测与 checkpoint 恢复 |
-| 已发布 | Native-60M Base-v1；CUDA 训练门禁、独立 test、发布包与 ModelScope 回拉验证均通过 |
-| 已冻结 | SFT Base、公开数据、assistant-only Trainer、quota sampler、评测协议与正式 run 门禁 |
-| 已验证 | SFT 数据 14/14 门禁、本地 8-step smoke、精确恢复和完整命令链 |
-| 当前重做 | 单卡 A10：数据与 Tokenizer 重做、Base smoke/pilot、正式 Base，再冻结新 SFT |
+| 已实现 | Native-60M、双语 BPE、磁盘 Packing、Pretrain、评测与 checkpoint 恢复 |
+| 已完成 | A10 Base 8-epoch 正式训练与质量验收通过 |
+| 当前阶段 | A10 SFT：待冻结独立 Base/data/run 门禁后启动 |
 | 后续方向，尚未实现 | DPO、GRPO、Hugging Face 导出与模型服务 |
 
-历史 Base-v1 从随机权重开始，只使用
-[`native-60m-base-local-smoke.yaml`](./configs/pipelines/native-60m-base-local-smoke.yaml)、
-[`native-60m-base-local-pilot100.yaml`](./configs/pipelines/native-60m-base-local-pilot100.yaml)
-和 [`native-60m-base-v1.yaml`](./configs/pipelines/native-60m-base-v1.yaml)。
-历史固定边界见 [Base-v1 历史训练手册](./docs/BASE_TRAINING_GUIDE.md)，
-实测结果与已知 provenance 偏离见
-[Base-v1 执行结果](./docs/BASE_TRAINING_RESULTS.md)。
 当前 A10 配置、目录和停止条件见 [A10 手册](./docs/A10_TRAINING_GUIDE.md)，
 实际进度见 [A10 执行记录](./docs/A10_TRAINING_RESULTS.md)。
 
@@ -291,18 +226,13 @@ flowchart TD
 | [数据介绍与准备](./docs/DATA_GUIDE.md) | 来源、许可、公开/自有数据、切分、Tokenizer、Packing 与迁移 |
 | [自有模型介绍](./docs/NATIVE_MODEL_GUIDE.md) | 模型结构、参数预算、前向、生成与结构消融 |
 | [A10 从零重跑手册](./docs/A10_TRAINING_GUIDE.md) | 当前默认硬件路线、独立数据、Base 与新 SFT 顺序 |
-| [A10 执行记录](./docs/A10_TRAINING_RESULTS.md) | 新 A10 环境、短验证与真实训练进度 |
-| [历史 Base-v1 训练手册](./docs/BASE_TRAINING_GUIDE.md) | 历史 MPS/4090 配方与冻结边界，不是 A10 主线 |
-| [Base-v1 执行结果](./docs/BASE_TRAINING_RESULTS.md) | 最终指标、训练证据、发布包与已知限制 |
-| [SFT 训练手册](./docs/SFT_TRAINING_GUIDE.md) | 数据物化、本地门禁、远端训练/恢复、dev、sealed test 与归档 |
-| [SFT 初始化门禁](./docs/SFT_INITIALIZATION_GATE.md) | 冻结 Base-v1 初始化身份、质量证据与 clean-run 要求 |
-| [SFT 数据门禁](./docs/SFT_DATA_GATE.md) | 冻结公开来源、许可、切分、对话协议与数据质量要求 |
-| [Pretrain 训练文档](./docs/NATIVE_PRETRAIN_GUIDE.md) | 环境、训练、评测、恢复、Reference 验收与排错 |
+| [A10 执行记录](./docs/A10_TRAINING_RESULTS.md) | A10 环境、短验证与真实训练进度 |
+| [Pretrain 训练文档](./docs/NATIVE_PRETRAIN_GUIDE.md) | 环境、训练、评测、恢复与排错 |
 | [脚本阅读指南](./scripts/README.md) | 从每个脚本的 `main()` 进入核心实现 |
 | [文档站维护](./docs/SITE_GUIDE.md) | 本地预览、GitHub Pages 发布与新增章节 |
 
 ```text
-configs/       模型、Pipeline、Reference 与阶段门禁配置
+configs/       模型、Pipeline 与阶段门禁配置
 docs/          七篇教程、操作指南与阅读站
 scripts/       可直接运行的实践入口
 src/           模型、数据与训练共享实现
@@ -356,8 +286,5 @@ requirements 与锁环境两条安装路径。
 
 ## 开源许可
 
-源代码采用 [Apache License 2.0](./LICENSE)。Native-60M Base-v1 的
-`model.pt`、`tokenizer.json` 和 `tokenizer_manifest.json` 采用
-[CC-BY-SA-4.0](./models/base-v1-final/LICENSE_MODEL)；公开数据与第三方资源
-仍各自遵循原有许可。具体边界见
-[`models/base-v1-final/NOTICE.md`](./models/base-v1-final/NOTICE.md)。
+源代码采用 [Apache License 2.0](./LICENSE)。公开数据与第三方资源
+仍各自遵循原有许可。

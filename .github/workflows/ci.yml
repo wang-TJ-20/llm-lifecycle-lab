@@ -59,7 +59,7 @@ jobs:
       - name: Compile package
         run: python -m compileall -q src scripts tests
 
-      - name: Validate reference configurations
+      - name: Validate A10 configurations
         run: |
           for config in configs/pipelines/*.yaml; do
             python scripts/validate_config.py "$config"
@@ -68,5 +68,5 @@ jobs:
       - name: Run base preflight
         run: python scripts/doctor.py
 
-      - name: Inspect native smoke model
-        run: python scripts/inspect_model.py --config configs/models/smoke-10m.yaml
+      - name: Inspect native model
+        run: python scripts/inspect_model.py --config configs/models/tiny-60m.yaml

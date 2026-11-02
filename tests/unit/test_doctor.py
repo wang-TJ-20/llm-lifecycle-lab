@@ -3,11 +3,17 @@ from __future__ import annotations
 import json
 import tempfile
 import unittest
+from operator import getitem
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from llm_lifecycle_lab.contracts import ModelRoute, RunConfig, RunProfile, Stage
+from llm_lifecycle_lab.contracts import (
+    ModelRoute,
+    RunConfig,
+    RunProfile,
+    Stage,
+)
 from llm_lifecycle_lab.data import prepare_dataset
 from llm_lifecycle_lab.doctor import profile_for_config, run_doctor
 from llm_lifecycle_lab.doctor.hardware import _cuda_check
@@ -49,8 +55,11 @@ class DoctorTests(unittest.TestCase):
             )
             self.assertIs(too_small.status, CheckStatus.FAIL)
 
-    def test_a10_profile_rejects_other_or_multiple_accelerators(self) -> None:
-        for names in (["NVIDIA GeForce RTX 4090"], ["NVIDIA A10", "NVIDIA A10"]):
+    def test_a10_profile_requires_one_a10_device(self) -> None:
+        for names in (
+            ["Tesla V100-SXM2-32GB"],
+            ["NVIDIA A10", "NVIDIA A10"],
+        ):
             with self.subTest(names=names):
                 devices = [
                     SimpleNamespace(name=name, total_memory=24 * 1024**3)
@@ -61,9 +70,9 @@ class DoctorTests(unittest.TestCase):
                     cuda=SimpleNamespace(
                         is_available=lambda: True,
                         device_count=lambda devices=devices: len(devices),
-                        get_device_properties=lambda index, devices=devices: devices[
-                            index
-                        ],
+                        get_device_properties=lambda index, devices=devices: getitem(
+                            devices, index
+                        ),
                     ),
                 )
                 with (
@@ -122,6 +131,7 @@ class DoctorTests(unittest.TestCase):
             stage=Stage.PRETRAIN,
             model={"provider": "native", "model_id": "tiny-60m"},
         )
+
         self.assertEqual(profile_for_config(qwen), "qwen3-0.6b-base")
         self.assertEqual(profile_for_config(smoke), "smoke-10m")
         self.assertEqual(profile_for_config(local_60m), "tiny-60m-local")
@@ -134,10 +144,15 @@ class DoctorTests(unittest.TestCase):
             stage=Stage.PRETRAIN,
             model={"provider": "native", "model_id": "smoke-10m"},
         )
-        report = run_doctor(profile="base", config=config)
+
+        report = run_doctor(
+            profile="base",
+            config=config,
+        )
         result = next(
             check for check in report.checks if check.name == "profile-config-match"
         )
+
         self.assertIs(result.status, CheckStatus.FAIL)
 
     def test_prepared_data_manifest_is_verified(self) -> None:
@@ -174,10 +189,12 @@ class DoctorTests(unittest.TestCase):
                 output_dir=str(root / "runs"),
                 data={"manifest": str(prepared / "data_manifest.json")},
             )
+
             report = run_doctor(config=config, workdir=root)
             result = next(
                 check for check in report.checks if check.name == "data-manifest"
             )
+
             self.assertIs(result.status, CheckStatus.PASS)
 
 

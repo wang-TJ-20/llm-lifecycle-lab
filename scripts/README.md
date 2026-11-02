@@ -64,86 +64,9 @@ python scripts/pretrain_experiment.py --mode resume
 开发结果，原子保存 `a10-development-gate.json`；不读取 test，不替代 SFT 门禁。
 `a10_resume_experiment.py` 在第 5 步受控中断并恢复第 4 步 checkpoint；
 严格 CUDA 逐位对照须对 baseline 和恢复同时启用手册中的确定性设置。
-历史 MPS/4090 与 SFT-v1 配置继续归档，不能直接改旧门禁的哈希来接入新 Base。
 
-`verify_reference.py` 的三种模式互斥，必须选择其中一种：
+## SFT 入口（待冻结）
 
-| 参数 | 检查范围 |
-| --- | --- |
-| `--inputs-only` | 配置、有效默认值、源码、真实输入文件与预算；不代表可开始训练 |
-| `--preflight` | 输入检查加 Linux/CUDA/BF16、GPU 显存、Git 和固定依赖版本 |
-| `--run <路径>` | 已完成 run 的预算、产物、环境记录、最终双语改善与 dev/test 报告 |
-
-正式基线训练使用 `train_pretrain.py --reference-spec <规范路径>`，其 `main()` 中直接
-先做门控，再调用训练流程。门控失败不会创建或恢复 run；普通教学训练不强制该参数。
-完整命令见 [训练文档](../docs/NATIVE_PRETRAIN_GUIDE.md#92-固定-60m-基线)。
-
-## SFT Stage 0 入口
-
-`verify_sft_init.py` 只校验 SFT 的 canonical Base 初始化边界，不执行 SFT：
-
-```bash
-python scripts/verify_sft_init.py \
-  --spec configs/gates/native-60m-sft-v1-base-init.yaml \
-  --inputs-only
-```
-
-`--inputs-only` 检查 Base 发布包、来源证据、质量门禁、Tokenizer 契约和权重严格
-加载。真正启动新 run 前改用 `--preflight`，额外要求当前 Git 工作树 clean。
-完整冻结范围见 [SFT 初始化门禁](../docs/SFT_INITIALIZATION_GATE.md)。
-
-## SFT Stage 1 入口
-
-`verify_sft_data.py` 将数据契约冻结与真实输入准入分开：
-
-```bash
-python scripts/verify_sft_data.py \
-  --spec configs/gates/native-60m-sft-v1-data.yaml \
-  --contract-only
-```
-
-`--contract-only` 不要求下载数据，用于检查 Base gate、公开数据 recipe、固定版本/
-文件哈希、许可、排除来源和切分策略。数据物化后改用 `--inputs-only`，逐项检查
-canonical source、prepared splits、Tokenizer、对话协议、长度、重复数据与冻结的
-train 统计。正式启动 run 前使用 `--preflight`，额外要求 Git 工作树 clean。
-
-当前工作目录的真实 source 与 prepared splits 已通过 `--inputs-only`；新 clone
-因为 `data/` 被 Git 忽略，仍需先执行 `data.py fetch-sft` 和 `data.py prepare`。
-完整命令见 [SFT 训练手册](../docs/SFT_TRAINING_GUIDE.md)。
-
-## SFT 训练与评测入口
-
-`train_sft.py` 从 canonical Base 权重开始新 stage，或恢复同一 run 的模型、
-optimizer、scheduler、RNG 和 quota sampler 状态。`eval_sft.py` 只允许冻结的
-完整 dev/test split：
-
-```bash
-python scripts/train_sft.py \
-  --config configs/pipelines/native-60m-sft-v1.yaml \
-  --run-id native-60m-sft-v1-s42
-
-python scripts/eval_sft.py \
-  --config configs/pipelines/native-60m-sft-v1.yaml \
-  --checkpoint runs/native-60m-sft-v1-s42/checkpoints/step-00014020 \
-  --split dev
-```
-
-`evaluate_capabilities.py` 对 Base 与 SFT 使用同一版本化 protocol，并拒绝比较
-protocol hash 不同的成绩单。`sft_experiment.py` 使用临时微型数据验证完整机制，
-不读取正式数据，也不留下 run。
-
-## SFT 完成态入口
-
-`verify_sft_run.py --dev` 检查正式配置锁、8M token 预算、确定性 coverage、
-step-0 到最终 step 的中英文 dev 改善、完整 checkpoint 和 1,459 条全量 dev。
-只有该模式通过后才能运行一次 test，再使用 `--sealed-test` 验收 1,458 条报告：
-
-```bash
-python scripts/verify_sft_run.py \
-  --spec configs/gates/native-60m-sft-v1-run.yaml \
-  --run runs/native-60m-sft-v1-s42 \
-  --dev
-```
-
-完整远端训练、恢复、能力对照、sealed test 和归档步骤只维护在
-[SFT 训练手册](../docs/SFT_TRAINING_GUIDE.md)。
+A10 Base 验收通过后，将冻结独立的 SFT Base/data/run 门禁。
+`verify_sft_init.py`、`verify_sft_data.py`、`verify_sft_run.py` 的通用机制
+已实现，但具体配置路径待 A10 SFT 阶段确定。

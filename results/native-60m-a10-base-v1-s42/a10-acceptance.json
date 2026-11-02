@@ -1,0 +1,98 @@
+{
+  "accepted_at": "2026-11-02T02:27:55.853216+00:00",
+  "archive_path": "results/native-60m-a10-base-v1-s42",
+  "checks": {
+    "checkpoint_architecture_and_length_match": true,
+    "checkpoint_tensors_finite": true,
+    "data_and_packed_contents_match_manifests": true,
+    "evaluation_environment_matches_training": true,
+    "frozen_training_and_evaluation_files_unchanged": true,
+    "source_id_splits_disjoint": true,
+    "tied_embeddings_equal": true,
+    "trainer_optimizer_scheduler_budget_match": true,
+    "training_source_commit_and_core_hash_match_acceptance": true,
+    "training_source_was_clean": true
+  },
+  "development": {
+    "baseline": {
+      "eval_en_loss": 9.844626326549974,
+      "eval_loss": 9.859972566366196,
+      "eval_zh_loss": 9.874075181219768
+    },
+    "best_eval_loss": 2.708167789503932,
+    "best_step": 33000,
+    "final": {
+      "eval_en_loss": 1.9557645805204156,
+      "eval_loss": 2.7556101950467564,
+      "eval_zh_loss": 3.4906309284137294
+    },
+    "final_vs_best_regression_percent": 1.7518266677086114,
+    "loss_reduction_percent": 72.0525571800621,
+    "max_regression_percent": 2.0,
+    "minimum_loss_reduction_percent": 50.0,
+    "reload_absolute_tolerance": 1e-06,
+    "reload_metrics_match": true
+  },
+  "identity": {
+    "checkpoint": "/mnt/bn/smart-customer-service/users/zitong/project/llm-lifecycle-lab/runs/native-60m-a10-base-v1-s42/checkpoints/step-00045191",
+    "config_sha256": "51abeeeb06fd32e86c1cb6b9c8f40d2833a5395111c7cef12efefd4af54b5b43",
+    "tokenizer_sha256": "7455ac1168f36a3d7dca03fee28784f97899fe233f496484a11e5da2e44a2f32",
+    "weights_sha256": "0c3290d6c76bbf775aba20c1d543a062e26aafb987a7d15bde1b652e4dbbb46c"
+  },
+  "publication_status": "not published; original A10 checkpoint retained",
+  "run_id": "native-60m-a10-base-v1-s42",
+  "schema_version": "1.0",
+  "scope": "A10 Base training and frozen development acceptance; one fixed-subset test measurement, not generic capability certification",
+  "sft_status": "not started; freeze independent A10 Base/data/run gates next",
+  "source": {
+    "acceptance_workspace_status": [
+      " M scripts/a10_resume_experiment.py",
+      " M tests/unit/test_doctor.py"
+    ],
+    "archive": "runs/native-60m-a10-base-v1-s42/export/source-f7021451919f86d5de4d197dbe4fcf01ad2ef42b.tar",
+    "archive_sha256": "6eeda8ea3359a2fb3bc5680fc7a93ae45cf3ac1e08a9dd3ba222a75f718fbf62",
+    "commit": "f7021451919f86d5de4d197dbe4fcf01ad2ef42b",
+    "source_sha256": "c673fc7c1509c03962e6f65099215fbe034df25c941164fdd9f0ccc80efbe6cf",
+    "training_dirty": false
+  },
+  "stage": "pretrain",
+  "status": "passed",
+  "test": {
+    "measurement_attempts": 1,
+    "packed_test_examples": 11055,
+    "result": {
+      "checkpoint": "/mnt/bn/smart-customer-service/users/zitong/project/llm-lifecycle-lab/runs/native-60m-a10-base-v1-s42/checkpoints/step-00045191",
+      "checkpoint_step": 45191,
+      "eval_bits_per_byte": 1.0227541500421957,
+      "eval_en_bits_per_byte": 0.6614791077767673,
+      "eval_en_loss": 1.9545975507088575,
+      "eval_en_perplexity": 7.061076726476049,
+      "eval_en_tokens": 245764.0,
+      "eval_loss": 2.732666279829573,
+      "eval_perplexity": 15.373823336884103,
+      "eval_tokens": 523264.0,
+      "eval_zh_bits_per_byte": 1.4132357276664118,
+      "eval_zh_loss": 3.421752023597663,
+      "eval_zh_perplexity": 30.623020302680864,
+      "eval_zh_tokens": 277500.0,
+      "report_path": "/mnt/bn/smart-customer-service/users/zitong/project/llm-lifecycle-lab/runs/native-60m-a10-base-v1-s42/evaluations/pretrain-test-step-00045191.json",
+      "split": "test"
+    },
+    "sample_count": 1024,
+    "scope": "fixed stratified test subset; not full test; no test-tuned threshold",
+    "selection_indices_sha256": "0ea59768db59a0d69a3dcb0b356179c558628770127ca4220e02440302e2b6b5",
+    "test_tuned_threshold": null
+  },
+  "training": {
+    "best_eval_loss": 2.708167789503932,
+    "elapsed_seconds": 16761.476791769266,
+    "epochs_seen": 8.000088514487427,
+    "final_checkpoint": "/mnt/bn/smart-customer-service/users/zitong/project/llm-lifecycle-lab/runs/native-60m-a10-base-v1-s42/checkpoints/step-00045191",
+    "final_loss": 1.7793613448739052,
+    "global_step": 45191,
+    "target_token_coverage": 1.0000110643109283,
+    "target_train_tokens": 369476240,
+    "tokens_seen": 369480328
+  },
+  "worker_id": 1158961
+}

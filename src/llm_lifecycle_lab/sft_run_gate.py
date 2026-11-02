@@ -318,12 +318,18 @@ def _preflight_check(
         isinstance(suite_path, str)
         and Path(suite_path).resolve() == spec.locks.evaluation_suite.resolve()
     )
+    base_gate_id = load_mapping(spec.locks.base_gate).get("gate_id")
+    data_gate_id = load_mapping(spec.locks.data_gate).get("gate_id")
     matches = (
         value.get("scope") == "preflight"
         and value.get("git_checked") is True
-        and base.get("gate_id") == "native-60m-sft-v1-base-init"
+        and isinstance(base_gate_id, str)
+        and bool(base_gate_id.strip())
+        and isinstance(data_gate_id, str)
+        and bool(data_gate_id.strip())
+        and base.get("gate_id") == base_gate_id
         and base.get("ok") is True
-        and data.get("gate_id") == "native-60m-sft-v1-data"
+        and data.get("gate_id") == data_gate_id
         and data.get("scope") == "preflight"
         and data.get("ok") is True
         and suite.get("sha256") == spec.locks.evaluation_suite_file_sha256

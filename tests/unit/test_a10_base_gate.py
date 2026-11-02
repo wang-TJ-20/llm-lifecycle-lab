@@ -132,7 +132,7 @@ def test_a10_gate_rejects_other_hardware(tmp_path, gate):
     run = make_run(tmp_path, gate)
     path = run / "runtime_environment.json"
     data = json.loads(path.read_text())
-    data["accelerator"]["devices"][0]["name"] = "NVIDIA GeForce RTX 4090"
+    data["accelerator"]["devices"][0]["name"] = "Tesla V100-SXM2-32GB"
     path.write_text(json.dumps(data), encoding="utf-8")
     with pytest.raises(ContractError, match="single NVIDIA A10"):
         module.verify(run, phase="smoke", root=PROJECT_ROOT)

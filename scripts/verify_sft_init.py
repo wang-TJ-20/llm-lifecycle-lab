@@ -23,7 +23,7 @@ from llm_lifecycle_lab.sft_initialization import verify_sft_initialization
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python scripts/verify_sft_init.py",
-        description="Check the frozen Base-v1 initialization boundary for SFT.",
+        description="Check the frozen Base initialization boundary for SFT.",
     )
     parser.add_argument("--spec", type=Path, required=True)
     mode = parser.add_mutually_exclusive_group(required=True)

@@ -1,0 +1,22 @@
+{
+  "absolute_tolerance": 1e-06,
+  "comparison": {
+    "eval_en_loss": {
+      "absolute_difference": 0.0,
+      "reloaded": 1.9557645805204156,
+      "training": 1.9557645805204156
+    },
+    "eval_loss": {
+      "absolute_difference": 0.0,
+      "reloaded": 2.7556101950467564,
+      "training": 2.7556101950467564
+    },
+    "eval_zh_loss": {
+      "absolute_difference": 0.0,
+      "reloaded": 3.4906309284137294,
+      "training": 3.4906309284137294
+    }
+  },
+  "scope": "single A10 BF16 final checkpoint with frozen dev subset",
+  "status": "passed"
+}

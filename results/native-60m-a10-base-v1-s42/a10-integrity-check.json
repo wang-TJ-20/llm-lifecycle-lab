@@ -1,0 +1,104 @@
+{
+  "acceptance_workspace_status": [
+    " M scripts/a10_resume_experiment.py",
+    " M tests/unit/test_doctor.py"
+  ],
+  "checks": {
+    "checkpoint_architecture_and_length_match": true,
+    "checkpoint_tensors_finite": true,
+    "data_and_packed_contents_match_manifests": true,
+    "evaluation_environment_matches_training": true,
+    "frozen_training_and_evaluation_files_unchanged": true,
+    "source_id_splits_disjoint": true,
+    "tied_embeddings_equal": true,
+    "trainer_optimizer_scheduler_budget_match": true,
+    "training_source_commit_and_core_hash_match_acceptance": true,
+    "training_source_was_clean": true
+  },
+  "config_sha256": "51abeeeb06fd32e86c1cb6b9c8f40d2833a5395111c7cef12efefd4af54b5b43",
+  "evaluation_runtime": {
+    "accelerator": {
+      "cudnn_version": 90701,
+      "devices": [
+        {
+          "capability": [
+            8,
+            6
+          ],
+          "index": 0,
+          "name": "NVIDIA A10",
+          "total_memory_bytes": 23609475072
+        }
+      ],
+      "selected_device": "cuda",
+      "torch_cuda_version": "12.6",
+      "type": "cuda"
+    },
+    "code": {
+      "branch": "main",
+      "commit": "f7021451919f86d5de4d197dbe4fcf01ad2ef42b",
+      "dirty": true,
+      "source_sha256": "c673fc7c1509c03962e6f65099215fbe034df25c941164fdd9f0ccc80efbe6cf",
+      "status_entries": 2
+    },
+    "created_at": "2026-11-02T02:25:21+00:00",
+    "packages": {
+      "PyYAML": "6.0.3",
+      "llm-lifecycle-lab": null,
+      "numpy": "2.3.2",
+      "tokenizers": "0.21.4",
+      "torch": "2.7.1"
+    },
+    "platform": {
+      "machine": "x86_64",
+      "release": "5.4.143.bsk.8-amd64",
+      "system": "Linux"
+    },
+    "project_version": "0.1.0.dev0",
+    "python": {
+      "executable": "/mnt/bn/smart-customer-service/users/zitong/project/llm-lifecycle-lab/.venv-a10/bin/python",
+      "version": "3.11.2"
+    },
+    "schema_version": "1.0"
+  },
+  "files_sha256": {
+    "configs/models/tiny-60m.yaml": "16321b31f1dfbbc7bfc9ede632dd664ddb41b1f6dcf824945a50d48a6fa46f1d",
+    "data/packed/bilingual-60m-a10-v1-seq512/packed_manifest.json": "9e49ad18706eaa44ab75859be3f430e3ef5d80dbc17fdc8e85b8db65f440c9a7",
+    "data/prepared/bilingual-60m-a10-v1/data_manifest.json": "96281bee74c9003f77e6d0a3c833d5617a62d46205bf92e8bc1fe1b0a9dacb8c",
+    "data/tokenizers/bilingual-60m-a10-v1/tokenizer.json": "7455ac1168f36a3d7dca03fee28784f97899fe233f496484a11e5da2e44a2f32",
+    "data/tokenizers/bilingual-60m-a10-v1/tokenizer_manifest.json": "8dc4a48be70cd1492148a9ab7b3f73bd81b986c72a8e5e2d62bf544eaf5997d5",
+    "requirements-a10.txt": "05da424e59dd8f5feb737ffb8d754b60b86bb23a59ef9815a2568957dd25ff5b",
+    "runs/native-60m-a10-base-v1-s42/checkpoints/step-00045191/checkpoint_metadata.json": "9e27348598a758ed3600c52b2e0a9ae18ac944d67fa4a940d470b1b186e9cf3a",
+    "runs/native-60m-a10-base-v1-s42/checkpoints/step-00045191/model/config.json": "64cfc541595cfd1e18fcada7cee887e0a0647a2309744b0da7e55f5e785a01a0",
+    "runs/native-60m-a10-base-v1-s42/checkpoints/step-00045191/model/model.pt": "0c3290d6c76bbf775aba20c1d543a062e26aafb987a7d15bde1b652e4dbbb46c",
+    "runs/native-60m-a10-base-v1-s42/checkpoints/step-00045191/optimizer_state.pt": "ae6674144ec8d47a700502d5ba4d02e3e58d52938c39eb5fe4b4bb88e1ce7145",
+    "runs/native-60m-a10-base-v1-s42/checkpoints/step-00045191/trainer_state.json": "91c6aa0759f8348ccdf53664a2077f9f52a55dd87da3f4d4c551243b97bd8e18",
+    "runs/native-60m-a10-base-v1-s42/resolved_config.yaml": "ad84ed3a8281f853f7468a734de85f17f0c64c45c4206e53db1fbaa6dc68d9b4",
+    "scripts/eval_pretrain.py": "e63ccead1c8f9d49db108d21e196382533941a096a3911cceebb364113a90016",
+    "scripts/verify_a10_base.py": "3577f66099853f531ea3d33409b56c1525cf9a976919613830f9b8cc223c114e"
+  },
+  "final_weight_sha256": "0c3290d6c76bbf775aba20c1d543a062e26aafb987a7d15bde1b652e4dbbb46c",
+  "optimizer_and_rng_tensor_entries": 224,
+  "optimizer_steps": [
+    45191
+  ],
+  "run_id": "native-60m-a10-base-v1-s42",
+  "scope": "integrity audit; test file hashes checked without computing test scores",
+  "source_sha256": "c673fc7c1509c03962e6f65099215fbe034df25c941164fdd9f0ccc80efbe6cf",
+  "split_groups": {
+    "dev": 22853,
+    "test": 22490,
+    "train": 180657
+  },
+  "status": "passed",
+  "trainer_state": {
+    "batch_stream": {
+      "epoch": 8,
+      "offset": 8
+    },
+    "best_eval_loss": 2.708167789503932,
+    "global_step": 45191,
+    "tokens_seen": 369480328
+  },
+  "weight_tensor_entries": 75
+}

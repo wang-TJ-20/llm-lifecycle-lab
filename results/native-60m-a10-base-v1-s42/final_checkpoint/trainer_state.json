@@ -1,0 +1,9 @@
+{
+  "batch_stream": {
+    "epoch": 8,
+    "offset": 8
+  },
+  "best_eval_loss": 2.708167789503932,
+  "global_step": 45191,
+  "tokens_seen": 369480328
+}

@@ -18,13 +18,5 @@
   - [自有模型介绍](/NATIVE_MODEL_GUIDE)
   - [Pretrain 训练文档](/NATIVE_PRETRAIN_GUIDE)
 
-- **历史冻结路线**
-  - [公开 Native-60M Base](https://modelscope.cn/models/wzt777/native-60m-base-v1)
-  - [Base-v1 历史训练手册](/BASE_TRAINING_GUIDE)
-  - [Base-v1 执行结果](/BASE_TRAINING_RESULTS)
-  - [历史 SFT-v1 训练手册](/SFT_TRAINING_GUIDE)
-  - [SFT 初始化门禁](/SFT_INITIALIZATION_GATE)
-  - [SFT 数据门禁](/SFT_DATA_GATE)
-
 - **维护**
   - [文档站维护](/SITE_GUIDE)

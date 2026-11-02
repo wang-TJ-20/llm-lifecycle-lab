@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from collections.abc import Mapping, Sequence
 from pathlib import Path
@@ -60,6 +61,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--baseline-run", type=Path, required=True)
     parser.add_argument("--run-id", required=True)
+    parser.add_argument("--create-baseline", action="store_true")
+    parser.add_argument("--deterministic", action="store_true")
     return parser
 
 
@@ -69,9 +72,36 @@ def main(argv: Sequence[str] | None = None) -> int:
     config = load_run_config(root / "configs/pipelines/native-60m-a10-base-smoke.yaml")
     run_path = root / config.output_dir / args.run_id
     try:
-        verify(args.baseline_run.resolve(), phase="smoke", root=root)
         if run_path.exists():
             raise ContractError("resume experiment run already exists; use a new ID")
+        baseline_path = args.baseline_run.resolve()
+        if args.deterministic:
+            os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
+            torch.use_deterministic_algorithms(True)
+        if args.create_baseline:
+            if baseline_path.parent != (root / config.output_dir).resolve():
+                raise ContractError("new baseline must be directly inside runs/")
+            if baseline_path == run_path.resolve():
+                raise ContractError("baseline and interrupted runs must differ")
+            baseline = run_native_pretraining(
+                config, run_id=baseline_path.name, workdir=root
+            )
+            baseline.artifacts.write_json(
+                "a10-cuda-settings.json",
+                {
+                    "deterministic_algorithms": args.deterministic,
+                    "cublas_workspace_config": os.environ.get(
+                        "CUBLAS_WORKSPACE_CONFIG"
+                    ),
+                },
+            )
+        elif args.deterministic:
+            settings = json.loads(
+                (baseline_path / "a10-cuda-settings.json").read_text()
+            )
+            if not settings["deterministic_algorithms"]:
+                raise ContractError("baseline did not enable deterministic algorithms")
+        verify(baseline_path, phase="smoke", root=root)
         try:
             run_native_pretraining(
                 config,
@@ -110,6 +140,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             "restored_checkpoint_step": latest["step"],
             "final_step": resumed.result.global_step,
             "tokens_seen": resumed.result.tokens_seen,
+            "deterministic_algorithms": args.deterministic,
+            "cublas_workspace_config": os.environ.get("CUBLAS_WORKSPACE_CONFIG"),
             **checks,
             "scope": "same A10, BF16, data and config; not cross-device equivalence",
         }

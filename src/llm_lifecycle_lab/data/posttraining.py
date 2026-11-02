@@ -643,8 +643,6 @@ def _load_posttraining_records(
         transformed = _transform_source(rows, recipe, source)
         for stage, stage_records in transformed.items():
             records[stage].extend(stage_records)
-    if recipe.recipe_id == "public-60m-v3":
-        records[RecordKind.SFT] = _dedupe_sft_conversations(records[RecordKind.SFT])
     for stage in _STAGES:
         records[stage].sort(key=lambda row: row["id"])
         expected = recipe.expected_records[stage.value]
@@ -654,28 +652,6 @@ def _load_posttraining_records(
                 f"{len(records[stage])} records; expected {expected}"
             )
     return records, loader_versions
-
-
-def _dedupe_sft_conversations(
-    records: Sequence[dict[str, Any]],
-) -> list[dict[str, Any]]:
-    selected = {}
-    for record in records:
-        identity = canonical_record_sha256(
-            {
-                "messages": [
-                    {
-                        "role": message["role"],
-                        "content": _normalize(message["content"]),
-                    }
-                    for message in record["messages"]
-                ]
-            }
-        )
-        current = selected.get(identity)
-        if current is None or record["id"] < current["id"]:
-            selected[identity] = record
-    return list(selected.values())
 
 
 def _download_sources(
